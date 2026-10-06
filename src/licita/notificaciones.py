@@ -62,7 +62,10 @@ def enviar_resumenes(
 ) -> ResumenEnvio:
     momento = momento or ahora()
     resultado = ResumenEnvio()
-    empresas = session.scalars(select(Empresa).where(Empresa.whatsapp != "", Empresa.whatsapp_activo.is_(True)))
+    # El plan gratis no recibe el resumen diario por WhatsApp.
+    empresas = session.scalars(select(Empresa).where(
+        Empresa.whatsapp != "", Empresa.whatsapp_activo.is_(True), Empresa.plan != "gratis",
+    ))
     for empresa in empresas:
         filas = seleccionar_calces(session, empresa, umbral=umbral, maximo=maximo, momento=momento)
         if not filas:

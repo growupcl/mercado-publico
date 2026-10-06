@@ -24,6 +24,7 @@ from sqlalchemy import select
 from .config import Config
 from .db import Empresa, crear_sesiones
 from .analisis import DocumentoInvalido, LimiteAlcanzado
+from .flow import ErrorFlow
 from .ia import ErrorIA
 from .mercadopublico import MercadoPublicoError
 from .whatsapp import ErrorWhatsApp, normalizar_telefono
@@ -184,14 +185,42 @@ def cmd_reconstruir_precios(args, config: Config, Sesion) -> int:
 def cmd_servidor(args, config: Config, Sesion) -> int:
     import uvicorn
 
+    from .ia import AsistenteIA
     from .servidor import crear_app
+    from .web import crear_router_web
 
-    app = crear_app(
-        Sesion, _whatsapp(config), verify_token=config.whatsapp_verify_token,
-        app_secret=config.whatsapp_app_secret, url_registro=config.url_registro,
-        phone_number_id=config.whatsapp_phone_number_id, analisis=_servicio_analisis(config),
+    flow = None
+    if config.flow_api_key:
+        from .flow import ClienteFlow
+
+        flow = ClienteFlow(config.flow_api_key, config.flow_secret_key, url_base=config.flow_url)
+    router_web = crear_router_web(
+        Sesion, flow=flow, ia=AsistenteIA(modelo=config.modelo_clasificacion),
+        url_publica=config.url_publica, whatsapp_publico=config.whatsapp_publico,
     )
+    wa = _whatsapp(config) if config.whatsapp_token else None
+    app = crear_app(
+        Sesion, wa, verify_token=config.whatsapp_verify_token,
+        app_secret=config.whatsapp_app_secret, url_registro=config.url_registro or f"{config.url_publica}/registro",
+        phone_number_id=config.whatsapp_phone_number_id, analisis=_servicio_analisis(config) if wa else None,
+        url_publica=config.url_publica, router_web=router_web,
+    )
+    if wa is None:
+        print("Aviso: WhatsApp no está configurado; el servidor solo atiende el sitio web.")
+    if flow is None:
+        print("Aviso: Flow no está configurado; los pagos en línea están desactivados.")
     uvicorn.run(app, host=args.host, port=args.puerto)
+    return 0
+
+
+def cmd_suscripciones(args, config: Config, Sesion) -> int:
+    from .suscripciones import por_vencer, revisar_vencimientos
+
+    with Sesion() as s:
+        for e in revisar_vencimientos(s):
+            print(f"Vencida → plan gratis: #{e.id} {e.nombre}")
+        for e, sus in por_vencer(s, dias=args.dias):
+            print(f"Por vencer ({sus.vigente_hasta:%d-%m-%Y}, {sus.estado}): #{e.id} {e.nombre} · {e.email}")
     return 0
 
 
@@ -246,11 +275,15 @@ def construir_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("reconstruir-precios", help="Llena la tabla de precios con lo ya sincronizado")
     s.set_defaults(fn=cmd_reconstruir_precios)
 
+    s = sub.add_parser("suscripciones", help="Vence las suscripciones impagas y lista las que están por vencer")
+    s.add_argument("--dias", type=int, default=3, help="Días de anticipación para listar las por vencer")
+    s.set_defaults(fn=cmd_suscripciones)
+
     s = sub.add_parser("whatsapp-enviar", help="Envía el resumen diario por WhatsApp a todas las empresas")
     s.add_argument("--umbral", type=int, default=60, help="Puntaje mínimo de calce")
     s.set_defaults(fn=cmd_whatsapp_enviar)
 
-    s = sub.add_parser("servidor", help="Inicia el servidor que recibe los mensajes de WhatsApp")
+    s = sub.add_parser("servidor", help="Inicia el sitio web y el receptor de mensajes de WhatsApp")
     s.add_argument("--host", default="0.0.0.0")
     s.add_argument("--puerto", type=int, default=8000)
     s.set_defaults(fn=cmd_servidor)
@@ -264,7 +297,7 @@ def main(argv: list[str] | None = None) -> int:
     Sesion = crear_sesiones(config.database_url)
     try:
         return args.fn(args, config, Sesion)
-    except (MercadoPublicoError, ErrorIA, ErrorWhatsApp, DocumentoInvalido, LimiteAlcanzado, ValueError) as e:
+    except (MercadoPublicoError, ErrorIA, ErrorWhatsApp, ErrorFlow, DocumentoInvalido, LimiteAlcanzado, ValueError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
 

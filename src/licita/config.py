@@ -18,6 +18,11 @@ class Config:
     modelo_analisis: str = "claude-sonnet-5-5"
     dir_documentos: str = "documentos"
     limite_analisis_mes: int = 15
+    url_publica: str = "http://localhost:8000"
+    whatsapp_publico: str = ""
+    flow_api_key: str = ""
+    flow_secret_key: str = ""
+    flow_url: str = "https://sandbox.flow.cl/api"
 
     @classmethod
     def desde_entorno(cls) -> "Config":
@@ -36,4 +41,9 @@ class Config:
             modelo_analisis=os.environ.get("LICITA_MODELO_ANALISIS", "claude-sonnet-5-5"),
             dir_documentos=os.environ.get("LICITA_DIR_DOCUMENTOS", "documentos"),
             limite_analisis_mes=int(os.environ.get("LICITA_LIMITE_ANALISIS_MES", "15")),
+            url_publica=os.environ.get("LICITA_URL_PUBLICA", "http://localhost:8000").rstrip("/"),
+            whatsapp_publico=os.environ.get("LICITA_WHATSAPP_PUBLICO", ""),
+            flow_api_key=os.environ.get("FLOW_API_KEY", ""),
+            flow_secret_key=os.environ.get("FLOW_SECRET_KEY", ""),
+            flow_url=os.environ.get("FLOW_URL", "https://sandbox.flow.cl/api"),
         )

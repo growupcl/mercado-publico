@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import logging
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, FastAPI, HTTPException, Request
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import sessionmaker
 
@@ -22,25 +22,31 @@ log = logging.getLogger(__name__)
 
 def crear_app(
     Sesion: sessionmaker,
-    wa: ClienteWhatsApp,
+    wa: ClienteWhatsApp | None = None,
     *,
-    verify_token: str,
-    app_secret: str,
+    verify_token: str = "",
+    app_secret: str = "",
     url_registro: str = "",
     phone_number_id: str = "",
     analisis: ServicioAnalisis | None = None,
+    url_publica: str = "",
     permitir_sin_firma: bool = False,
+    router_web: APIRouter | None = None,
 ) -> FastAPI:
-    if not verify_token:
-        raise ValueError("Falta WHATSAPP_VERIFY_TOKEN.")
-    if not app_secret and not permitir_sin_firma:
-        raise ValueError("Falta WHATSAPP_APP_SECRET: sin él no se puede verificar que los mensajes vengan de Meta.")
-
     app = FastAPI(title="Calza")
+    if router_web is not None:
+        app.include_router(router_web)
 
     @app.get("/salud")
     def salud():
         return {"ok": True}
+
+    if wa is None:
+        return app
+    if not verify_token:
+        raise ValueError("Falta WHATSAPP_VERIFY_TOKEN.")
+    if not app_secret and not permitir_sin_firma:
+        raise ValueError("Falta WHATSAPP_APP_SECRET: sin él no se puede verificar que los mensajes vengan de Meta.")
 
     @app.get("/webhook/whatsapp")
     def verificar(request: Request):
@@ -54,6 +60,7 @@ def crear_app(
             with Sesion() as s:
                 procesar_webhook(
                     s, wa, payload, url_registro=url_registro, phone_number_id=phone_number_id, analisis=analisis,
+                    url_publica=url_publica,
                 )
         except Exception:
             log.exception("Error procesando webhook de WhatsApp")

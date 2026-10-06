@@ -76,8 +76,15 @@ class Empresa(Base):
     palabras_clave: Mapped[list[str]] = mapped_column(JSON, default=list)
     whatsapp: Mapped[str] = mapped_column(String(20), default="", index=True)
     whatsapp_activo: Mapped[bool] = mapped_column(Boolean, default=True)
-    # Plan contratado: "gratis", "pyme", "pro" o "consultora". Define qué funciones tiene.
+    # Plan vigente: "gratis", "pyme", "pro" o "consultora". Define qué funciones tiene.
     plan: Mapped[str] = mapped_column(String(20), default="pyme")
+    # Datos para facturar y para el acceso a la cuenta (registro web).
+    rut: Mapped[str] = mapped_column(String(12), default="", index=True)
+    razon_social: Mapped[str] = mapped_column(String(200), default="")
+    giro: Mapped[str] = mapped_column(String(200), default="")
+    email: Mapped[str] = mapped_column(String(200), default="")
+    token_cuenta_hash: Mapped[str] = mapped_column(String(64), default="", index=True)
+    consentimiento_whatsapp_en: Mapped[datetime | None] = mapped_column(DateTime)
     # Último mensaje recibido del usuario: abre la ventana de 24 h en que responder es gratis.
     ultimo_mensaje_entrante: Mapped[datetime | None] = mapped_column(DateTime)
     # Contexto de la conversación: última licitación vista y último análisis de bases enviado.
@@ -185,6 +192,40 @@ class Precio(Base):
     organismo: Mapped[str] = mapped_column(Text, default="")
     region: Mapped[str] = mapped_column(String(120), default="")
     fecha: Mapped[datetime | None] = mapped_column(DateTime, index=True)
+
+
+class Suscripcion(Base):
+    """Estado comercial de una empresa: prueba, activa o vencida, y hasta cuándo."""
+
+    __tablename__ = "suscripciones"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    empresa_id: Mapped[int] = mapped_column(ForeignKey("empresas.id"), unique=True)
+    plan: Mapped[str] = mapped_column(String(20))  # plan elegido (se aplica al pagar)
+    periodicidad: Mapped[str] = mapped_column(String(10), default="mensual")
+    estado: Mapped[str] = mapped_column(String(10), default="prueba")  # prueba, activa, vencida
+    vigente_hasta: Mapped[datetime] = mapped_column(DateTime)
+    # Precio fundador del plan Pro: se congela de por vida al primer pago.
+    precio_fundador: Mapped[bool] = mapped_column(Boolean, default=False)
+    creada_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
+
+
+class Pago(Base):
+    __tablename__ = "pagos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    empresa_id: Mapped[int] = mapped_column(ForeignKey("empresas.id"), index=True)
+    plan: Mapped[str] = mapped_column(String(20))
+    periodicidad: Mapped[str] = mapped_column(String(10))
+    monto: Mapped[int] = mapped_column(Integer)  # CLP con IVA
+    precio_fundador: Mapped[bool] = mapped_column(Boolean, default=False)
+    orden_comercio: Mapped[str] = mapped_column(String(40), unique=True)
+    flow_token: Mapped[str] = mapped_column(String(120), default="", index=True)
+    flow_order: Mapped[int | None] = mapped_column(Integer)
+    estado: Mapped[str] = mapped_column(String(12), default="pendiente")  # pendiente, pagado, rechazado, anulado
+    pagado_en: Mapped[datetime | None] = mapped_column(DateTime)
+    factura_emitida: Mapped[bool] = mapped_column(Boolean, default=False)
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
 
 
 def crear_sesiones(database_url: str) -> sessionmaker:

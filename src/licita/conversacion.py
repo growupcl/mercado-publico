@@ -20,6 +20,7 @@ from .db import AnalisisBases, Calce, Empresa, Licitacion, MensajeWhatsApp, ahor
 from .ia import ErrorIA
 from .precios import informe_precios, texto_precios
 from .notificaciones import VENTANA, registrar
+from .suscripciones import generar_token
 from .resumen import texto_detalle, texto_resumen, ultimo_resumen
 from .whatsapp import ClienteWhatsApp, ErrorWhatsApp, normalizar_telefono
 
@@ -35,6 +36,7 @@ TEXTO_AYUDA = (
     "• Escribe *TODAS* para volver a ver el último resumen.\n"
     "• Escribe *PRECIOS* después de ver una licitación para saber cuánto ha pagado el Estado por lo mismo.\n"
     "• Envíame el *PDF de las bases* de una licitación y te digo qué piden, plazos, garantías y cómo se evalúa.\n"
+    "• Escribe *CUENTA* para ver tu plan o pagar.\n"
     "• Escribe *BAJA* si ya no quieres recibir mensajes."
 )
 
@@ -110,6 +112,7 @@ def responder(
     contenido: str,
     *,
     analisis: ServicioAnalisis | None = None,
+    url_publica: str = "",
     momento: datetime | None = None,
 ) -> list[str]:
     """Decide la respuesta (uno o más mensajes) para un mensaje de texto o botón de una empresa registrada."""
@@ -136,6 +139,13 @@ def responder(
     if comando in PALABRAS_ALTA:
         empresa.whatsapp_activo = True
         return ["¡Bienvenido de vuelta! Mañana temprano recibirás tu resumen de licitaciones."]
+
+    if comando in ("cuenta", "mi cuenta", "pagar", "plan"):
+        if not url_publica:
+            return ["Escríbenos a hola@calza.cl y te ayudamos con tu cuenta."]
+        token = generar_token(empresa)
+        return [f"🔐 Este es tu enlace privado para ver tu plan y pagar:\n{url_publica}/cuenta/{token}\n\n"
+                "No lo compartas: funciona como una contraseña. Si pides uno nuevo, el anterior deja de funcionar."]
 
     if comando in ("precios", "precio"):
         return [_precios(session, empresa, momento)]
@@ -213,6 +223,7 @@ def procesar_webhook(
     url_registro: str = "",
     phone_number_id: str = "",
     analisis: ServicioAnalisis | None = None,
+    url_publica: str = "",
     momento: datetime | None = None,
 ) -> int:
     """Procesa un webhook de Meta y responde cada mensaje. Devuelve cuántos mensajes entrantes respondió."""
@@ -252,7 +263,7 @@ def procesar_webhook(
             if tipo == "documento":
                 procesar_documento(session, wa, empresa, msg, analisis=analisis, momento=momento, enviar=enviar)
             else:
-                for texto in responder(session, empresa, tipo, contenido, analisis=analisis, momento=momento):
+                for texto in responder(session, empresa, tipo, contenido, analisis=analisis, url_publica=url_publica, momento=momento):
                     enviar(texto)
         if enviados:
             respondidos += 1

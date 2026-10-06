@@ -5,7 +5,7 @@ Encuentra las licitaciones que calzan con lo que vende cada empresa y se las env
 
 Sitio: [calza.cl](https://calza.cl) · El nombre interno del proyecto y del comando es `licita`.
 
-> Estado: **MVP, fase 4** (motor de datos, calce con IA, WhatsApp, análisis de bases e inteligencia de precios). Web y cobro vienen en las fases siguientes.
+> Estado: **MVP, fase 5** (motor de datos, calce con IA, WhatsApp, análisis de bases, inteligencia de precios, y web de registro con pagos).
 
 ## Cómo funciona
 
@@ -29,6 +29,10 @@ Sitio: [calza.cl](https://calza.cl) · El nombre interno del proyecto y del coma
    licitación muestra cuánto ha pagado el Estado (mediana y rango habitual de los últimos 24 meses), un rango de precio
    competitivo, quién suele ganar y si el presupuesto alcanza a precios de mercado. Se alimenta de las órdenes de compra
    y de las licitaciones adjudicadas que trae `licita sync --ordenes`; no usa IA, así que no tiene costo variable.
+9. **Sitio web, registro y pagos** (`licita servidor`): página de inicio con los planes, registro con 14 días de prueba
+   del plan Pro sin tarjeta, cuenta con enlace privado (sin contraseñas; por WhatsApp se pide con *CUENTA*) y pago
+   mensual o anual con **Flow** (Webpay, débito y crédito). Precio fundador del plan Pro para los primeros 100 clientes,
+   congelado de por vida. Al vencer sin pagar, la cuenta pasa al plan gratis (`licita suscripciones`, una vez al día).
 
 Las órdenes de compra quedan guardadas para construir más adelante la inteligencia de precios.
 
@@ -62,7 +66,13 @@ licita calce --empresa 1
 licita resumen --empresa 1 --marcar
 licita analizar --pdf bases.pdf --codigo 1234-56-LE26
 licita precios --codigo 1234-56-LE26
+licita servidor --puerto 8000      # sitio web en http://localhost:8000 y webhook de WhatsApp
+licita suscripciones               # vence las suscripciones impagas (programar una vez al día)
 ```
+
+Para probar los pagos, crea una cuenta en el [sandbox de Flow](https://sandbox.flow.cl), copia la API key y la clave
+secreta en `FLOW_API_KEY` y `FLOW_SECRET_KEY`, y define `LICITA_URL_PUBLICA` con una URL pública (Flow necesita
+poder llamar a `/pagos/flow/confirmacion`).
 
 ## Pruebas
 
@@ -87,6 +97,11 @@ así que no necesitan ticket ni clave.
 | `src/licita/notificaciones.py` | Envío del resumen diario cuidando la ventana gratuita de 24 h |
 | `src/licita/conversacion.py` | Respuestas a los mensajes entrantes (botones, números, PDF de bases, preguntas, baja/alta) |
 | `src/licita/precios.py` | Inteligencia de precios: referencias por producto, rango competitivo y proveedores frecuentes |
+| `src/licita/web.py` y `src/licita/plantillas/` | Sitio web: inicio, registro, cuenta, retorno de pagos, términos y privacidad |
+| `src/licita/suscripciones.py` | Registro, prueba gratuita, pagos, activación y vencimientos |
+| `src/licita/flow.py` | Cliente de la API de pagos de Flow (firma HMAC) |
+| `src/licita/planes.py` | Planes y precios (con IVA), descuento anual y precio fundador |
+| `src/licita/legal.py` | **Borrador** de términos y política de privacidad: revisar con un abogado antes del lanzamiento |
 | `src/licita/analisis.py` | Análisis de bases en PDF con Claude Sonnet, reutilización por archivo y límite mensual |
 | `src/licita/servidor.py` | Servidor web que recibe los webhooks de WhatsApp |
 | `src/licita/cli.py` | Línea de comandos |
@@ -97,4 +112,6 @@ así que no necesitan ticket ni clave.
 - Probar con datos reales: validar formato de respuesta, volumen diario y límites del ticket.
 - Descarga automática de las bases desde Mercado Público (hoy el usuario reenvía el PDF), si los términos de uso lo permiten.
 - Carga del histórico de órdenes de compra desde datos-abiertos.chilecompra.cl, para tener precios de referencia desde el primer día.
-- Web de registro, suscripción (Flow o Mercado Pago) y factura electrónica.
+- Factura electrónica automática al confirmar cada pago (hoy queda marcada como pendiente de emitir).
+- Recordatorios de pago por WhatsApp y correo antes del vencimiento.
+- Migraciones de base de datos (Alembic) antes de pasar a producción.

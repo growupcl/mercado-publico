@@ -8,7 +8,9 @@ dependencies = [
     "anthropic>=1.11",
     "fastapi>=0.110",
     "httpx>=0.27",
+    "jinja2>=3.1",
     "pydantic>=2.7",
+    "python-multipart>=0.0.9",
     "sqlalchemy>=2.0",
     "uvicorn>=0.29",
 ]
@@ -25,6 +27,9 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+licita = ["plantillas/*.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

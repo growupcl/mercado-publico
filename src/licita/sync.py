@@ -13,6 +13,7 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from .db import Licitacion, OrdenCompra
+from .precios import registrar_precios_adjudicacion, registrar_precios_orden
 from .mercadopublico import MercadoPublicoClient, MercadoPublicoError, normalizar_licitacion, normalizar_orden_de_compra
 
 log = logging.getLogger(__name__)
@@ -57,10 +58,14 @@ def sincronizar_licitaciones(
             for campo, valor in datos.items():
                 setattr(existente, campo, valor)
             existente.raw = raw
+            lic = existente
             resumen.actualizadas += 1
         else:
-            session.add(Licitacion(**datos, raw=raw))
+            lic = Licitacion(**datos, raw=raw)
+            session.add(lic)
             resumen.nuevas += 1
+        if lic.estado_codigo == 8:  # adjudicada: guardamos los precios ganadores
+            registrar_precios_adjudicacion(session, lic)
         session.commit()
     return resumen
 
@@ -92,7 +97,9 @@ def sincronizar_ordenes_de_compra(
         if raw is None:
             resumen.errores += 1
             continue
-        session.add(OrdenCompra(**normalizar_orden_de_compra(raw), raw=raw))
+        oc = OrdenCompra(**normalizar_orden_de_compra(raw), raw=raw)
+        session.add(oc)
+        registrar_precios_orden(session, oc)
         resumen.nuevas += 1
         session.commit()
     return resumen

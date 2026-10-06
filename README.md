@@ -5,7 +5,7 @@ Encuentra las licitaciones que calzan con lo que vende cada empresa y se las env
 
 Sitio: [calza.cl](https://calza.cl) · El nombre interno del proyecto y del comando es `licita`.
 
-> Estado: **MVP, fase 3** (motor de datos, calce con IA, WhatsApp y análisis de bases). Web y cobro vienen en las fases siguientes.
+> Estado: **MVP, fase 4** (motor de datos, calce con IA, WhatsApp, análisis de bases e inteligencia de precios). Web y cobro vienen en las fases siguientes.
 
 ## Cómo funciona
 
@@ -25,6 +25,10 @@ Sitio: [calza.cl](https://calza.cl) · El nombre interno del proyecto y del coma
    entrega requisitos que dejan fuera, documentos a presentar, garantías, criterios de evaluación, plazos, multas y
    preguntas sugeridas para el foro. Después, el usuario puede hacer preguntas sobre esas bases por 24 horas.
    Cada PDF se analiza una sola vez y el resultado se reutiliza para todos (el mismo archivo no vuelve a costar IA).
+8. **Inteligencia de precios** (`licita precios` o escribiendo *PRECIOS* en WhatsApp, plan Pro): para cada ítem de una
+   licitación muestra cuánto ha pagado el Estado (mediana y rango habitual de los últimos 24 meses), un rango de precio
+   competitivo, quién suele ganar y si el presupuesto alcanza a precios de mercado. Se alimenta de las órdenes de compra
+   y de las licitaciones adjudicadas que trae `licita sync --ordenes`; no usa IA, así que no tiene costo variable.
 
 Las órdenes de compra quedan guardadas para construir más adelante la inteligencia de precios.
 
@@ -57,6 +61,7 @@ licita empresa-agregar --nombre "Aseo Sur" \
 licita calce --empresa 1
 licita resumen --empresa 1 --marcar
 licita analizar --pdf bases.pdf --codigo 1234-56-LE26
+licita precios --codigo 1234-56-LE26
 ```
 
 ## Pruebas
@@ -81,6 +86,7 @@ así que no necesitan ticket ni clave.
 | `src/licita/whatsapp.py` | Cliente de la WhatsApp Cloud API de Meta y verificación de firma |
 | `src/licita/notificaciones.py` | Envío del resumen diario cuidando la ventana gratuita de 24 h |
 | `src/licita/conversacion.py` | Respuestas a los mensajes entrantes (botones, números, PDF de bases, preguntas, baja/alta) |
+| `src/licita/precios.py` | Inteligencia de precios: referencias por producto, rango competitivo y proveedores frecuentes |
 | `src/licita/analisis.py` | Análisis de bases en PDF con Claude Sonnet, reutilización por archivo y límite mensual |
 | `src/licita/servidor.py` | Servidor web que recibe los webhooks de WhatsApp |
 | `src/licita/cli.py` | Línea de comandos |
@@ -90,5 +96,5 @@ así que no necesitan ticket ni clave.
 
 - Probar con datos reales: validar formato de respuesta, volumen diario y límites del ticket.
 - Descarga automática de las bases desde Mercado Público (hoy el usuario reenvía el PDF), si los términos de uso lo permiten.
-- Inteligencia de precios a partir de las órdenes de compra.
+- Carga del histórico de órdenes de compra desde datos-abiertos.chilecompra.cl, para tener precios de referencia desde el primer día.
 - Web de registro, suscripción (Flow o Mercado Pago) y factura electrónica.

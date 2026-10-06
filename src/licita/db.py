@@ -33,6 +33,7 @@ class Licitacion(Base):
     moneda: Mapped[str] = mapped_column(String(10), default="")
     fecha_publicacion: Mapped[datetime | None] = mapped_column(DateTime)
     fecha_cierre: Mapped[datetime | None] = mapped_column(DateTime, index=True)
+    fecha_adjudicacion: Mapped[datetime | None] = mapped_column(DateTime)
     items: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
     raw: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     # Clasificación con IA: se hace una sola vez por licitación y se comparte entre usuarios.
@@ -75,6 +76,8 @@ class Empresa(Base):
     palabras_clave: Mapped[list[str]] = mapped_column(JSON, default=list)
     whatsapp: Mapped[str] = mapped_column(String(20), default="", index=True)
     whatsapp_activo: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Plan contratado: "gratis", "pyme", "pro" o "consultora". Define qué funciones tiene.
+    plan: Mapped[str] = mapped_column(String(20), default="pyme")
     # Último mensaje recibido del usuario: abre la ventana de 24 h en que responder es gratis.
     ultimo_mensaje_entrante: Mapped[datetime | None] = mapped_column(DateTime)
     # Contexto de la conversación: última licitación vista y último análisis de bases enviado.
@@ -157,6 +160,31 @@ class SolicitudAnalisis(Base):
     empresa_id: Mapped[int] = mapped_column(ForeignKey("empresas.id"), index=True)
     analisis_id: Mapped[int] = mapped_column(ForeignKey("analisis_bases.id"))
     creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
+
+
+class Precio(Base):
+    """Un precio unitario pagado por el Estado: de una orden de compra o de una adjudicación.
+
+    Se llena al sincronizar y es la base de la inteligencia de precios.
+    """
+
+    __tablename__ = "precios"
+    __table_args__ = (UniqueConstraint("fuente", "referencia", "posicion"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    fuente: Mapped[str] = mapped_column(String(20))  # "orden_de_compra" o "adjudicacion"
+    referencia: Mapped[str] = mapped_column(String(40))  # código de la OC o de la licitación
+    posicion: Mapped[int] = mapped_column(Integer)
+    codigo_producto: Mapped[str] = mapped_column(String(20), index=True, default="")
+    producto: Mapped[str] = mapped_column(Text, default="")
+    unidad: Mapped[str] = mapped_column(String(60), default="")
+    precio_unitario: Mapped[float] = mapped_column(Float)
+    cantidad: Mapped[float | None] = mapped_column(Float)
+    proveedor_rut: Mapped[str] = mapped_column(String(20), default="")
+    proveedor_nombre: Mapped[str] = mapped_column(Text, default="")
+    organismo: Mapped[str] = mapped_column(Text, default="")
+    region: Mapped[str] = mapped_column(String(120), default="")
+    fecha: Mapped[datetime | None] = mapped_column(DateTime, index=True)
 
 
 def crear_sesiones(database_url: str) -> sessionmaker:

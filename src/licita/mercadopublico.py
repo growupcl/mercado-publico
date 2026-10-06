@@ -137,6 +137,7 @@ def normalizar_licitacion(raw: dict[str, Any]) -> dict[str, Any]:
         "moneda": raw.get("Moneda") or "",
         "fecha_publicacion": parsear_fecha(fechas.get("FechaPublicacion")),
         "fecha_cierre": parsear_fecha(fechas.get("FechaCierre") or raw.get("FechaCierre")),
+        "fecha_adjudicacion": parsear_fecha(fechas.get("FechaAdjudicacion")),
         "items": [
             {
                 "codigo_producto": it.get("CodigoProducto"),
@@ -145,9 +146,25 @@ def normalizar_licitacion(raw: dict[str, Any]) -> dict[str, Any]:
                 "descripcion": it.get("Descripcion") or "",
                 "unidad": it.get("UnidadMedida") or "",
                 "cantidad": it.get("Cantidad"),
+                "adjudicacion": _normalizar_adjudicacion(it.get("Adjudicacion")),
             }
             for it in items
         ],
+    }
+
+
+def _normalizar_adjudicacion(adj: Any) -> dict[str, Any] | None:
+    """Proveedor ganador y precio unitario adjudicado de un ítem (solo en licitaciones adjudicadas)."""
+    if not isinstance(adj, dict):
+        return None
+    precio = parsear_monto(adj.get("MontoUnitario"))
+    if precio is None:
+        return None
+    return {
+        "proveedor_rut": adj.get("NumeroDocumento") or adj.get("RutProveedor") or "",
+        "proveedor_nombre": adj.get("NombreProveedor") or "",
+        "cantidad": adj.get("Cantidad") or adj.get("CantidadAdjudicada"),
+        "precio_unitario": precio,
     }
 
 
@@ -175,6 +192,7 @@ def normalizar_orden_de_compra(raw: dict[str, Any]) -> dict[str, Any]:
                 "categoria": it.get("Categoria") or "",
                 "producto": it.get("Producto") or "",
                 "especificacion": it.get("EspecificacionComprador") or "",
+                "unidad": it.get("UnidadMedida") or it.get("Unidad") or "",
                 "cantidad": it.get("Cantidad"),
                 "precio_neto": parsear_monto(it.get("PrecioNeto")),
                 "total": parsear_monto(it.get("Total")),

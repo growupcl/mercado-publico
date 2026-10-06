@@ -19,6 +19,8 @@ Resultado: como máximo **una plantilla pagada al día por usuario**. Todo lo de
 - Botón **Ver la mejor** → el detalle de la licitación con mayor calce.
 - Responder **1, 2, 3…** → el detalle de esa licitación del último resumen.
 - **TODAS** → repite el último resumen.
+- **PRECIOS** (después de abrir una licitación) → precios de referencia por ítem, rango competitivo y quién suele
+  ganar. Es del plan Pro; en los demás planes se muestra una invitación con cuántos ítems tienen referencia.
 - **Enviar el PDF de las bases** → análisis completo: requisitos que dejan fuera, documentos, garantías, criterios
   de evaluación, plazos, multas y preguntas para el foro. Si el usuario venía de ver el detalle de una licitación,
   el análisis queda asociado a esa licitación.

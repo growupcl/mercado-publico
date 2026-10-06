@@ -18,6 +18,7 @@ import anthropic
 from .analisis import DocumentoInvalido, LimiteAlcanzado, ServicioAnalisis, detectar_codigo, textos_analisis
 from .db import AnalisisBases, Calce, Empresa, Licitacion, MensajeWhatsApp, ahora
 from .ia import ErrorIA
+from .precios import informe_precios, texto_precios
 from .notificaciones import VENTANA, registrar
 from .resumen import texto_detalle, texto_resumen, ultimo_resumen
 from .whatsapp import ClienteWhatsApp, ErrorWhatsApp, normalizar_telefono
@@ -32,6 +33,7 @@ TEXTO_AYUDA = (
     "• Cada mañana te envío las licitaciones que calzan con tu negocio.\n"
     "• Responde con el *número* de una licitación del resumen para ver su detalle.\n"
     "• Escribe *TODAS* para volver a ver el último resumen.\n"
+    "• Escribe *PRECIOS* después de ver una licitación para saber cuánto ha pagado el Estado por lo mismo.\n"
     "• Envíame el *PDF de las bases* de una licitación y te digo qué piden, plazos, garantías y cómo se evalúa.\n"
     "• Escribe *BAJA* si ya no quieres recibir mensajes."
 )
@@ -67,8 +69,11 @@ def leer_mensaje(msg: dict[str, Any]) -> tuple[str, str]:
     return tipo or "desconocido", ""
 
 
+PLANES_CON_PRECIOS = {"pro", "consultora"}
+
 INVITACION_BASES = (
-    "\n\n📄 ¿Quieres saber qué piden exactamente? Descarga el PDF de las bases desde la ficha y "
+    "\n\n💲 Escribe *PRECIOS* para ver cuánto ha pagado el Estado por estos productos."
+    "\n📄 ¿Quieres saber qué piden exactamente? Descarga el PDF de las bases desde la ficha y "
     "envíamelo aquí: te digo requisitos, garantías, plazos y cómo se evalúa."
 )
 
@@ -81,6 +86,21 @@ def _detalle(empresa: Empresa, calce: Calce, lic: Licitacion, momento: datetime)
 
 def _contexto_vigente(empresa: Empresa, momento: datetime) -> bool:
     return empresa.contexto_actualizado_en is not None and momento - empresa.contexto_actualizado_en < VENTANA
+
+
+def _precios(session: Session, empresa: Empresa, momento: datetime) -> str:
+    if not empresa.licitacion_activa or not _contexto_vigente(empresa, momento):
+        return "Primero abre una licitación (responde con su número en el resumen) y luego escribe *PRECIOS*."
+    lic = session.get(Licitacion, empresa.licitacion_activa)
+    if lic is None:
+        return "No encontré esa licitación. Escribe *TODAS* para ver tu último resumen."
+    informe = informe_precios(session, lic, momento=momento)
+    if empresa.plan not in PLANES_CON_PRECIOS:
+        con, total = informe.cobertura
+        detalle = f" Para esta licitación tengo referencias de {con} de {total} ítems." if con else ""
+        return ("💲 Los precios de referencia y quién suele ganar son parte del *plan Pro*." + detalle
+                + " Escríbenos si quieres probarlo.")
+    return texto_precios(informe)
 
 
 def responder(
@@ -116,6 +136,9 @@ def responder(
     if comando in PALABRAS_ALTA:
         empresa.whatsapp_activo = True
         return ["¡Bienvenido de vuelta! Mañana temprano recibirás tu resumen de licitaciones."]
+
+    if comando in ("precios", "precio"):
+        return [_precios(session, empresa, momento)]
 
     if comando.isdigit():
         filas = ultimo_resumen(session, empresa)

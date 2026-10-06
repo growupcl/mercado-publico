@@ -7,6 +7,7 @@ Ejemplos:
   licita calce --empresa 1
   licita resumen --empresa 1
   licita analizar --pdf bases.pdf --codigo 1234-56-LE26
+  licita precios --codigo 1234-56-LE26
   licita whatsapp-enviar
   licita servidor --puerto 8000
 """
@@ -68,6 +69,7 @@ def cmd_empresa_agregar(args, config: Config, Sesion) -> int:
         monto_max=args.monto_max,
         palabras_clave=perfil.palabras_clave + perfil.rubros,
         whatsapp=normalizar_telefono(args.whatsapp or ""),
+        plan=args.plan,
     )
     with Sesion() as s:
         s.add(empresa)
@@ -159,6 +161,26 @@ def cmd_analizar(args, config: Config, Sesion) -> int:
     return 0
 
 
+def cmd_precios(args, config: Config, Sesion) -> int:
+    from .db import Licitacion
+    from .precios import informe_precios, texto_precios
+
+    with Sesion() as s:
+        lic = s.get(Licitacion, args.codigo)
+        if lic is None:
+            raise SystemExit(f"No existe la licitación {args.codigo} en la base. Sincronízala primero con licita sync.")
+        print(texto_precios(informe_precios(s, lic)))
+    return 0
+
+
+def cmd_reconstruir_precios(args, config: Config, Sesion) -> int:
+    from .precios import reconstruir_precios
+
+    with Sesion() as s:
+        print(f"Precios agregados: {reconstruir_precios(s)}")
+    return 0
+
+
 def cmd_servidor(args, config: Config, Sesion) -> int:
     import uvicorn
 
@@ -194,6 +216,7 @@ def construir_parser() -> argparse.ArgumentParser:
     s.add_argument("--monto-min", type=float)
     s.add_argument("--monto-max", type=float)
     s.add_argument("--whatsapp")
+    s.add_argument("--plan", choices=["gratis", "pyme", "pro", "consultora"], default="pyme")
     s.set_defaults(fn=cmd_empresa_agregar)
 
     s = sub.add_parser("empresas", help="Lista las empresas registradas")
@@ -215,6 +238,13 @@ def construir_parser() -> argparse.ArgumentParser:
     s.add_argument("--codigo", help="Código de la licitación (opcional)")
     s.add_argument("--empresa", type=int, help="Empresa a la que se le descuenta del límite mensual (opcional)")
     s.set_defaults(fn=cmd_analizar)
+
+    s = sub.add_parser("precios", help="Precios de referencia para los ítems de una licitación")
+    s.add_argument("--codigo", required=True, help="Código de la licitación")
+    s.set_defaults(fn=cmd_precios)
+
+    s = sub.add_parser("reconstruir-precios", help="Llena la tabla de precios con lo ya sincronizado")
+    s.set_defaults(fn=cmd_reconstruir_precios)
 
     s = sub.add_parser("whatsapp-enviar", help="Envía el resumen diario por WhatsApp a todas las empresas")
     s.add_argument("--umbral", type=int, default=60, help="Puntaje mínimo de calce")

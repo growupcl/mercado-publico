@@ -24,7 +24,7 @@ PALABRAS_BAJA = {"baja", "stop", "detener", "cancelar", "no mas", "no más"}
 PALABRAS_ALTA = {"alta", "activar", "reanudar"}
 
 TEXTO_AYUDA = (
-    "Soy el asistente de Licita 🤖\n\n"
+    "Soy el asistente de Licita Inteligente 🤖\n\n"
     "• Cada mañana te envío las licitaciones que calzan con tu negocio.\n"
     "• Responde con el *número* de una licitación del resumen para ver su detalle.\n"
     "• Escribe *TODAS* para volver a ver el último resumen.\n"
@@ -113,7 +113,7 @@ def procesar_webhook(
         empresa = session.scalar(select(Empresa).where(Empresa.whatsapp == telefono))
         registrar(session, empresa, telefono, "entrante", tipo, contenido, msg.get("id", ""))
         if empresa is None:
-            respuesta = "Hola 👋 Este número no está registrado en Licita."
+            respuesta = "Hola 👋 Este número no está registrado en Licita Inteligente."
             if url_registro:
                 respuesta += f" Puedes inscribirte en {url_registro}"
         else:

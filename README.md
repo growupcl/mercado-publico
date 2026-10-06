@@ -1,7 +1,9 @@
-# Licita
+# Licita Inteligente
 
 Copiloto con IA para pymes que le venden al Estado a través de [Mercado Público](https://www.mercadopublico.cl).
 Encuentra las licitaciones que calzan con lo que vende cada empresa y se las envía en un resumen diario.
+
+Sitio: [licitainteligente.cl](https://licitainteligente.cl) · El nombre interno del proyecto y del comando es `licita`.
 
 > Estado: **MVP, fase 2** (motor de datos, calce con IA y WhatsApp). Web y cobro vienen en las fases siguientes.
 

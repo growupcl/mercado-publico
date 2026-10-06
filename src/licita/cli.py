@@ -1,4 +1,4 @@
-"""Línea de comandos de Licita.
+"""Línea de comandos de Licita Inteligente.
 
 Ejemplos:
   licita sync --fecha 2026-10-06

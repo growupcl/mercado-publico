@@ -62,7 +62,7 @@ class OrdenCompra(Base):
 
 
 class Empresa(Base):
-    """Cliente de Licita: una pyme proveedora y su perfil de búsqueda."""
+    """Cliente de Licita Inteligente: una pyme proveedora y su perfil de búsqueda."""
 
     __tablename__ = "empresas"
 

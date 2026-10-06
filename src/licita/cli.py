@@ -1,0 +1,163 @@
+"""Línea de comandos de Licita.
+
+Ejemplos:
+  licita sync --fecha 2026-10-06
+  licita clasificar
+  licita empresa-agregar --nombre "Aseo Sur" --descripcion "Vendemos insumos de aseo..." --regiones "Biobío,Ñuble"
+  licita calce --empresa 1
+  licita resumen --empresa 1
+"""
+
+from __future__ import annotations
+
+import argparse
+import logging
+import sys
+from datetime import date
+
+from sqlalchemy import select
+
+from .config import Config
+from .db import Empresa, crear_sesiones
+from .ia import ErrorIA
+from .mercadopublico import MercadoPublicoError
+
+
+def _ia(config: Config):
+    from .ia import AsistenteIA
+
+    return AsistenteIA(modelo=config.modelo_clasificacion)
+
+
+def cmd_sync(args, config: Config, Sesion) -> int:
+    from .mercadopublico import MercadoPublicoClient
+    from .sync import sincronizar_licitaciones, sincronizar_ordenes_de_compra
+
+    cliente = MercadoPublicoClient(config.ticket)
+    fecha = date.fromisoformat(args.fecha) if args.fecha else date.today()
+    with Sesion() as s:
+        r = sincronizar_licitaciones(s, cliente, fecha, max_detalles=args.max_detalles)
+        print(f"Licitaciones {fecha}: {r.nuevas} nuevas, {r.actualizadas} actualizadas, {r.sin_cambios} sin cambios, {r.errores} errores")
+        if args.ordenes:
+            r = sincronizar_ordenes_de_compra(s, cliente, fecha, max_detalles=args.max_detalles)
+            print(f"Órdenes de compra {fecha}: {r.nuevas} nuevas, {r.sin_cambios} ya guardadas, {r.errores} errores")
+    return 0
+
+
+def cmd_clasificar(args, config: Config, Sesion) -> int:
+    from .ia import clasificar_pendientes
+
+    with Sesion() as s:
+        ok, errores = clasificar_pendientes(s, _ia(config), limite=args.limite)
+    print(f"Clasificadas: {ok} · Errores: {errores}")
+    return 0
+
+
+def cmd_empresa_agregar(args, config: Config, Sesion) -> int:
+    perfil = _ia(config).extraer_perfil(args.descripcion)
+    empresa = Empresa(
+        nombre=args.nombre,
+        descripcion=args.descripcion,
+        regiones=[r.strip() for r in args.regiones.split(",") if r.strip()] if args.regiones else [],
+        monto_min=args.monto_min,
+        monto_max=args.monto_max,
+        palabras_clave=perfil.palabras_clave + perfil.rubros,
+        whatsapp=args.whatsapp or "",
+    )
+    with Sesion() as s:
+        s.add(empresa)
+        s.commit()
+        print(f"Empresa #{empresa.id} creada: {empresa.nombre}")
+        print("Palabras clave detectadas:", ", ".join(empresa.palabras_clave))
+    return 0
+
+
+def cmd_empresas(args, config: Config, Sesion) -> int:
+    with Sesion() as s:
+        for e in s.scalars(select(Empresa).order_by(Empresa.id)):
+            regiones = ", ".join(e.regiones) or "todas"
+            print(f"#{e.id} {e.nombre} · regiones: {regiones} · {len(e.palabras_clave)} palabras clave")
+    return 0
+
+
+def _empresa(s, empresa_id: int) -> Empresa:
+    empresa = s.get(Empresa, empresa_id)
+    if empresa is None:
+        raise SystemExit(f"No existe la empresa #{empresa_id}")
+    return empresa
+
+
+def cmd_calce(args, config: Config, Sesion) -> int:
+    from .calce import buscar_calces
+
+    with Sesion() as s:
+        calces = buscar_calces(s, _empresa(s, args.empresa), _ia(config), limite=args.limite)
+        if not calces:
+            print("No hay licitaciones nuevas que calcen con este perfil.")
+        for c in calces:
+            print(f"{c.puntaje:>3}%  {c.licitacion_codigo}  {c.razon}")
+    return 0
+
+
+def cmd_resumen(args, config: Config, Sesion) -> int:
+    from .resumen import resumen_diario
+
+    with Sesion() as s:
+        texto = resumen_diario(s, _empresa(s, args.empresa), umbral=args.umbral, marcar_notificado=args.marcar)
+    print(texto or "Nada nuevo que enviar hoy.")
+    return 0
+
+
+def construir_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(prog="licita", description="Copiloto de licitaciones de Mercado Público")
+    sub = p.add_subparsers(dest="comando", required=True)
+
+    s = sub.add_parser("sync", help="Sincroniza licitaciones (y opcionalmente órdenes de compra) de un día")
+    s.add_argument("--fecha", help="AAAA-MM-DD (por defecto hoy)")
+    s.add_argument("--ordenes", action="store_true", help="También sincroniza órdenes de compra")
+    s.add_argument("--max-detalles", type=int, help="Máximo de detalles a pedir (cuida el límite diario del ticket)")
+    s.set_defaults(fn=cmd_sync)
+
+    s = sub.add_parser("clasificar", help="Clasifica con IA las licitaciones publicadas pendientes")
+    s.add_argument("--limite", type=int, default=100)
+    s.set_defaults(fn=cmd_clasificar)
+
+    s = sub.add_parser("empresa-agregar", help="Registra una empresa y extrae su perfil con IA")
+    s.add_argument("--nombre", required=True)
+    s.add_argument("--descripcion", required=True, help="Qué vende la empresa, en lenguaje natural")
+    s.add_argument("--regiones", help="Separadas por coma; vacío = todas")
+    s.add_argument("--monto-min", type=float)
+    s.add_argument("--monto-max", type=float)
+    s.add_argument("--whatsapp")
+    s.set_defaults(fn=cmd_empresa_agregar)
+
+    s = sub.add_parser("empresas", help="Lista las empresas registradas")
+    s.set_defaults(fn=cmd_empresas)
+
+    s = sub.add_parser("calce", help="Busca y evalúa licitaciones para una empresa")
+    s.add_argument("--empresa", type=int, required=True)
+    s.add_argument("--limite", type=int, default=20, help="Candidatas que evalúa la IA")
+    s.set_defaults(fn=cmd_calce)
+
+    s = sub.add_parser("resumen", help="Muestra el resumen diario (formato WhatsApp)")
+    s.add_argument("--empresa", type=int, required=True)
+    s.add_argument("--umbral", type=int, default=60, help="Puntaje mínimo de calce")
+    s.add_argument("--marcar", action="store_true", help="Marca los calces como notificados")
+    s.set_defaults(fn=cmd_resumen)
+    return p
+
+
+def main(argv: list[str] | None = None) -> int:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    args = construir_parser().parse_args(argv)
+    config = Config.desde_entorno()
+    Sesion = crear_sesiones(config.database_url)
+    try:
+        return args.fn(args, config, Sesion)
+    except (MercadoPublicoError, ErrorIA) as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

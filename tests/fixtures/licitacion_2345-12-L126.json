@@ -1,0 +1,44 @@
+{
+ "Cantidad": 1,
+ "FechaCreacion": "2026-10-06T08:00:00",
+ "Version": "v1",
+ "Listado": [
+  {
+   "CodigoExterno": "2345-12-L126",
+   "Nombre": "Mantención de áreas verdes plaza central",
+   "CodigoEstado": 5,
+   "Descripcion": "Servicio de mantención de áreas verdes, poda y riego por 12 meses.",
+   "FechaCierre": "2026-10-15T15:00:00",
+   "Estado": "Publicada",
+   "Comprador": {
+    "CodigoOrganismo": "7248",
+    "NombreOrganismo": "Ilustre Municipalidad de Temuco",
+    "NombreUnidad": "Unidad de Compras",
+    "ComunaUnidad": "Temuco",
+    "RegionUnidad": "Región de la Araucanía"
+   },
+   "Tipo": "L1",
+   "Moneda": "CLP",
+   "MontoEstimado": 24000000,
+   "Fechas": {
+    "FechaCreacion": "2026-10-01T10:00:00",
+    "FechaCierre": "2026-10-15T15:00:00",
+    "FechaPublicacion": "2026-10-06T09:00:00"
+   },
+   "Items": {
+    "Cantidad": 1,
+    "Listado": [
+     {
+      "Correlativo": 1,
+      "CodigoProducto": 70111703,
+      "Categoria": "Servicios de jardinería",
+      "NombreProducto": "Mantención de áreas verdes",
+      "Descripcion": "Poda, riego y corte de pasto",
+      "UnidadMedida": "Unidad",
+      "Cantidad": 12
+     }
+    ]
+   }
+  }
+ ]
+}

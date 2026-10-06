@@ -184,6 +184,16 @@ def test_numero_no_registrado(escenario):
     assert wa.enviados == [("texto", "56911111111", "Hola 👋 Este número no está registrado en Licita. Puedes inscribirte en https://licita.cl")]
 
 
+def test_solo_responde_mensajes_dirigidos_al_numero_de_licita(escenario):
+    s, _ = escenario
+    wa = WhatsAppFalso()
+    payload = mensaje_entrante("hola")
+    payload["entry"][0]["changes"][0]["value"]["metadata"] = {"phone_number_id": "NUMERO_MASIVO"}
+    assert procesar_webhook(s, wa, payload, phone_number_id="NUMERO_LICITA", momento=MOMENTO) == 0
+    payload["entry"][0]["changes"][0]["value"]["metadata"] = {"phone_number_id": "NUMERO_LICITA"}
+    assert procesar_webhook(s, wa, payload, phone_number_id="NUMERO_LICITA", momento=MOMENTO) == 1
+
+
 def test_ignora_confirmaciones_de_lectura(escenario):
     s, _ = escenario
     wa = WhatsAppFalso()

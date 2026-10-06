@@ -26,6 +26,7 @@ def crear_app(
     verify_token: str,
     app_secret: str,
     url_registro: str = "",
+    phone_number_id: str = "",
     permitir_sin_firma: bool = False,
 ) -> FastAPI:
     if not verify_token:
@@ -57,7 +58,7 @@ def crear_app(
             raise HTTPException(status_code=400, detail="JSON inválido")
         try:
             with Sesion() as s:
-                procesar_webhook(s, wa, payload, url_registro=url_registro)
+                procesar_webhook(s, wa, payload, url_registro=url_registro, phone_number_id=phone_number_id)
         except Exception:
             # Respondemos 200 igual: si no, Meta reintenta y el usuario recibiría respuestas duplicadas.
             log.exception("Error procesando webhook de WhatsApp")

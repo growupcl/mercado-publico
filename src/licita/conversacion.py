@@ -32,11 +32,18 @@ TEXTO_AYUDA = (
 )
 
 
-def mensajes_entrantes(payload: dict[str, Any]) -> Iterator[dict[str, Any]]:
-    """Extrae los mensajes del webhook de Meta (ignora confirmaciones de entrega y lectura)."""
+def mensajes_entrantes(payload: dict[str, Any], phone_number_id: str = "") -> Iterator[dict[str, Any]]:
+    """Extrae los mensajes del webhook de Meta (ignora confirmaciones de entrega y lectura).
+
+    Si se indica phone_number_id, solo considera los mensajes dirigidos a ese número: la app de
+    Meta puede ser compartida con otros números (por ejemplo, los de Masivo App).
+    """
     for entrada in payload.get("entry", []):
         for cambio in entrada.get("changes", []):
-            yield from cambio.get("value", {}).get("messages", []) or []
+            valor = cambio.get("value", {})
+            if phone_number_id and valor.get("metadata", {}).get("phone_number_id") != phone_number_id:
+                continue
+            yield from valor.get("messages", []) or []
 
 
 def leer_mensaje(msg: dict[str, Any]) -> tuple[str, str]:
@@ -89,12 +96,18 @@ def responder(session: Session, empresa: Empresa, tipo: str, contenido: str) -> 
 
 
 def procesar_webhook(
-    session: Session, wa: ClienteWhatsApp, payload: dict[str, Any], *, url_registro: str = "", momento: datetime | None = None
+    session: Session,
+    wa: ClienteWhatsApp,
+    payload: dict[str, Any],
+    *,
+    url_registro: str = "",
+    phone_number_id: str = "",
+    momento: datetime | None = None,
 ) -> int:
     """Procesa un webhook de Meta y responde cada mensaje. Devuelve cuántos mensajes respondió."""
     momento = momento or ahora()
     respondidos = 0
-    for msg in mensajes_entrantes(payload):
+    for msg in mensajes_entrantes(payload, phone_number_id):
         telefono = normalizar_telefono(msg.get("from", ""))
         tipo, contenido = leer_mensaje(msg)
         empresa = session.scalar(select(Empresa).where(Empresa.whatsapp == telefono))

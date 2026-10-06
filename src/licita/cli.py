@@ -137,6 +137,7 @@ def cmd_servidor(args, config: Config, Sesion) -> int:
     app = crear_app(
         Sesion, _whatsapp(config), verify_token=config.whatsapp_verify_token,
         app_secret=config.whatsapp_app_secret, url_registro=config.url_registro,
+        phone_number_id=config.whatsapp_phone_number_id,
     )
     uvicorn.run(app, host=args.host, port=args.puerto)
     return 0

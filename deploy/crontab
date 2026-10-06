@@ -1,0 +1,19 @@
+# Tareas programadas de Calza (hora de Chile; el servidor usa America/Santiago).
+# Instalar con:  crontab deploy/crontab   (como el usuario calza, desde /opt/calza)
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Cada 2 horas, de 7:00 a 21:00: licitaciones nuevas, clasificación con IA y calces.
+0 7-21/2 * * *  /opt/calza/deploy/tareas.sh ciclo --max-detalles 400
+
+# Días hábiles a las 8:00: resumen diario por WhatsApp (después del ciclo de las 7:00).
+0 8 * * 1-5     /opt/calza/deploy/tareas.sh whatsapp-enviar
+
+# 23:30: órdenes de compra del día (alimentan la inteligencia de precios).
+30 23 * * *     /opt/calza/deploy/tareas.sh sync --ordenes --max-detalles 1500
+
+# 3:15: vence suscripciones impagas y lista las próximas a vencer.
+15 3 * * *      /opt/calza/deploy/tareas.sh suscripciones
+
+# 2:45: respaldo de la base de datos.
+45 2 * * *      /opt/calza/deploy/respaldo.sh >> /opt/calza/logs/respaldos.log 2>&1

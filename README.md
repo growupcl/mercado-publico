@@ -70,6 +70,7 @@ licita calce --empresa 1
 licita resumen --empresa 1 --marcar
 licita analizar --pdf bases.pdf --codigo 1234-56-LE26
 licita precios --codigo 1234-56-LE26
+licita ciclo                       # sincroniza, clasifica y busca calces para todas las empresas activas
 licita servidor --puerto 8000      # sitio web en http://localhost:8000 y webhook de WhatsApp
 licita suscripciones               # vence las suscripciones impagas (programar una vez al día)
 ```
@@ -79,6 +80,17 @@ Credenciales de prueba) en `MERCADOPAGO_ACCESS_TOKEN`, configura un webhook haci
 `https://<tu-dominio>/pagos/mercadopago/webhook` con los eventos *Planes y suscripciones*, copia su clave secreta en
 `MERCADOPAGO_WEBHOOK_SECRET` y paga con un usuario y tarjetas de prueba. Ver [docs/mercadopago.md](docs/mercadopago.md).
 
+## Publicar en el servidor
+
+Calza corre en un VPS (Vultr, Santiago) con Docker: aplicación, Postgres y Caddy (HTTPS automático), más tareas
+programadas y respaldos diarios. Guía paso a paso en [docs/despliegue.md](docs/despliegue.md).
+
+```bash
+docker compose up -d --build      # en el servidor, con .env completo
+crontab deploy/crontab            # tareas programadas
+deploy/actualizar.sh              # publicar una versión nueva
+```
+
 ## Pruebas
 
 ```bash
@@ -86,7 +98,8 @@ pytest
 ```
 
 Las pruebas usan respuestas de ejemplo con el formato de la API (`tests/fixtures/`) y un cliente de Claude simulado,
-así que no necesitan ticket ni clave.
+así que no necesitan ticket ni clave. Para correrlas contra Postgres:
+`LICITA_TEST_DATABASE_URL=postgresql+psycopg://usuario@host/base pytest`.
 
 ## Estructura
 
@@ -109,7 +122,9 @@ así que no necesitan ticket ni clave.
 | `src/licita/legal.py` | **Borrador** de términos y política de privacidad: revisar con un abogado antes del lanzamiento |
 | `src/licita/analisis.py` | Análisis de bases en PDF con Claude Sonnet, reutilización por archivo y límite mensual |
 | `src/licita/servidor.py` | Servidor web que recibe los webhooks de WhatsApp |
+| `src/licita/tareas.py` | Ciclo periódico: sincronizar, clasificar y buscar calces |
 | `src/licita/cli.py` | Línea de comandos |
+| `Dockerfile`, `compose.yaml`, `deploy/` | Despliegue: imagen, servicios, HTTPS, cron, respaldos y preparación del servidor |
 | `docs/modelo_financiero_licita.xlsx` | Modelo financiero (escenarios base y conservador) |
 
 ## Próximas fases

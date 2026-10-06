@@ -1,0 +1,52 @@
+"""Planes y precios de Calza (montos en CLP con IVA incluido), según el modelo financiero."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+DIAS_PRUEBA = 14
+CUPOS_FUNDADOR = 100
+DESCUENTO_ANUAL = 0.10
+
+
+@dataclass(frozen=True)
+class Plan:
+    codigo: str
+    nombre: str
+    mensual: int
+    beneficios: tuple[str, ...]
+
+
+PLANES = {
+    "pyme": Plan("pyme", "Pyme", 19_990, (
+        "Resumen diario por WhatsApp con las licitaciones que te calzan",
+        "Detalle de cada licitación y puntaje de calce",
+        "Análisis de bases en PDF (hasta 15 al mes)",
+    )),
+    "pro": Plan("pro", "Pro", 59_990, (
+        "Todo lo del plan Pyme",
+        "Precios de referencia y quién suele ganar",
+        "Alertas urgentes de Compra Ágil",
+        "Análisis de bases en PDF (hasta 50 al mes)",
+    )),
+}
+PRECIO_FUNDADOR_PRO = 39_990
+PERIODICIDADES = {"mensual": 1, "anual": 12}
+
+
+def precio_mensual(plan: str, *, fundador: bool = False) -> int:
+    if plan == "pro" and fundador:
+        return PRECIO_FUNDADOR_PRO
+    return PLANES[plan].mensual
+
+
+def monto(plan: str, periodicidad: str, *, fundador: bool = False) -> int:
+    """Monto a pagar por el período, redondeado a la centena (como en el modelo financiero)."""
+    mensual = precio_mensual(plan, fundador=fundador)
+    if periodicidad == "anual":
+        return round(mensual * 12 * (1 - DESCUENTO_ANUAL), -2)
+    return mensual
+
+
+def formato_pesos(valor: int | float) -> str:
+    return "$" + f"{round(valor):,}".replace(",", ".")

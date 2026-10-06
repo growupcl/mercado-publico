@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 
 import httpx
@@ -31,7 +32,21 @@ def respuesta_falsa(request: httpx.Request) -> httpx.Response:
 
 @pytest.fixture
 def Sesion():
-    return crear_sesiones("sqlite://")
+    """SQLite en memoria por defecto. Con LICITA_TEST_DATABASE_URL las pruebas corren contra Postgres."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import close_all_sessions
+
+    from licita.db import Base
+
+    url = os.environ.get("LICITA_TEST_DATABASE_URL")
+    if url:
+        motor = create_engine(url)
+        Base.metadata.drop_all(motor)
+        motor.dispose()
+    fabrica = crear_sesiones(url or "sqlite://")
+    yield fabrica
+    close_all_sessions()
+    fabrica.kw["bind"].dispose()
 
 
 @pytest.fixture

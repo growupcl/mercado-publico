@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block titulo %}Mi cuenta · Calza{% endblock %}
+{% block accion %}{% endblock %}
+{% block contenido %}
+<div style="max-width:820px" class="pila">
+  <h1>{{ empresa.nombre }}</h1>
+  <div class="tarjeta pila">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+      {% if suscripcion.estado == "prueba" %}<span class="chip oro">Prueba gratuita</span>
+      {% elif suscripcion.estado == "activa" %}<span class="chip ok">Activa</span>
+      {% else %}<span class="chip error">Vencida</span>{% endif %}
+      <span class="chip">Plan actual: {{ plan_actual }}</span>
+      {% if suscripcion.precio_fundador %}<span class="chip oro">Precio fundador</span>{% endif %}
+    </div>
+    {% if suscripcion.estado == "vencida" %}
+      <p>Tu suscripción venció el {{ vigente_hasta }}. Ahora estás en el plan gratis: no recibes el resumen diario por WhatsApp. Elige un plan para volver.</p>
+    {% else %}
+      <p>{% if suscripcion.estado == "prueba" %}Tu prueba termina{% else %}Tu plan está pagado hasta{% endif %} el <strong>{{ vigente_hasta }}</strong> ({{ dias_restantes }} días).</p>
+    {% endif %}
+    {% if mandato %}
+      <p>🔁 Renovación automática: plan <strong>{{ nombre_mandato }} {{ mandato.periodicidad }}</strong> por {{ fmt(mandato.monto) }}, con tu tarjeta en Mercado Pago.
+      {% if suscripcion.estado == "prueba" %}El primer cobro será el {{ vigente_hasta }}.{% endif %}</p>
+      <form method="post" action="/cuenta/{{ token }}/cancelar"><button class="boton secundario" type="submit">Cancelar renovación automática</button></form>
+      <p class="ayuda">Si cancelas, mantienes tu plan hasta el {{ vigente_hasta }}.</p>
+    {% endif %}
+  </div>
+
+  <h2>{% if mandato %}Cambiar de plan{% else %}Elige tu plan{% endif %}</h2>
+  <p class="muted">Suscripción con cobro automático mensual o anual, con tarjeta de crédito o débito a través de Mercado Pago. Puedes cancelar cuando quieras.
+  {% if suscripcion.estado != "vencida" %}No te cobramos nada hasta el {{ vigente_hasta }}.{% endif %} Precios con IVA.</p>
+  {% if not pagos_activos %}<p class="aviso">Los pagos en línea todavía no están habilitados. Escríbenos a hola@calza.cl.</p>{% endif %}
+  <div class="rejilla dos">
+    {% for o in opciones %}
+    <form method="post" action="/cuenta/{{ token }}/suscribir" class="tarjeta pila plan">
+      <input type="hidden" name="plan" value="{{ o.plan }}">
+      <input type="hidden" name="periodicidad" value="{{ o.periodicidad }}">
+      <h3>{{ o.nombre }} · {{ o.periodicidad }}</h3>
+      <div class="precio">{{ fmt(o.monto) }} <small>/ {% if o.periodicidad == "anual" %}año{% else %}mes{% endif %}</small></div>
+      {% if o.fundador %}<p class="ayuda">Precio fundador: se mantiene mientras sigas con Calza.</p>{% endif %}
+      {% if o.periodicidad == "anual" %}<p class="ayuda">Equivale a {{ fmt(o.monto / 12) }} al mes.</p>{% endif %}
+      {% if o.actual %}<div><span class="chip ok">Tu plan actual</span></div>
+      {% else %}<div><button class="boton" type="submit" {% if not pagos_activos %}disabled{% endif %}>{% if mandato %}Cambiar a este plan{% else %}Suscribirme{% endif %}</button></div>{% endif %}
+    </form>
+    {% endfor %}
+  </div>
+
+  {% if pagos %}
+  <h2>Pagos</h2>
+  <div class="tabla"><table>
+    <thead><tr><th>Fecha</th><th>Plan</th><th>Monto</th><th>Estado</th></tr></thead>
+    <tbody>{% for p in pagos %}
+      <tr><td>{{ (p.pagado_en or p.creado_en).strftime("%d-%m-%Y") }}</td><td>{{ p.plan|capitalize }} {{ p.periodicidad }}</td><td>{{ fmt(p.monto) }}</td><td>{{ p.estado|capitalize }}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  {% endif %}
+  <p class="ayuda">{{ prestador }} emite la factura a nombre de {{ empresa.razon_social }} (RUT {{ rut }}). ¿Datos incorrectos? Escríbenos a hola@calza.cl.</p>
+</div>
+{% endblock %}

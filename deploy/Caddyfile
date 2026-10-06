@@ -1,0 +1,9 @@
+# Caddy obtiene y renueva solo los certificados HTTPS (Let's Encrypt).
+{$DOMINIO} {
+	encode gzip
+	reverse_proxy app:8000
+}
+
+www.{$DOMINIO} {
+	redir https://{$DOMINIO}{uri} permanent
+}

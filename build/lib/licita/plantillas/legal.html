@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block titulo %}{{ titulo }} · Calza{% endblock %}
+{% block contenido %}
+<article style="max-width:68ch" class="pila">
+  <h1>{{ titulo }}</h1>
+  <p class="muted">Última actualización: {{ fecha }}</p>
+  {% for seccion, parrafos in secciones %}
+    <h3>{{ seccion }}</h3>
+    {% for p in parrafos %}<p>{{ p }}</p>{% endfor %}
+  {% endfor %}
+</article>
+{% endblock %}

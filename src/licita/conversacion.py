@@ -28,7 +28,7 @@ PALABRAS_BAJA = {"baja", "stop", "detener", "cancelar", "no mas", "no más"}
 PALABRAS_ALTA = {"alta", "activar", "reanudar"}
 
 TEXTO_AYUDA = (
-    "Soy el asistente de Licita Inteligente 🤖\n\n"
+    "Soy el asistente de Calza 🤖\n\n"
     "• Cada mañana te envío las licitaciones que calzan con tu negocio.\n"
     "• Responde con el *número* de una licitación del resumen para ver su detalle.\n"
     "• Escribe *TODAS* para volver a ver el último resumen.\n"
@@ -220,7 +220,7 @@ def procesar_webhook(
                 log.warning("No se pudo responder a %s: %s", telefono, e)
 
         if empresa is None:
-            respuesta = "Hola 👋 Este número no está registrado en Licita Inteligente."
+            respuesta = "Hola 👋 Este número no está registrado en Calza."
             if url_registro:
                 respuesta += f" Puedes inscribirte en {url_registro}"
             enviar(respuesta)

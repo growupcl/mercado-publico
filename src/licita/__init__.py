@@ -1,1 +1,1 @@
-"""Licita Inteligente: copiloto con IA para pymes que le venden al Estado."""
+"""Calza: copiloto con IA para pymes que le venden al Estado."""

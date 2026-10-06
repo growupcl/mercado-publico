@@ -36,7 +36,7 @@ def crear_app(
     if not app_secret and not permitir_sin_firma:
         raise ValueError("Falta WHATSAPP_APP_SECRET: sin él no se puede verificar que los mensajes vengan de Meta.")
 
-    app = FastAPI(title="Licita Inteligente")
+    app = FastAPI(title="Calza")
 
     @app.get("/salud")
     def salud():

@@ -169,7 +169,7 @@ def test_flujo_boton_y_numero(escenario):
     assert "número entre 1 y 2" in wa.enviados[-1][2]
 
     procesar_webhook(s, wa, mensaje_entrante("hola"), momento=MOMENTO)
-    assert "Soy el asistente de Licita Inteligente" in wa.enviados[-1][2]
+    assert "Soy el asistente de Calza" in wa.enviados[-1][2]
     assert s.query(MensajeWhatsApp).count() == 10 + 1  # 5 entrantes + 5 respuestas + la plantilla
 
 
@@ -185,8 +185,8 @@ def test_baja_y_alta(escenario):
 def test_numero_no_registrado(escenario):
     s, _ = escenario
     wa = WhatsAppFalso()
-    procesar_webhook(s, wa, mensaje_entrante("hola", de="56911111111"), url_registro="https://licitainteligente.cl", momento=MOMENTO)
-    assert wa.enviados == [("texto", "56911111111", "Hola 👋 Este número no está registrado en Licita Inteligente. Puedes inscribirte en https://licitainteligente.cl")]
+    procesar_webhook(s, wa, mensaje_entrante("hola", de="56911111111"), url_registro="https://calza.cl", momento=MOMENTO)
+    assert wa.enviados == [("texto", "56911111111", "Hola 👋 Este número no está registrado en Calza. Puedes inscribirte en https://calza.cl")]
 
 
 def test_solo_responde_mensajes_dirigidos_al_numero_de_licita(escenario):

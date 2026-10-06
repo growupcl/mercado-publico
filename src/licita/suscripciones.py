@@ -1,8 +1,8 @@
-"""Registro de empresas, prueba gratuita, pagos con Flow y vencimientos.
+"""Registro de empresas, prueba gratuita, suscripciones con Mercado Pago y vencimientos.
 
-Modelo de cobro: pago por período (mensual o anual) con un enlace de Flow, que acepta Webpay
-(débito y crédito). Al pagar, la suscripción se extiende desde la fecha de término vigente,
-así nadie pierde días de su prueba ni de un período ya pagado.
+Modelo de cobro: suscripción de Mercado Pago (tarjeta de crédito o débito) que cobra sola cada
+mes o cada año. Si el cliente se suscribe durante la prueba, el primer cobro es al terminar la
+prueba. Cada cobro aprobado extiende el período desde la fecha de término vigente.
 """
 
 from __future__ import annotations
@@ -21,8 +21,8 @@ from sqlalchemy.orm import Session
 
 from . import rut as rutlib
 from .calce import tokens
-from .db import Empresa, Pago, Suscripcion, ahora
-from .flow import ESTADO_ANULADO, ESTADO_RECHAZADO, ClienteFlow
+from .db import Empresa, MandatoPago, Pago, Suscripcion, ahora
+from .mercadopago import ClienteMercadoPago
 from .ia import AsistenteIA, ErrorIA
 from .planes import CUPOS_FUNDADOR, DIAS_PRUEBA, PERIODICIDADES, PLANES, monto
 from .whatsapp import normalizar_telefono
@@ -174,64 +174,111 @@ def cotizar(session: Session, suscripcion: Suscripcion, plan: str, periodicidad:
     return monto(plan, periodicidad, fundador=fundador), fundador
 
 
-def iniciar_pago(
-    session: Session, empresa: Empresa, flow: ClienteFlow, *, plan: str, periodicidad: str, url_publica: str
+def iniciar_suscripcion(
+    session: Session, empresa: Empresa, mp: ClienteMercadoPago, *, plan: str, periodicidad: str, url_publica: str,
+    momento: datetime | None = None,
 ) -> str:
-    """Registra el pago pendiente y devuelve la URL de Flow donde el cliente paga."""
+    """Crea la suscripción en Mercado Pago y devuelve la URL donde el cliente ingresa su tarjeta."""
+    momento = momento or ahora()
     if plan not in PLANES or periodicidad not in PERIODICIDADES:
         raise ValueError("Plan o periodicidad no válidos.")
     suscripcion = suscripcion_de(session, empresa)
     valor, fundador = cotizar(session, suscripcion, plan, periodicidad)
-    pago = Pago(
+    mandato = MandatoPago(
         empresa_id=empresa.id, plan=plan, periodicidad=periodicidad, monto=valor, precio_fundador=fundador,
-        orden_comercio=f"CALZA-{empresa.id}-{secrets.token_hex(4).upper()}",
+        referencia=f"CALZA-{empresa.id}-{secrets.token_hex(4).upper()}",
+    )
+    session.add(mandato)
+    session.flush()
+    # Si aún le quedan días (prueba o período pagado), el primer cobro es cuando terminen.
+    inicio = suscripcion.vigente_hasta if suscripcion.vigente_hasta > momento + timedelta(hours=1) else None
+    creada = mp.crear_suscripcion(
+        referencia=mandato.referencia, motivo=f"Calza plan {PLANES[plan].nombre} {periodicidad}",
+        email=empresa.email, monto=valor, meses=PERIODICIDADES[periodicidad],
+        url_retorno=f"{url_publica}/pagos/mercadopago/retorno", inicio=inicio,
+    )
+    mandato.mp_id = creada.id
+    session.commit()
+    return creada.url_pago
+
+
+def actualizar_mandato(session: Session, mp: ClienteMercadoPago, mp_id: str) -> MandatoPago | None:
+    """Sincroniza el estado de una suscripción de Mercado Pago (autorizada, pausada o cancelada)."""
+    remota = mp.obtener_suscripcion(mp_id)
+    mandato = session.scalar(select(MandatoPago).where(MandatoPago.referencia == remota.referencia))
+    if mandato is None or (mandato.mp_id and mandato.mp_id != remota.id):
+        log.warning("Suscripción de Mercado Pago %s sin mandato conocido", mp_id)
+        return None
+    mandato.mp_id, mandato.estado = remota.id, remota.estado
+    suscripcion = session.scalar(select(Suscripcion).where(Suscripcion.empresa_id == mandato.empresa_id))
+    if remota.estado == "authorized" and suscripcion.mandato_activo_id != mandato.id:
+        anterior = session.get(MandatoPago, suscripcion.mandato_activo_id) if suscripcion.mandato_activo_id else None
+        suscripcion.mandato_activo_id = mandato.id
+        suscripcion.plan, suscripcion.periodicidad = mandato.plan, mandato.periodicidad
+        suscripcion.precio_fundador = suscripcion.precio_fundador or mandato.precio_fundador
+        if anterior is not None and anterior.estado != "cancelled":
+            # Cambio de plan: la suscripción anterior deja de cobrar.
+            mp.cancelar_suscripcion(anterior.mp_id)
+            anterior.estado = "cancelled"
+    elif remota.estado in ("cancelled", "paused") and suscripcion.mandato_activo_id == mandato.id:
+        # Sin renovación automática: mantiene lo pagado hasta su fecha de término.
+        suscripcion.mandato_activo_id = None
+    session.commit()
+    return mandato
+
+
+def registrar_cobro(session: Session, mp: ClienteMercadoPago, cobro_id: str, *, momento: datetime | None = None) -> Pago | None:
+    """Registra un cobro de Mercado Pago; si fue aprobado, extiende la suscripción. Es idempotente."""
+    momento = momento or ahora()
+    existente = session.scalar(select(Pago).where(Pago.mp_cobro_id == str(cobro_id)))
+    if existente is not None and existente.estado == "pagado":
+        return existente
+    cobro = mp.obtener_cobro(cobro_id)
+    mandato = session.scalar(select(MandatoPago).where(MandatoPago.mp_id == cobro.suscripcion_id))
+    if mandato is None:
+        log.warning("Cobro %s de una suscripción desconocida (%s)", cobro_id, cobro.suscripcion_id)
+        return None
+    if cobro.estado_pago not in ("approved", "rejected"):
+        return existente  # aún en proceso: Mercado Pago avisará de nuevo
+    if round(cobro.monto) != mandato.monto:
+        log.error("El cobro %s no coincide con el monto pactado (%s ≠ %s)", cobro_id, cobro.monto, mandato.monto)
+        return existente
+    pago = existente or Pago(
+        empresa_id=mandato.empresa_id, plan=mandato.plan, periodicidad=mandato.periodicidad, monto=mandato.monto,
+        mandato_id=mandato.id, mp_cobro_id=str(cobro_id),
     )
     session.add(pago)
-    session.flush()
-    creado = flow.crear_pago(
-        orden_comercio=pago.orden_comercio,
-        asunto=f"Calza plan {PLANES[plan].nombre} {periodicidad}",
-        monto=valor, email=empresa.email,
-        url_confirmacion=f"{url_publica}/pagos/flow/confirmacion",
-        url_retorno=f"{url_publica}/pagos/flow/retorno",
-    )
-    pago.flow_token, pago.flow_order = creado.token, creado.flow_order
-    session.commit()
-    return creado.url
-
-
-def confirmar_pago(session: Session, flow: ClienteFlow, token: str, *, momento: datetime | None = None) -> Pago | None:
-    """Consulta a Flow el resultado y, si está pagado, activa o extiende la suscripción. Es idempotente."""
-    momento = momento or ahora()
-    pago = session.scalar(select(Pago).where(Pago.flow_token == token))
-    if pago is None:
-        log.warning("Confirmación de Flow con un token desconocido")
-        return None
-    if pago.estado == "pagado":
-        return pago
-    estado = flow.estado_pago(token)
-    if estado.orden_comercio != pago.orden_comercio or round(estado.monto) != pago.monto:
-        log.error("El pago %s no coincide con lo informado por Flow (orden %s, monto %s)", pago.orden_comercio, estado.orden_comercio, estado.monto)
-        return pago
-    if estado.pagado:
-        empresa = session.get(Empresa, pago.empresa_id)
+    if cobro.estado_pago == "approved":
+        empresa = session.get(Empresa, mandato.empresa_id)
         suscripcion = suscripcion_de(session, empresa)
         inicio = max(momento, suscripcion.vigente_hasta)
-        suscripcion.vigente_hasta = sumar_meses(inicio, PERIODICIDADES[pago.periodicidad])
-        suscripcion.plan, suscripcion.periodicidad, suscripcion.estado = pago.plan, pago.periodicidad, "activa"
-        suscripcion.precio_fundador = suscripcion.precio_fundador or pago.precio_fundador
-        # El plan pagado se activa de inmediato; los días de prueba que quedaban se suman al período.
-        empresa.plan = pago.plan
+        suscripcion.vigente_hasta = sumar_meses(inicio, PERIODICIDADES[mandato.periodicidad])
+        suscripcion.plan, suscripcion.periodicidad, suscripcion.estado = mandato.plan, mandato.periodicidad, "activa"
+        empresa.plan = mandato.plan
         pago.estado, pago.pagado_en = "pagado", momento
-    elif estado.estado == ESTADO_RECHAZADO:
-        pago.estado = "rechazado"
-    elif estado.estado == ESTADO_ANULADO:
-        pago.estado = "anulado"
+    else:
+        pago.estado = "rechazado"  # Mercado Pago reintenta el cobro por su cuenta
     session.commit()
     return pago
 
 
+def cancelar_renovacion(session: Session, empresa: Empresa, mp: ClienteMercadoPago) -> bool:
+    suscripcion = suscripcion_de(session, empresa)
+    if not suscripcion.mandato_activo_id:
+        return False
+    mandato = session.get(MandatoPago, suscripcion.mandato_activo_id)
+    mp.cancelar_suscripcion(mandato.mp_id)
+    mandato.estado = "cancelled"
+    suscripcion.mandato_activo_id = None
+    session.commit()
+    return True
+
+
 # --- Vencimientos ---
+
+# Con renovación automática, el cobro y su aviso pueden llegar unas horas después del término.
+DIAS_GRACIA_RENOVACION = 3
+
 
 def revisar_vencimientos(session: Session, *, momento: datetime | None = None) -> list[Empresa]:
     """Pasa al plan gratis a quienes terminaron su prueba o período sin pagar. Devuelve esas empresas."""
@@ -240,6 +287,8 @@ def revisar_vencimientos(session: Session, *, momento: datetime | None = None) -
     for suscripcion in session.scalars(select(Suscripcion).where(
         Suscripcion.estado.in_(("prueba", "activa")), Suscripcion.vigente_hasta < momento,
     )):
+        if suscripcion.mandato_activo_id and momento < suscripcion.vigente_hasta + timedelta(days=DIAS_GRACIA_RENOVACION):
+            continue
         suscripcion.estado = "vencida"
         empresa = session.get(Empresa, suscripcion.empresa_id)
         empresa.plan = "gratis"

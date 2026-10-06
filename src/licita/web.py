@@ -1,4 +1,4 @@
-"""Sitio web: página de inicio, registro, cuenta y pagos con Flow."""
+"""Sitio web: página de inicio, registro, cuenta y suscripciones con Mercado Pago."""
 
 from __future__ import annotations
 
@@ -15,13 +15,13 @@ from sqlalchemy.orm import sessionmaker
 
 from . import legal
 from . import rut as rutlib
-from .db import Pago, ahora
-from .flow import ClienteFlow, ErrorFlow
+from .db import MandatoPago, Pago, Suscripcion, ahora
+from .mercadopago import ClienteMercadoPago, ErrorMercadoPago, verificar_firma
 from .ia import AsistenteIA
 from .planes import DIAS_PRUEBA, PLANES, PRECIO_FUNDADOR_PRO, formato_pesos, monto
 from .suscripciones import (
-    REGIONES, DatosRegistro, ErrorRegistro, confirmar_pago, cotizar, empresa_por_token, fundador_disponible,
-    iniciar_pago, registrar_empresa, suscripcion_de,
+    REGIONES, DatosRegistro, ErrorRegistro, actualizar_mandato, cancelar_renovacion, cotizar, empresa_por_token,
+    fundador_disponible, iniciar_suscripcion, registrar_cobro, registrar_empresa, suscripcion_de,
 )
 
 log = logging.getLogger(__name__)
@@ -36,11 +36,16 @@ def _fecha(dt: datetime) -> str:
 def crear_router_web(
     Sesion: sessionmaker,
     *,
-    flow: ClienteFlow | None,
+    mp: ClienteMercadoPago | None,
     ia: AsistenteIA | None,
     url_publica: str,
     whatsapp_publico: str = "",
+    mp_webhook_secreto: str = "",
+    prestador: str = "Virtus SpA",
+    permitir_sin_firma: bool = False,
 ) -> APIRouter:
+    if mp is not None and not mp_webhook_secreto and not permitir_sin_firma:
+        raise ValueError("Falta MERCADOPAGO_WEBHOOK_SECRET: sin él no se puede verificar que los avisos vengan de Mercado Pago.")
     router = APIRouter()
     url_publica = url_publica.rstrip("/")
     wa_link = f"https://wa.me/{whatsapp_publico}?text={quote('Hola Calza')}" if whatsapp_publico else ""
@@ -111,77 +116,116 @@ def crear_router_web(
                                "Este enlace de acceso no existe o fue reemplazado. Escribe CUENTA a Calza por WhatsApp para recibir uno nuevo.",
                                estado=404)
             suscripcion = suscripcion_de(s, empresa)
+            mandato = s.get(MandatoPago, suscripcion.mandato_activo_id) if suscripcion.mandato_activo_id else None
             opciones = []
             for codigo, plan in PLANES.items():
                 for periodicidad in ("mensual", "anual"):
                     valor, fundador = cotizar(s, suscripcion, codigo, periodicidad)
-                    opciones.append({"plan": codigo, "nombre": plan.nombre, "periodicidad": periodicidad, "monto": valor, "fundador": fundador})
+                    actual = mandato is not None and (mandato.plan, mandato.periodicidad) == (codigo, periodicidad)
+                    opciones.append({"plan": codigo, "nombre": plan.nombre, "periodicidad": periodicidad, "monto": valor,
+                                     "fundador": fundador, "actual": actual})
             pagos = list(s.scalars(select(Pago).where(Pago.empresa_id == empresa.id).order_by(Pago.creado_en.desc()).limit(12)))
             restantes = max(0, (suscripcion.vigente_hasta - ahora()).days)
             nombres = {**{c: p.nombre for c, p in PLANES.items()}, "gratis": "Gratis", "consultora": "Consultoras"}
             return plantillas.TemplateResponse(request, "cuenta.html", {
                 "empresa": empresa, "suscripcion": suscripcion, "plan_actual": nombres.get(empresa.plan, empresa.plan),
-                "vigente_hasta": _fecha(suscripcion.vigente_hasta), "dias_restantes": restantes,
-                "opciones": opciones, "pagos": pagos, "token": token, "rut": rutlib.formatear(empresa.rut) if empresa.rut else "",
+                "vigente_hasta": _fecha(suscripcion.vigente_hasta), "dias_restantes": restantes, "mandato": mandato,
+                "nombre_mandato": nombres.get(mandato.plan) if mandato else "",
+                "opciones": opciones, "pagos": pagos, "token": token, "prestador": prestador,
+                "rut": rutlib.formatear(empresa.rut) if empresa.rut else "", "pagos_activos": mp is not None,
             })
 
-    @router.post("/cuenta/{token}/pagar")
-    def pagar(request: Request, token: str, plan: str = Form(...), periodicidad: str = Form(...)):
-        if flow is None:
+    @router.post("/cuenta/{token}/suscribir")
+    def suscribir(request: Request, token: str, plan: str = Form(...), periodicidad: str = Form(...)):
+        if mp is None:
             return mensaje(request, "Pagos no disponibles", "Todavía no podemos recibir pagos en línea. Escríbenos a hola@calza.cl.", estado=503)
         with Sesion() as s:
             empresa = empresa_por_token(s, token)
             if empresa is None:
                 return mensaje(request, "Enlace no válido", "Escribe CUENTA a Calza por WhatsApp para recibir un enlace nuevo.", estado=404)
             try:
-                url = iniciar_pago(s, empresa, flow, plan=plan, periodicidad=periodicidad, url_publica=url_publica)
+                url = iniciar_suscripcion(s, empresa, mp, plan=plan, periodicidad=periodicidad, url_publica=url_publica)
             except ValueError:
                 return mensaje(request, "Plan no válido", "Vuelve a tu cuenta y elige uno de los planes.", estado=400)
-            except ErrorFlow as e:
+            except ErrorMercadoPago as e:
                 s.rollback()
-                log.error("No se pudo crear el pago en Flow: %s", e)
-                return mensaje(request, "No pudimos iniciar el pago", "Inténtalo de nuevo en unos minutos.", estado=502)
+                log.error("No se pudo crear la suscripción en Mercado Pago: %s", e)
+                return mensaje(request, "No pudimos iniciar la suscripción", "Inténtalo de nuevo en unos minutos.", estado=502)
         return RedirectResponse(url, status_code=303)
 
-    @router.post("/pagos/flow/confirmacion")
-    def confirmacion(token: str = Form(...)):
-        """Aviso de Flow (servidor a servidor). Siempre se verifica el estado consultando a Flow."""
-        if flow is None:
+    @router.post("/cuenta/{token}/cancelar")
+    def cancelar(request: Request, token: str):
+        if mp is None:
+            return mensaje(request, "Pagos no disponibles", "Escríbenos a hola@calza.cl.", estado=503)
+        with Sesion() as s:
+            empresa = empresa_por_token(s, token)
+            if empresa is None:
+                return mensaje(request, "Enlace no válido", "Escribe CUENTA a Calza por WhatsApp para recibir un enlace nuevo.", estado=404)
+            try:
+                cancelar_renovacion(s, empresa, mp)
+            except ErrorMercadoPago as e:
+                s.rollback()
+                log.error("No se pudo cancelar la suscripción: %s", e)
+                return mensaje(request, "No pudimos cancelar", "Inténtalo de nuevo en unos minutos o escríbenos a hola@calza.cl.", estado=502)
+        return RedirectResponse(f"/cuenta/{token}", status_code=303)
+
+    @router.post("/pagos/mercadopago/webhook")
+    async def webhook_mp(request: Request):
+        """Avisos de Mercado Pago. Se verifica la firma y luego se consulta la API: nunca se confía en el aviso."""
+        if mp is None:
             return PlainTextResponse("no configurado", status_code=503)
+        try:
+            cuerpo = await request.json()
+        except ValueError:
+            cuerpo = {}
+        tipo = request.query_params.get("type") or cuerpo.get("type") or ""
+        data_id = request.query_params.get("data.id") or str((cuerpo.get("data") or {}).get("id") or "")
+        if not data_id:
+            return PlainTextResponse("ok")
+        if mp_webhook_secreto and not verificar_firma(
+            mp_webhook_secreto, request.headers.get("x-signature"), request.headers.get("x-request-id"), data_id,
+        ):
+            return PlainTextResponse("firma inválida", status_code=401)
         with Sesion() as s:
             try:
-                confirmar_pago(s, flow, token)
-            except ErrorFlow as e:
-                log.error("No se pudo confirmar el pago: %s", e)
-                return PlainTextResponse("error", status_code=502)
+                if tipo == "subscription_preapproval":
+                    actualizar_mandato(s, mp, data_id)
+                elif tipo == "subscription_authorized_payment":
+                    registrar_cobro(s, mp, data_id)
+            except ErrorMercadoPago as e:
+                log.error("No se pudo procesar el aviso de Mercado Pago (%s %s): %s", tipo, data_id, e)
+                return PlainTextResponse("error", status_code=502)  # Mercado Pago reintentará
         return PlainTextResponse("ok")
 
-    @router.api_route("/pagos/flow/retorno", methods=["GET", "POST"], response_class=HTMLResponse)
-    async def retorno(request: Request):
-        """Flow devuelve aquí al cliente después de pagar."""
-        token = request.query_params.get("token") or (await request.form()).get("token", "")
-        pago = None
-        if flow is not None and token:
+    @router.get("/pagos/mercadopago/retorno", response_class=HTMLResponse)
+    def retorno(request: Request, preapproval_id: str = ""):
+        """Mercado Pago devuelve aquí al cliente después de suscribirse."""
+        mandato, inicio_cobro = None, None
+        if mp is not None and preapproval_id:
             with Sesion() as s:
                 try:
-                    pago = confirmar_pago(s, flow, str(token))
-                except ErrorFlow as e:
-                    log.error("No se pudo confirmar el pago en el retorno: %s", e)
-                estado = pago.estado if pago else None
-        else:
-            estado = None
-        if estado == "pagado":
-            return mensaje(request, "¡Pago recibido!", "Tu plan ya está activo. Te enviaremos la factura a tu correo.", chip="Pagado", chip_clase="ok")
-        if estado in ("rechazado", "anulado"):
-            return mensaje(request, "El pago no se completó", "No se realizó ningún cargo. Puedes intentarlo de nuevo desde tu cuenta.", chip="Sin cargo", chip_clase="error")
-        return mensaje(request, "Estamos confirmando tu pago", "Puede tardar unos minutos. Te avisaremos cuando esté listo.", chip="Pendiente", chip_clase="oro")
+                    mandato = actualizar_mandato(s, mp, preapproval_id)
+                except ErrorMercadoPago as e:
+                    log.error("No se pudo confirmar la suscripción en el retorno: %s", e)
+                if mandato is not None:
+                    suscripcion = s.scalar(select(Suscripcion).where(Suscripcion.empresa_id == mandato.empresa_id))
+                    if suscripcion.vigente_hasta > ahora():
+                        inicio_cobro = _fecha(suscripcion.vigente_hasta)
+        estado = mandato.estado if mandato else None
+        if estado == "authorized":
+            texto = (f"Tu plan quedó con renovación automática. El primer cobro será el {inicio_cobro}: hasta entonces no pagas nada."
+                     if inicio_cobro else "Tu plan quedó activo con renovación automática. Te enviaremos la factura a tu correo.")
+            return mensaje(request, "¡Suscripción lista!", texto, chip="Activa", chip_clase="ok")
+        if estado in ("cancelled", "paused"):
+            return mensaje(request, "La suscripción no se completó", "No se realizó ningún cargo. Puedes intentarlo de nuevo desde tu cuenta.", chip="Sin cargo", chip_clase="error")
+        return mensaje(request, "Estamos confirmando tu suscripción", "Puede tardar unos minutos. Te avisaremos cuando esté lista.", chip="Pendiente", chip_clase="oro")
 
     @router.get("/terminos", response_class=HTMLResponse)
     def terminos(request: Request):
-        return plantillas.TemplateResponse(request, "legal.html", {"titulo": "Términos del servicio", "fecha": legal.FECHA, "secciones": legal.TERMINOS})
+        return plantillas.TemplateResponse(request, "legal.html", {"titulo": "Términos del servicio", "fecha": legal.FECHA, "secciones": legal.terminos(prestador)})
 
     @router.get("/privacidad", response_class=HTMLResponse)
     def privacidad(request: Request):
-        return plantillas.TemplateResponse(request, "legal.html", {"titulo": "Política de privacidad", "fecha": legal.FECHA, "secciones": legal.PRIVACIDAD})
+        return plantillas.TemplateResponse(request, "legal.html", {"titulo": "Política de privacidad", "fecha": legal.FECHA, "secciones": legal.privacidad(prestador)})
 
     return router

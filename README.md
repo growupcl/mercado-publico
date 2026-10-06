@@ -30,9 +30,13 @@ Sitio: [calza.cl](https://calza.cl) · El nombre interno del proyecto y del coma
    competitivo, quién suele ganar y si el presupuesto alcanza a precios de mercado. Se alimenta de las órdenes de compra
    y de las licitaciones adjudicadas que trae `licita sync --ordenes`; no usa IA, así que no tiene costo variable.
 9. **Sitio web, registro y pagos** (`licita servidor`): página de inicio con los planes, registro con 14 días de prueba
-   del plan Pro sin tarjeta, cuenta con enlace privado (sin contraseñas; por WhatsApp se pide con *CUENTA*) y pago
-   mensual o anual con **Flow** (Webpay, débito y crédito). Precio fundador del plan Pro para los primeros 100 clientes,
-   congelado de por vida. Al vencer sin pagar, la cuenta pasa al plan gratis (`licita suscripciones`, una vez al día).
+   del plan Pro sin tarjeta, cuenta con enlace privado (sin contraseñas; por WhatsApp se pide con *CUENTA*) y
+   **suscripción con Mercado Pago** (tarjeta de crédito o débito) que cobra sola cada mes o cada año. Si el cliente se
+   suscribe durante la prueba, el primer cobro es al terminar la prueba. Puede cambiar de plan o cancelar la
+   renovación desde su cuenta. Precio fundador del plan Pro para los primeros 100 clientes, congelado de por vida.
+   Al vencer sin pago, la cuenta pasa al plan gratis (`licita suscripciones`, una vez al día; con renovación
+   automática hay 3 días de gracia para que llegue el cobro). Durante el piloto factura **Virtus SpA**
+   (`LICITA_PRESTADOR`).
 
 Las órdenes de compra quedan guardadas para construir más adelante la inteligencia de precios.
 
@@ -70,9 +74,10 @@ licita servidor --puerto 8000      # sitio web en http://localhost:8000 y webhoo
 licita suscripciones               # vence las suscripciones impagas (programar una vez al día)
 ```
 
-Para probar los pagos, crea una cuenta en el [sandbox de Flow](https://sandbox.flow.cl), copia la API key y la clave
-secreta en `FLOW_API_KEY` y `FLOW_SECRET_KEY`, y define `LICITA_URL_PUBLICA` con una URL pública (Flow necesita
-poder llamar a `/pagos/flow/confirmacion`).
+Para probar los pagos, usa las **credenciales de prueba** de la cuenta de Mercado Pago (Tus integraciones →
+Credenciales de prueba) en `MERCADOPAGO_ACCESS_TOKEN`, configura un webhook hacia
+`https://<tu-dominio>/pagos/mercadopago/webhook` con los eventos *Planes y suscripciones*, copia su clave secreta en
+`MERCADOPAGO_WEBHOOK_SECRET` y paga con un usuario y tarjetas de prueba. Ver [docs/mercadopago.md](docs/mercadopago.md).
 
 ## Pruebas
 
@@ -99,7 +104,7 @@ así que no necesitan ticket ni clave.
 | `src/licita/precios.py` | Inteligencia de precios: referencias por producto, rango competitivo y proveedores frecuentes |
 | `src/licita/web.py` y `src/licita/plantillas/` | Sitio web: inicio, registro, cuenta, retorno de pagos, términos y privacidad |
 | `src/licita/suscripciones.py` | Registro, prueba gratuita, pagos, activación y vencimientos |
-| `src/licita/flow.py` | Cliente de la API de pagos de Flow (firma HMAC) |
+| `src/licita/mercadopago.py` | Cliente de suscripciones de Mercado Pago y verificación de la firma de sus avisos |
 | `src/licita/planes.py` | Planes y precios (con IVA), descuento anual y precio fundador |
 | `src/licita/legal.py` | **Borrador** de términos y política de privacidad: revisar con un abogado antes del lanzamiento |
 | `src/licita/analisis.py` | Análisis de bases en PDF con Claude Sonnet, reutilización por archivo y límite mensual |
@@ -113,5 +118,5 @@ así que no necesitan ticket ni clave.
 - Descarga automática de las bases desde Mercado Público (hoy el usuario reenvía el PDF), si los términos de uso lo permiten.
 - Carga del histórico de órdenes de compra desde datos-abiertos.chilecompra.cl, para tener precios de referencia desde el primer día.
 - Factura electrónica automática al confirmar cada pago (hoy queda marcada como pendiente de emitir).
-- Recordatorios de pago por WhatsApp y correo antes del vencimiento.
+- Aviso por WhatsApp o correo cuando un cobro automático es rechazado.
 - Migraciones de base de datos (Alembic) antes de pasar a producción.

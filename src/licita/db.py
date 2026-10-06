@@ -207,7 +207,26 @@ class Suscripcion(Base):
     vigente_hasta: Mapped[datetime] = mapped_column(DateTime)
     # Precio fundador del plan Pro: se congela de por vida al primer pago.
     precio_fundador: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Suscripción de Mercado Pago que cobra automáticamente (None = sin renovación automática).
+    mandato_activo_id: Mapped[int | None] = mapped_column(Integer)
     creada_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
+
+
+class MandatoPago(Base):
+    """Una suscripción creada en Mercado Pago (autorización de cobro recurrente)."""
+
+    __tablename__ = "mandatos_pago"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    empresa_id: Mapped[int] = mapped_column(ForeignKey("empresas.id"), index=True)
+    mp_id: Mapped[str] = mapped_column(String(64), default="", index=True)
+    referencia: Mapped[str] = mapped_column(String(40), unique=True)
+    plan: Mapped[str] = mapped_column(String(20))
+    periodicidad: Mapped[str] = mapped_column(String(10))
+    monto: Mapped[int] = mapped_column(Integer)  # CLP con IVA, por período
+    precio_fundador: Mapped[bool] = mapped_column(Boolean, default=False)
+    estado: Mapped[str] = mapped_column(String(12), default="pending")  # pending, authorized, paused, cancelled
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
 
 
 class Pago(Base):
@@ -218,11 +237,9 @@ class Pago(Base):
     plan: Mapped[str] = mapped_column(String(20))
     periodicidad: Mapped[str] = mapped_column(String(10))
     monto: Mapped[int] = mapped_column(Integer)  # CLP con IVA
-    precio_fundador: Mapped[bool] = mapped_column(Boolean, default=False)
-    orden_comercio: Mapped[str] = mapped_column(String(40), unique=True)
-    flow_token: Mapped[str] = mapped_column(String(120), default="", index=True)
-    flow_order: Mapped[int | None] = mapped_column(Integer)
-    estado: Mapped[str] = mapped_column(String(12), default="pendiente")  # pendiente, pagado, rechazado, anulado
+    mandato_id: Mapped[int] = mapped_column(ForeignKey("mandatos_pago.id"), index=True)
+    mp_cobro_id: Mapped[str] = mapped_column(String(64), unique=True)  # authorized payment de Mercado Pago
+    estado: Mapped[str] = mapped_column(String(12), default="pagado")  # pagado, rechazado
     pagado_en: Mapped[datetime | None] = mapped_column(DateTime)
     factura_emitida: Mapped[bool] = mapped_column(Boolean, default=False)
     creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)

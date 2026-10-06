@@ -20,9 +20,9 @@ class Config:
     limite_analisis_mes: int = 15
     url_publica: str = "http://localhost:8000"
     whatsapp_publico: str = ""
-    flow_api_key: str = ""
-    flow_secret_key: str = ""
-    flow_url: str = "https://sandbox.flow.cl/api"
+    mercadopago_access_token: str = ""
+    mercadopago_webhook_secret: str = ""
+    prestador: str = "Virtus SpA"
 
     @classmethod
     def desde_entorno(cls) -> "Config":
@@ -43,7 +43,7 @@ class Config:
             limite_analisis_mes=int(os.environ.get("LICITA_LIMITE_ANALISIS_MES", "15")),
             url_publica=os.environ.get("LICITA_URL_PUBLICA", "http://localhost:8000").rstrip("/"),
             whatsapp_publico=os.environ.get("LICITA_WHATSAPP_PUBLICO", ""),
-            flow_api_key=os.environ.get("FLOW_API_KEY", ""),
-            flow_secret_key=os.environ.get("FLOW_SECRET_KEY", ""),
-            flow_url=os.environ.get("FLOW_URL", "https://sandbox.flow.cl/api"),
+            mercadopago_access_token=os.environ.get("MERCADOPAGO_ACCESS_TOKEN", ""),
+            mercadopago_webhook_secret=os.environ.get("MERCADOPAGO_WEBHOOK_SECRET", ""),
+            prestador=os.environ.get("LICITA_PRESTADOR", "Virtus SpA"),
         )

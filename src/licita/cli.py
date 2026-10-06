@@ -24,7 +24,7 @@ from sqlalchemy import select
 from .config import Config
 from .db import Empresa, crear_sesiones
 from .analisis import DocumentoInvalido, LimiteAlcanzado
-from .flow import ErrorFlow
+from .mercadopago import ErrorMercadoPago
 from .ia import ErrorIA
 from .mercadopublico import MercadoPublicoError
 from .whatsapp import ErrorWhatsApp, normalizar_telefono
@@ -189,14 +189,15 @@ def cmd_servidor(args, config: Config, Sesion) -> int:
     from .servidor import crear_app
     from .web import crear_router_web
 
-    flow = None
-    if config.flow_api_key:
-        from .flow import ClienteFlow
+    mp = None
+    if config.mercadopago_access_token:
+        from .mercadopago import ClienteMercadoPago
 
-        flow = ClienteFlow(config.flow_api_key, config.flow_secret_key, url_base=config.flow_url)
+        mp = ClienteMercadoPago(config.mercadopago_access_token)
     router_web = crear_router_web(
-        Sesion, flow=flow, ia=AsistenteIA(modelo=config.modelo_clasificacion),
+        Sesion, mp=mp, ia=AsistenteIA(modelo=config.modelo_clasificacion),
         url_publica=config.url_publica, whatsapp_publico=config.whatsapp_publico,
+        mp_webhook_secreto=config.mercadopago_webhook_secret, prestador=config.prestador,
     )
     wa = _whatsapp(config) if config.whatsapp_token else None
     app = crear_app(
@@ -207,8 +208,8 @@ def cmd_servidor(args, config: Config, Sesion) -> int:
     )
     if wa is None:
         print("Aviso: WhatsApp no está configurado; el servidor solo atiende el sitio web.")
-    if flow is None:
-        print("Aviso: Flow no está configurado; los pagos en línea están desactivados.")
+    if mp is None:
+        print("Aviso: Mercado Pago no está configurado; los pagos en línea están desactivados.")
     uvicorn.run(app, host=args.host, port=args.puerto)
     return 0
 
@@ -297,7 +298,7 @@ def main(argv: list[str] | None = None) -> int:
     Sesion = crear_sesiones(config.database_url)
     try:
         return args.fn(args, config, Sesion)
-    except (MercadoPublicoError, ErrorIA, ErrorWhatsApp, ErrorFlow, DocumentoInvalido, LimiteAlcanzado, ValueError) as e:
+    except (MercadoPublicoError, ErrorIA, ErrorWhatsApp, ErrorMercadoPago, DocumentoInvalido, LimiteAlcanzado, ValueError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
 

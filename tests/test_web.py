@@ -10,15 +10,14 @@ from fastapi.testclient import TestClient
 
 from licita import rut as rutlib
 from licita.conversacion import procesar_webhook
-from licita.db import Empresa, Pago, Suscripcion, ahora
-from licita.flow import ClienteFlow, EstadoPago, PagoCreado, firmar
+from licita.db import Empresa, MandatoPago, Pago, Suscripcion, ahora
+from licita.mercadopago import ClienteMercadoPago, CobroMP, SuscripcionMP, verificar_firma
 from licita.ia import ErrorIA, PerfilExtraido
 from licita.notificaciones import enviar_resumenes
 from licita.planes import monto
 from licita.servidor import crear_app
 from licita.suscripciones import (
-    DatosRegistro, ErrorRegistro, confirmar_pago, empresa_por_token, por_vencer, registrar_empresa,
-    revisar_vencimientos, sumar_meses,
+    DatosRegistro, empresa_por_token, por_vencer, registrar_empresa, revisar_vencimientos, sumar_meses,
 )
 from licita.web import crear_router_web
 
@@ -42,28 +41,52 @@ class IAFalsa:
         return PerfilExtraido(rubros=["artículos de aseo"], palabras_clave=["detergente", "guantes"])
 
 
-class FlowFalso:
-    def __init__(self, estado=2, monto=None):
-        self.creados = []
-        self.estado = estado
-        self.monto = monto
+SECRETO = "secreto-webhook"
 
-    def crear_pago(self, **kw):
-        self.creados.append(kw)
-        return PagoCreado(url=f"https://sandbox.flow.cl/app/web/pay.php?token=TOK{len(self.creados)}", token=f"TOK{len(self.creados)}", flow_order=99)
 
-    def estado_pago(self, token):
-        pedido = self.creados[int(token.removeprefix("TOK")) - 1]
-        return EstadoPago(estado=self.estado, orden_comercio=pedido["orden_comercio"],
-                          monto=self.monto if self.monto is not None else pedido["monto"], flow_order=99)
+class MPFalso:
+    """Imita la API de Mercado Pago: suscripciones y cobros."""
+
+    def __init__(self):
+        self.creadas = []
+        self.estados = {}
+        self.cobros = {}
+        self.canceladas = []
+
+    def crear_suscripcion(self, **kw):
+        self.creadas.append(kw)
+        mp_id = f"PRE{len(self.creadas)}"
+        self.estados[mp_id] = "pending"
+        return SuscripcionMP(id=mp_id, estado="pending", referencia=kw["referencia"], monto=kw["monto"],
+                             url_pago=f"https://www.mercadopago.cl/subscriptions/checkout?preapproval_id={mp_id}")
+
+    def obtener_suscripcion(self, mp_id):
+        kw = self.creadas[int(mp_id.removeprefix("PRE")) - 1]
+        return SuscripcionMP(id=mp_id, estado=self.estados[mp_id], referencia=kw["referencia"], monto=kw["monto"])
+
+    def cancelar_suscripcion(self, mp_id):
+        self.estados[mp_id] = "cancelled"
+        self.canceladas.append(mp_id)
+        return self.obtener_suscripcion(mp_id)
+
+    def obtener_cobro(self, cobro_id):
+        return self.cobros[cobro_id]
+
+
+def _aviso(cliente, tipo, data_id, *, secreto=SECRETO):
+    ts, req = "1760000000", "req-1"
+    firma = hmac.new(secreto.encode(), f"id:{data_id.lower()};request-id:{req};ts:{ts};".encode(), hashlib.sha256).hexdigest()
+    return cliente.post(f"/pagos/mercadopago/webhook?type={tipo}&data.id={data_id}",
+                        json={"type": tipo, "data": {"id": data_id}},
+                        headers={"x-signature": f"ts={ts},v1={firma}", "x-request-id": req})
 
 
 @pytest.fixture
 def web(Sesion):
-    flow = FlowFalso()
-    app = crear_app(Sesion, router_web=crear_router_web(Sesion, flow=flow, ia=IAFalsa(), url_publica="https://calza.cl",
-                                                        whatsapp_publico="56900000000"))
-    return TestClient(app), Sesion, flow
+    mp = MPFalso()
+    app = crear_app(Sesion, router_web=crear_router_web(Sesion, mp=mp, ia=IAFalsa(), url_publica="https://calza.cl",
+                                                        whatsapp_publico="56900000000", mp_webhook_secreto=SECRETO))
+    return TestClient(app), Sesion, mp
 
 
 def _registrar(cliente):
@@ -92,28 +115,37 @@ def test_sumar_meses():
     assert sumar_meses(datetime(2026, 10, 20), 12) == datetime(2027, 10, 20)
 
 
-def test_firma_y_cliente_flow():
-    esperado = hmac.new(b"secreto", b"amount5000apiKeyAKcommerceOrderX", hashlib.sha256).hexdigest()
-    assert firmar({"commerceOrder": "X", "apiKey": "AK", "amount": 5000}, "secreto") == esperado
-    capturado = {}
+def test_firma_de_webhook_de_mercado_pago():
+    v1 = hmac.new(b"clave", b"id:abc123;request-id:r1;ts:170;", hashlib.sha256).hexdigest()
+    assert verificar_firma("clave", f"ts=170,v1={v1}", "r1", "ABC123")
+    assert not verificar_firma("clave", f"ts=170,v1={v1}", "otro", "ABC123")
+    assert not verificar_firma("clave", None, "r1", "ABC123")
+
+
+def test_cliente_mercado_pago():
+    vistos = []
 
     def handler(request):
-        if request.method == "POST":
-            capturado["form"] = parse_qs(request.content.decode())
-            return httpx.Response(200, json={"url": "https://sandbox.flow.cl/app/web/pay.php", "token": "T1", "flowOrder": 7})
-        capturado["get"] = dict(request.url.params)
-        return httpx.Response(200, json={"status": 2, "commerceOrder": "CALZA-1", "amount": "19990", "flowOrder": 7})
+        vistos.append(request)
+        if request.url.path == "/preapproval":
+            return httpx.Response(201, json={"id": "2c93", "status": "pending", "external_reference": "CALZA-1-AB",
+                                             "init_point": "https://www.mercadopago.cl/subscriptions/checkout?preapproval_id=2c93",
+                                             "auto_recurring": {"transaction_amount": 39990}})
+        return httpx.Response(200, json={"id": 7001, "preapproval_id": "2c93", "transaction_amount": 39990,
+                                         "payment": {"id": 555, "status": "approved"}})
 
-    flow = ClienteFlow("AK", "secreto", http=httpx.Client(transport=httpx.MockTransport(handler)))
-    creado = flow.crear_pago(orden_comercio="CALZA-1", asunto="Calza", monto=19990, email="a@b.cl",
-                             url_confirmacion="https://calza.cl/c", url_retorno="https://calza.cl/r")
-    assert creado.url == "https://sandbox.flow.cl/app/web/pay.php?token=T1"
-    form = {k: v[0] for k, v in capturado["form"].items()}
-    firma = form.pop("s")
-    assert firma == firmar(form, "secreto") and form["amount"] == "19990" and form["currency"] == "CLP"
-    estado = flow.estado_pago("T1")
-    assert estado.pagado and estado.monto == 19990
-    assert capturado["get"]["s"] == firmar({"token": "T1", "apiKey": "AK"}, "secreto")
+    mp = ClienteMercadoPago("TEST-123", http=httpx.Client(transport=httpx.MockTransport(handler)))
+    creada = mp.crear_suscripcion(referencia="CALZA-1-AB", motivo="Calza plan Pro mensual", email="a@b.cl", monto=39990,
+                                  meses=1, url_retorno="https://calza.cl/pagos/mercadopago/retorno", inicio=datetime(2026, 10, 20, 12))
+    assert creada.url_pago.endswith("preapproval_id=2c93") and creada.monto == 39990
+    import json
+    cuerpo = json.loads(vistos[0].content)
+    assert vistos[0].headers["Authorization"] == "Bearer TEST-123" and vistos[0].headers["X-Idempotency-Key"]
+    assert cuerpo["auto_recurring"] == {"frequency": 1, "frequency_type": "months", "transaction_amount": 39990,
+                                        "currency_id": "CLP", "start_date": "2026-10-20T12:00:00.000Z"}
+    assert cuerpo["status"] == "pending" and cuerpo["external_reference"] == "CALZA-1-AB"
+    cobro = mp.obtener_cobro("7001")
+    assert (cobro.suscripcion_id, cobro.estado_pago, cobro.monto) == ("2c93", "approved", 39990)
 
 
 # --- Registro ---
@@ -166,61 +198,107 @@ def test_si_la_ia_falla_usa_las_palabras_de_la_descripcion(Sesion):
         assert "guantes" in e.palabras_clave and "basura" in e.palabras_clave
 
 
-# --- Cuenta y pagos ---
+# --- Cuenta y suscripción ---
 
-def test_cuenta_y_pago_completo(web):
-    cliente, Sesion, flow = web
+def _suscribir(cliente, token, plan="pro", periodicidad="mensual"):
+    r = cliente.post(f"/cuenta/{token}/suscribir", data={"plan": plan, "periodicidad": periodicidad}, follow_redirects=False)
+    assert r.status_code == 303, r.text
+    return r.headers["location"]
+
+
+def test_suscripcion_completa_durante_la_prueba(web):
+    cliente, Sesion, mp = web
     _, token = _registrar(cliente)
     cuenta = cliente.get(f"/cuenta/{token}")
     assert cuenta.status_code == 200 and "Prueba gratuita" in cuenta.text and "$39.990" in cuenta.text
+    assert "Virtus SpA emite la factura a nombre de Aseo Sur SpA" in cuenta.text
     assert cliente.get("/cuenta/token-que-no-existe-xxxxxxxx").status_code == 404
 
-    r = cliente.post(f"/cuenta/{token}/pagar", data={"plan": "pro", "periodicidad": "mensual"}, follow_redirects=False)
-    assert r.status_code == 303 and r.headers["location"].startswith("https://sandbox.flow.cl/")
-    assert flow.creados[0]["monto"] == 39990 and flow.creados[0]["url_confirmacion"] == "https://calza.cl/pagos/flow/confirmacion"
+    assert _suscribir(cliente, token).startswith("https://www.mercadopago.cl/subscriptions/checkout")
+    pedido = mp.creadas[0]
+    with Sesion() as s:
+        fin_prueba = s.query(Suscripcion).one().vigente_hasta
+    assert pedido["monto"] == 39990 and pedido["meses"] == 1 and pedido["inicio"] == fin_prueba  # cobra al terminar la prueba
 
-    assert cliente.post("/pagos/flow/confirmacion", data={"token": "TOK1"}).text == "ok"
+    mp.estados["PRE1"] = "authorized"
+    retorno = cliente.get("/pagos/mercadopago/retorno", params={"preapproval_id": "PRE1"})
+    assert "¡Suscripción lista!" in retorno.text and "El primer cobro será el" in retorno.text
     with Sesion() as s:
         sus = s.query(Suscripcion).one()
-        pago = s.query(Pago).one()
-        assert (pago.estado, sus.estado, sus.plan, sus.precio_fundador) == ("pagado", "activa", "pro", True)
-        # Los días de prueba se suman al mes pagado.
-        assert timedelta(days=13 + 28) < sus.vigente_hasta - ahora() <= timedelta(days=14 + 31)
-        fin = sus.vigente_hasta
+        assert sus.mandato_activo_id is not None and sus.estado == "prueba"
+    assert "Renovación automática" in cliente.get(f"/cuenta/{token}").text
 
-    retorno = cliente.post("/pagos/flow/retorno", data={"token": "TOK1"})
-    assert "¡Pago recibido!" in retorno.text
-    with Sesion() as s:  # confirmar dos veces no extiende dos veces
-        assert s.query(Suscripcion).one().vigente_hasta == fin
-
-
-def test_pago_con_monto_distinto_no_activa(web):
-    cliente, Sesion, flow = web
-    _, token = _registrar(cliente)
-    cliente.post(f"/cuenta/{token}/pagar", data={"plan": "pyme", "periodicidad": "anual"}, follow_redirects=False)
-    flow.monto = 100
-    cliente.post("/pagos/flow/confirmacion", data={"token": "TOK1"})
+    # Al terminar la prueba, Mercado Pago cobra y avisa.
+    mp.cobros["9001"] = CobroMP(id="9001", suscripcion_id="PRE1", estado_pago="approved", monto=39990)
+    assert _aviso(cliente, "subscription_authorized_payment", "9001").text == "ok"
     with Sesion() as s:
-        assert s.query(Pago).one().estado == "pendiente"
+        sus = s.query(Suscripcion).one()
+        assert (sus.estado, sus.plan, sus.precio_fundador) == ("activa", "pro", True)
+        assert sus.vigente_hasta == sumar_meses(fin_prueba, 1)
+        assert s.query(Pago).one().estado == "pagado"
+    _aviso(cliente, "subscription_authorized_payment", "9001")  # aviso repetido
+    with Sesion() as s:
+        assert s.query(Pago).count() == 1 and s.query(Suscripcion).one().vigente_hasta == sumar_meses(fin_prueba, 1)
+
+
+def test_aviso_con_firma_invalida_se_rechaza(web):
+    cliente, _, mp = web
+    assert _aviso(cliente, "subscription_preapproval", "PRE1", secreto="otro").status_code == 401
+
+
+def test_cambio_de_plan_cancela_la_suscripcion_anterior(web):
+    cliente, Sesion, mp = web
+    _, token = _registrar(cliente)
+    _suscribir(cliente, token, "pyme", "mensual")
+    mp.estados["PRE1"] = "authorized"
+    _aviso(cliente, "subscription_preapproval", "PRE1")
+    _suscribir(cliente, token, "pro", "anual")
+    mp.estados["PRE2"] = "authorized"
+    _aviso(cliente, "subscription_preapproval", "PRE2")
+    assert mp.canceladas == ["PRE1"]
+    with Sesion() as s:
+        sus = s.query(Suscripcion).one()
+        assert (sus.plan, sus.periodicidad) == ("pro", "anual")
+        assert s.get(MandatoPago, sus.mandato_activo_id).monto == 431900
+
+
+def test_cancelar_renovacion(web):
+    cliente, Sesion, mp = web
+    _, token = _registrar(cliente)
+    _suscribir(cliente, token, "pyme", "mensual")
+    mp.estados["PRE1"] = "authorized"
+    _aviso(cliente, "subscription_preapproval", "PRE1")
+    r = cliente.post(f"/cuenta/{token}/cancelar", follow_redirects=False)
+    assert r.status_code == 303 and mp.canceladas == ["PRE1"]
+    with Sesion() as s:
+        assert s.query(Suscripcion).one().mandato_activo_id is None
+
+
+def test_cobro_rechazado_o_con_monto_distinto_no_extiende(web):
+    cliente, Sesion, mp = web
+    _, token = _registrar(cliente)
+    _suscribir(cliente, token, "pyme", "anual")
+    mp.estados["PRE1"] = "authorized"
+    _aviso(cliente, "subscription_preapproval", "PRE1")
+    mp.cobros["1"] = CobroMP(id="1", suscripcion_id="PRE1", estado_pago="approved", monto=100)
+    mp.cobros["2"] = CobroMP(id="2", suscripcion_id="PRE1", estado_pago="rejected", monto=215900)
+    _aviso(cliente, "subscription_authorized_payment", "1")
+    _aviso(cliente, "subscription_authorized_payment", "2")
+    with Sesion() as s:
+        assert [p.estado for p in s.query(Pago)] == ["rechazado"]
         assert s.query(Suscripcion).one().estado == "prueba"
 
 
-def test_pago_rechazado(web):
-    cliente, Sesion, flow = web
+def test_sin_mercado_pago_configurado(Sesion):
+    cliente = TestClient(crear_app(Sesion, router_web=crear_router_web(Sesion, mp=None, ia=IAFalsa(), url_publica="https://calza.cl")))
     _, token = _registrar(cliente)
-    cliente.post(f"/cuenta/{token}/pagar", data={"plan": "pyme", "periodicidad": "mensual"}, follow_redirects=False)
-    flow.estado = 3
-    r = cliente.get("/pagos/flow/retorno", params={"token": "TOK1"})
-    assert "El pago no se completó" in r.text
-    with Sesion() as s:
-        assert s.query(Pago).one().estado == "rechazado"
+    assert "todavía no están habilitados" in cliente.get(f"/cuenta/{token}").text
+    assert cliente.post(f"/cuenta/{token}/suscribir", data={"plan": "pyme", "periodicidad": "mensual"}).status_code == 503
 
 
-def test_pagar_sin_flow_configurado(Sesion):
-    cliente = TestClient(crear_app(Sesion, router_web=crear_router_web(Sesion, flow=None, ia=IAFalsa(), url_publica="https://calza.cl")))
-    _, token = _registrar(cliente)
-    r = cliente.post(f"/cuenta/{token}/pagar", data={"plan": "pyme", "periodicidad": "mensual"})
-    assert r.status_code == 503
+def test_exige_secreto_de_webhook(Sesion):
+    with pytest.raises(ValueError, match="MERCADOPAGO_WEBHOOK_SECRET"):
+        crear_router_web(Sesion, mp=MPFalso(), ia=None, url_publica="https://calza.cl")
 
 
 # --- Vencimientos, WhatsApp y planes ---
@@ -233,11 +311,24 @@ def test_vencimiento_pasa_a_gratis_y_deja_de_recibir_resumen(web):
         assert [e.nombre for e, _ in por_vencer(s, dias=3, momento=en_10_dias)] == ["Aseo Sur"]
         vencidas = revisar_vencimientos(s, momento=ahora() + timedelta(days=15))
         assert [e.plan for e in vencidas] == ["gratis"]
+        assert "Virtus SpA" in cliente.get("/terminos").text
 
         class WA:
             enviados = []
         r = enviar_resumenes(s, WA())
         assert (r.plantillas, r.textos, r.sin_novedades) == (0, 0, 0)
+
+
+def test_con_renovacion_automatica_hay_dias_de_gracia(web):
+    cliente, Sesion, mp = web
+    _, token = _registrar(cliente)
+    _suscribir(cliente, token, "pyme", "mensual")
+    mp.estados["PRE1"] = "authorized"
+    _aviso(cliente, "subscription_preapproval", "PRE1")
+    with Sesion() as s:
+        fin = s.query(Suscripcion).one().vigente_hasta
+        assert revisar_vencimientos(s, momento=fin + timedelta(days=1)) == []  # el cobro puede venir atrasado
+        assert len(revisar_vencimientos(s, momento=fin + timedelta(days=4))) == 1
 
 
 def test_cuenta_por_whatsapp_genera_enlace_nuevo(web):

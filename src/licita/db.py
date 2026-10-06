@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, create_engine
+from sqlalchemy.pool import StaticPool
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 
@@ -72,7 +73,10 @@ class Empresa(Base):
     monto_min: Mapped[float | None] = mapped_column(Float)
     monto_max: Mapped[float | None] = mapped_column(Float)
     palabras_clave: Mapped[list[str]] = mapped_column(JSON, default=list)
-    whatsapp: Mapped[str] = mapped_column(String(20), default="")
+    whatsapp: Mapped[str] = mapped_column(String(20), default="", index=True)
+    whatsapp_activo: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Último mensaje recibido del usuario: abre la ventana de 24 h en que responder es gratis.
+    ultimo_mensaje_entrante: Mapped[datetime | None] = mapped_column(DateTime)
     creada_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
 
 
@@ -89,10 +93,32 @@ class Calce(Base):
     razon: Mapped[str] = mapped_column(Text, default="")
     puntaje_prefiltro: Mapped[float] = mapped_column(Float, default=0)
     notificado: Mapped[bool] = mapped_column(Boolean, default=False)
+    notificado_en: Mapped[datetime | None] = mapped_column(DateTime)
+    # Número con que apareció en el último resumen ("responde 1, 2, 3...").
+    posicion_resumen: Mapped[int | None] = mapped_column(Integer)
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
+
+
+class MensajeWhatsApp(Base):
+    """Registro de mensajes enviados y recibidos (auditoría y control de costos)."""
+
+    __tablename__ = "mensajes_whatsapp"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    empresa_id: Mapped[int | None] = mapped_column(ForeignKey("empresas.id"), index=True)
+    telefono: Mapped[str] = mapped_column(String(20))
+    direccion: Mapped[str] = mapped_column(String(10))  # "entrante" o "saliente"
+    tipo: Mapped[str] = mapped_column(String(20))  # "texto", "plantilla", "boton"
+    contenido: Mapped[str] = mapped_column(Text, default="")
+    wamid: Mapped[str] = mapped_column(String(120), default="")
     creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
 
 
 def crear_sesiones(database_url: str) -> sessionmaker:
-    engine = create_engine(database_url)
+    if database_url in ("sqlite://", "sqlite:///:memory:"):
+        # Base en memoria (pruebas): una sola conexión compartida entre hilos.
+        engine = create_engine(database_url, poolclass=StaticPool, connect_args={"check_same_thread": False})
+    else:
+        engine = create_engine(database_url)
     Base.metadata.create_all(engine)
     return sessionmaker(engine, expire_on_commit=False)

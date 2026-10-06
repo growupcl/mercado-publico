@@ -97,7 +97,7 @@ def test_resumen_diario_formato_whatsapp(Sesion, cliente_mp):
     assert "Hoy encontramos 1 licitación para ti" in texto
     assert "*Adquisición de insumos de aseo para CESFAM* (92% de calce)" in texto
     assert "Monto estimado: $8.500.000 · Cierra: 20-10-2026 15:00" in texto
-    assert "idLicitacion=1234-56-LE26" in texto
+    assert "Responde con el número" in texto
     assert "Mantención" not in texto
     # Ya notificado: el día siguiente no se repite.
     assert resumen_diario(s, e, momento=MOMENTO) is None

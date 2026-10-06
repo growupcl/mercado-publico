@@ -7,6 +7,14 @@ class Config:
     ticket: str
     database_url: str
     modelo_clasificacion: str
+    whatsapp_token: str = ""
+    whatsapp_phone_number_id: str = ""
+    whatsapp_verify_token: str = ""
+    whatsapp_app_secret: str = ""
+    whatsapp_api_version: str = "v23.0"
+    whatsapp_plantilla_resumen: str = "resumen_diario_licitaciones"
+    whatsapp_idioma: str = "es"
+    url_registro: str = ""
 
     @classmethod
     def desde_entorno(cls) -> "Config":
@@ -14,4 +22,12 @@ class Config:
             ticket=os.environ.get("MERCADOPUBLICO_TICKET", ""),
             database_url=os.environ.get("DATABASE_URL", "sqlite:///licita.db"),
             modelo_clasificacion=os.environ.get("LICITA_MODELO_CLASIFICACION", "claude-haiku-4-5"),
+            whatsapp_token=os.environ.get("WHATSAPP_TOKEN", ""),
+            whatsapp_phone_number_id=os.environ.get("WHATSAPP_PHONE_NUMBER_ID", ""),
+            whatsapp_verify_token=os.environ.get("WHATSAPP_VERIFY_TOKEN", ""),
+            whatsapp_app_secret=os.environ.get("WHATSAPP_APP_SECRET", ""),
+            whatsapp_api_version=os.environ.get("WHATSAPP_API_VERSION", "v23.0"),
+            whatsapp_plantilla_resumen=os.environ.get("WHATSAPP_PLANTILLA_RESUMEN", "resumen_diario_licitaciones"),
+            whatsapp_idioma=os.environ.get("WHATSAPP_IDIOMA", "es"),
+            url_registro=os.environ.get("LICITA_URL_REGISTRO", ""),
         )

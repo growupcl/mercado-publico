@@ -3,7 +3,7 @@
 Copiloto con IA para pymes que le venden al Estado a través de [Mercado Público](https://www.mercadopublico.cl).
 Encuentra las licitaciones que calzan con lo que vende cada empresa y se las envía en un resumen diario.
 
-> Estado: **MVP, fase 1** (motor de datos y calce). WhatsApp, web y cobro vienen en las fases siguientes.
+> Estado: **MVP, fase 2** (motor de datos, calce con IA y WhatsApp). Web y cobro vienen en las fases siguientes.
 
 ## Cómo funciona
 
@@ -16,7 +16,9 @@ Encuentra las licitaciones que calzan con lo que vende cada empresa y se las env
    extrae sus palabras clave.
 4. **Calce** (`licita calce`): un prefiltro sin IA (estado, cierre, región, monto, palabras clave) elige las mejores
    candidatas y la IA les asigna un puntaje de 0 a 100 con una explicación.
-5. **Resumen diario** (`licita resumen`): arma el mensaje con las mejores oportunidades, listo para enviar por WhatsApp.
+5. **Resumen diario** (`licita resumen`): arma el mensaje con las mejores oportunidades.
+6. **WhatsApp** (`licita whatsapp-enviar` y `licita servidor`): envía el resumen diario como una plantilla con botones
+   y responde los mensajes del usuario (detalle de cada licitación, baja/alta). Ver [docs/whatsapp.md](docs/whatsapp.md).
 
 Las órdenes de compra quedan guardadas para construir más adelante la inteligencia de precios.
 
@@ -33,6 +35,10 @@ set -a && source .env && set +a
 
 - **Ticket de Mercado Público**: se solicita con Clave Única en [chilecompra.cl/api](https://www.chilecompra.cl/api) y llega por correo.
 - **Clave de Claude**: en [console.anthropic.com](https://console.anthropic.com).
+- **WhatsApp** (opcional): ver [docs/whatsapp.md](docs/whatsapp.md).
+
+Nota: si ya tenías una base `licita.db` de la fase 1, bórrala para que se cree con las tablas nuevas
+(todavía no hay migraciones; se agregarán antes de pasar a producción).
 
 ## Uso
 
@@ -64,14 +70,17 @@ así que no necesitan ticket ni clave.
 | `src/licita/sync.py` | Sincronización diaria hacia la base de datos propia |
 | `src/licita/ia.py` | Clasificación, extracción de perfil y evaluación de calce con Claude (salidas estructuradas) |
 | `src/licita/calce.py` | Prefiltro sin IA y búsqueda de calces |
-| `src/licita/resumen.py` | Resumen diario en formato WhatsApp |
+| `src/licita/resumen.py` | Textos del resumen diario y del detalle de cada licitación |
+| `src/licita/whatsapp.py` | Cliente de la WhatsApp Cloud API de Meta y verificación de firma |
+| `src/licita/notificaciones.py` | Envío del resumen diario cuidando la ventana gratuita de 24 h |
+| `src/licita/conversacion.py` | Respuestas a los mensajes entrantes (botones, números, baja/alta) |
+| `src/licita/servidor.py` | Servidor web que recibe los webhooks de WhatsApp |
 | `src/licita/cli.py` | Línea de comandos |
 | `docs/modelo_financiero_licita.xlsx` | Modelo financiero (escenarios base y conservador) |
 
 ## Próximas fases
 
 - Probar con datos reales: validar formato de respuesta, volumen diario y límites del ticket.
-- Envío por WhatsApp (Cloud API de Meta) con plantillas *utility* y botones.
 - Análisis de bases (PDF) con Claude Sonnet y caché compartido entre usuarios.
 - Inteligencia de precios a partir de las órdenes de compra.
 - Web de registro, suscripción (Flow o Mercado Pago) y factura electrónica.

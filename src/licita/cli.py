@@ -6,6 +6,8 @@ Ejemplos:
   licita empresa-agregar --nombre "Aseo Sur" --descripcion "Vendemos insumos de aseo..." --regiones "Biobío,Ñuble"
   licita calce --empresa 1
   licita resumen --empresa 1
+  licita whatsapp-enviar
+  licita servidor --puerto 8000
 """
 
 from __future__ import annotations
@@ -21,6 +23,7 @@ from .config import Config
 from .db import Empresa, crear_sesiones
 from .ia import ErrorIA
 from .mercadopublico import MercadoPublicoError
+from .whatsapp import ErrorWhatsApp, normalizar_telefono
 
 
 def _ia(config: Config):
@@ -62,7 +65,7 @@ def cmd_empresa_agregar(args, config: Config, Sesion) -> int:
         monto_min=args.monto_min,
         monto_max=args.monto_max,
         palabras_clave=perfil.palabras_clave + perfil.rubros,
-        whatsapp=args.whatsapp or "",
+        whatsapp=normalizar_telefono(args.whatsapp or ""),
     )
     with Sesion() as s:
         s.add(empresa)
@@ -108,6 +111,37 @@ def cmd_resumen(args, config: Config, Sesion) -> int:
     return 0
 
 
+def _whatsapp(config: Config):
+    from .whatsapp import ClienteWhatsApp
+
+    return ClienteWhatsApp(config.whatsapp_token, config.whatsapp_phone_number_id, version=config.whatsapp_api_version)
+
+
+def cmd_whatsapp_enviar(args, config: Config, Sesion) -> int:
+    from .notificaciones import enviar_resumenes
+
+    with Sesion() as s:
+        r = enviar_resumenes(
+            s, _whatsapp(config), plantilla=config.whatsapp_plantilla_resumen, idioma=config.whatsapp_idioma,
+            umbral=args.umbral,
+        )
+    print(f"Plantillas: {r.plantillas} · Textos gratis (ventana abierta): {r.textos} · Sin novedades: {r.sin_novedades} · Errores: {r.errores}")
+    return 0
+
+
+def cmd_servidor(args, config: Config, Sesion) -> int:
+    import uvicorn
+
+    from .servidor import crear_app
+
+    app = crear_app(
+        Sesion, _whatsapp(config), verify_token=config.whatsapp_verify_token,
+        app_secret=config.whatsapp_app_secret, url_registro=config.url_registro,
+    )
+    uvicorn.run(app, host=args.host, port=args.puerto)
+    return 0
+
+
 def construir_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="licita", description="Copiloto de licitaciones de Mercado Público")
     sub = p.add_subparsers(dest="comando", required=True)
@@ -144,6 +178,15 @@ def construir_parser() -> argparse.ArgumentParser:
     s.add_argument("--umbral", type=int, default=60, help="Puntaje mínimo de calce")
     s.add_argument("--marcar", action="store_true", help="Marca los calces como notificados")
     s.set_defaults(fn=cmd_resumen)
+
+    s = sub.add_parser("whatsapp-enviar", help="Envía el resumen diario por WhatsApp a todas las empresas")
+    s.add_argument("--umbral", type=int, default=60, help="Puntaje mínimo de calce")
+    s.set_defaults(fn=cmd_whatsapp_enviar)
+
+    s = sub.add_parser("servidor", help="Inicia el servidor que recibe los mensajes de WhatsApp")
+    s.add_argument("--host", default="0.0.0.0")
+    s.add_argument("--puerto", type=int, default=8000)
+    s.set_defaults(fn=cmd_servidor)
     return p
 
 
@@ -154,7 +197,7 @@ def main(argv: list[str] | None = None) -> int:
     Sesion = crear_sesiones(config.database_url)
     try:
         return args.fn(args, config, Sesion)
-    except (MercadoPublicoError, ErrorIA) as e:
+    except (MercadoPublicoError, ErrorIA, ErrorWhatsApp, ValueError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
 

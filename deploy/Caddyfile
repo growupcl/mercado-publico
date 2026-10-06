@@ -7,3 +7,8 @@
 www.{$DOMINIO} {
 	redir https://{$DOMINIO}{uri} permanent
 }
+
+# Dominios anteriores o alternativos: redirigen al sitio principal (separados por coma).
+{$DOMINIOS_REDIRIGIDOS} {
+	redir https://{$DOMINIO}{uri} permanent
+}

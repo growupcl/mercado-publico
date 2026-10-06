@@ -1,18 +1,24 @@
-# Publicar Calza en un VPS de Vultr (Santiago)
+# Publicar Calza en Vultr (Santiago)
 
 Al terminar esta guía tendrás:
 
 ```
-Nebox (cPanel)                      VPS Vultr Santiago (Ubuntu 24.04)
-├── DNS de calza.cl ───────────────►  Caddy (HTTPS automático)
-│                                       └── Calza (sitio web + webhooks de WhatsApp y Mercado Pago)
-├── Correo hola@calza.cl                      └── Postgres (base de datos)
-└── Redirección licitainteligente.cl  Cron: ciclo cada 2 h · resumen 8:00 · órdenes 23:30 ·
-                                       suscripciones 3:15 · respaldo 2:45
+NIC Chile (registro de calza.cl y licitainteligente.cl)
+   └── servidores DNS → Vultr DNS
+                          ├── calza.cl, www ─────────────► VPS Vultr Santiago (Ubuntu 24.04)
+                          ├── licitainteligente.cl ──────►   Caddy (HTTPS y redirecciones)
+                          │                                    └── Calza (sitio + webhooks)
+                          │                                          └── Postgres
+                          └── correo (MX, SPF, DKIM) ────► Google Workspace (hola@calza.cl)
+
+Cron en el VPS: ciclo cada 2 h · resumen 8:00 · órdenes 23:30 · suscripciones 3:15 · respaldo 2:45
 ```
 
-Tiempo estimado: 45 a 60 minutos, más la espera de DNS. Costo: unos US$10–12 al mes por el VPS más
-~US$2 por los respaldos automáticos de Vultr (revisa los precios vigentes al contratar).
+Calza queda **separada del hosting de tus clientes**: nada depende de Nebox.
+
+Tiempo estimado: 1 a 1,5 horas, más la espera de propagación de DNS. Costos aproximados (revisa los precios
+vigentes): VPS ~US$10–12 al mes, respaldos automáticos de Vultr ~US$2, Google Workspace ~US$7 por usuario al mes.
+Vultr DNS no tiene costo.
 
 ## 1. Crear el VPS en Vultr
 
@@ -28,21 +34,62 @@ Tiempo estimado: 45 a 60 minutos, más la espera de DNS. Costo: unos US$10–12 
    - **Hostname:** `calza`.
 3. Anota la **IP pública** del servidor.
 
-## 2. Apuntar el dominio desde Nebox
+## 2. DNS en Vultr
 
-En el cPanel de Nebox → **Zone Editor** de `calza.cl`:
+### 2.1 Crear las zonas en Vultr
 
-| Tipo | Nombre | Valor |
-|---|---|---|
-| A | `calza.cl.` | IP del VPS |
-| A | `www.calza.cl.` | IP del VPS |
+En Vultr → **Network → DNS → Add Domain**:
 
-- **No toques los registros MX** ni los del correo: `hola@calza.cl` sigue funcionando en Nebox.
-- Si existen registros A anteriores para `calza.cl` o `www`, reemplázalos.
-- Para `licitainteligente.cl`: en cPanel → **Redirects**, redirige (301) a `https://calza.cl`.
-- Revisa que el cambio se propagó con [dnschecker.org](https://dnschecker.org) (puede tardar de minutos a unas horas).
+1. Dominio `calza.cl`, con la IP del VPS como dirección por defecto.
+2. Repite con `licitainteligente.cl` (misma IP).
 
-## 3. Preparar el servidor
+Vultr crea registros por defecto. Déjalos así:
+
+**Zona `calza.cl`**
+
+| Tipo | Nombre | Valor | Comentario |
+|---|---|---|---|
+| A | *(vacío, la raíz)* | IP del VPS | Sitio |
+| A | `www` | IP del VPS | Redirige a calza.cl |
+| MX | *(vacío)* | Los de Google Workspace (paso 3) | **Borra el MX que Vultr crea por defecto** |
+| TXT | *(vacío)* | `v=spf1 include:_spf.google.com ~all` | Autoriza a Google a enviar tu correo |
+| TXT | `google._domainkey` | La llave DKIM de Google (paso 3.4) | Firma de tus correos |
+| TXT | `_dmarc` | `v=DMARC1; p=none; rua=mailto:hola@calza.cl` | Política antifraude (empieza en modo observación) |
+
+**Zona `licitainteligente.cl`:** solo los registros **A** de la raíz y de `www` hacia la IP del VPS. Borra el MX por
+defecto: ese dominio no recibe correo. Caddy redirige ambos a `https://calza.cl`.
+
+### 2.2 Cambiar los servidores DNS en NIC Chile
+
+Hazlo **después** de crear las zonas, para que el dominio no quede sin respuesta.
+
+1. Entra a [nic.cl](https://www.nic.cl) → **Mis dominios** → `calza.cl` → **Modificar servidores de nombre (DNS)**.
+2. Deja solo:
+   - `ns1.vultr.com`
+   - `ns2.vultr.com`
+3. Repite con `licitainteligente.cl`.
+4. Revisa la propagación en [dnschecker.org](https://dnschecker.org) (registros NS y A). En Chile suele tardar
+   minutos a pocas horas.
+
+## 3. Correo con Google Workspace
+
+1. Contrata Google Workspace (plan Business Starter) en [workspace.google.com](https://workspace.google.com) con el
+   dominio `calza.cl`.
+2. **Verifica el dominio:** Google te da un registro TXT (`google-site-verification=…`). Agrégalo en Vultr DNS, en la
+   raíz de `calza.cl`, y confirma en Google.
+3. **Activa Gmail:** Google indica el registro MX (hoy, `smtp.google.com` con prioridad 1). Agrégalo en Vultr DNS y
+   borra cualquier otro MX.
+4. **Activa DKIM:** en la consola de administración → Aplicaciones → Google Workspace → Gmail →
+   **Autenticar correo electrónico** → generar registro (2048 bits). Copia el TXT `google._domainkey` en Vultr DNS y
+   vuelve a la consola a **Iniciar autenticación** (puede pedir esperar unas horas).
+5. Crea el usuario o alias **`hola@calza.cl`**. Un alias en tu propio usuario no tiene costo extra.
+6. Prueba: envía un correo desde `hola@calza.cl` a una cuenta de Gmail y, en "Mostrar original", revisa que SPF,
+   DKIM y DMARC digan **PASS**.
+
+Este correo es el que usarás para Meta, Mercado Pago y el contacto con clientes. Cuando Meta verifique el dominio,
+te pedirá agregar otro TXT (`facebook-domain-verification=…`): va en la misma zona de Vultr DNS.
+
+## 4. Preparar el servidor
 
 Conéctate como root: `ssh root@IP_DEL_VPS`
 
@@ -64,12 +111,12 @@ git clone git@github.com:growupcl/mercado-publico.git /opt/calza
 bash /opt/calza/deploy/preparar-servidor.sh
 ```
 
-El script deja la hora de Chile, parches de seguridad automáticos, Docker, cortafuegos (solo SSH, HTTP y HTTPS),
+El script `preparar-servidor.sh` deja la hora de Chile, parches de seguridad automáticos, Docker, cortafuegos (solo SSH, HTTP y HTTPS),
 fail2ban y el usuario `calza`, que es el que corre la aplicación.
 
-## 4. Configurar las claves
+## 5. Configurar las claves
 
-Desde aquí, todo como usuario `calza`:
+Desde aquí, todo como usuario `calza`. Al terminar el paso 4 el script te indica cómo seguir:
 
 ```bash
 su - calza
@@ -85,6 +132,7 @@ Completa al menos:
 |---|---|
 | `POSTGRES_PASSWORD` | El resultado de `openssl rand -base64 24` |
 | `DOMINIO` | `calza.cl` |
+| `DOMINIOS_REDIRIGIDOS` | `licitainteligente.cl, www.licitainteligente.cl` |
 | `LICITA_URL_PUBLICA` | `https://calza.cl` |
 | `LICITA_URL_REGISTRO` | `https://calza.cl/registro` |
 | `ANTHROPIC_API_KEY` | Clave de Claude |
@@ -96,7 +144,7 @@ Completa al menos:
 Lo que aún no tengas (ticket, WhatsApp, Mercado Pago) puede quedar vacío: el sitio funciona igual y esas partes
 se activan al completar la variable y reiniciar (`docker compose up -d`).
 
-## 5. Levantar Calza
+## 6. Levantar Calza
 
 ```bash
 docker compose up -d --build
@@ -104,11 +152,12 @@ docker compose ps
 ```
 
 Los tres servicios (`app`, `db`, `caddy`) deben aparecer en `running`, y `app` y `db` en `healthy`.
-Abre **https://calza.cl**: Caddy obtiene el certificado HTTPS solo, apenas el DNS apunta al servidor.
+Abre **https://calza.cl**: Caddy obtiene los certificados HTTPS solo, apenas el DNS apunta al servidor.
+Revisa también que `https://www.calza.cl` y `https://licitainteligente.cl` redirijan a `https://calza.cl`.
 
 Si no carga: `docker compose logs caddy` (problemas de DNS o certificado) y `docker compose logs app`.
 
-## 6. Activar las tareas programadas
+## 7. Activar las tareas programadas
 
 ```bash
 crontab /opt/calza/deploy/crontab
@@ -128,7 +177,7 @@ El registro de cada tarea queda en `/opt/calza/logs/tareas.log`.
 Los límites `--max-detalles` del crontab cuidan el límite diario de consultas del ticket de Mercado Público.
 Ajústalos cuando veamos el volumen real.
 
-## 7. Conectar WhatsApp y Mercado Pago
+## 8. Conectar WhatsApp y Mercado Pago
 
 - **WhatsApp:** URL del webhook `https://calza.cl/webhook/whatsapp` ([whatsapp-masivo-app.md](whatsapp-masivo-app.md), paso 5).
 - **Mercado Pago:** URL del webhook `https://calza.cl/pagos/mercadopago/webhook` ([mercadopago.md](mercadopago.md)).

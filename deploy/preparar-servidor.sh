@@ -36,4 +36,4 @@ for f in authorized_keys github_calza github_calza.pub config known_hosts; do
 done
 chown -R calza:calza /home/calza/.ssh && chmod 700 /home/calza/.ssh && chmod 600 /home/calza/.ssh/* 2>/dev/null || true
 
-echo "==> Listo. Sigue con el paso 4 de docs/despliegue.md como usuario calza:  su - calza"
+echo "==> Listo. Sigue con el paso 5 de docs/despliegue.md como usuario calza:  su - calza"

@@ -29,8 +29,12 @@ plantillas = Jinja2Templates(directory=str(Path(__file__).parent / "plantillas")
 plantillas.env.globals["fmt"] = formato_pesos
 
 
+MESES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre",
+         "noviembre", "diciembre")
+
+
 def _fecha(dt: datetime) -> str:
-    return dt.strftime("%d-%m-%Y")
+    return f"{dt.day} de {MESES[dt.month - 1]} de {dt.year}"
 
 
 def crear_router_web(

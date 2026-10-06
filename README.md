@@ -5,7 +5,7 @@ Encuentra las licitaciones que calzan con lo que vende cada empresa y se las env
 
 Sitio: [licitainteligente.cl](https://licitainteligente.cl) · El nombre interno del proyecto y del comando es `licita`.
 
-> Estado: **MVP, fase 2** (motor de datos, calce con IA y WhatsApp). Web y cobro vienen en las fases siguientes.
+> Estado: **MVP, fase 3** (motor de datos, calce con IA, WhatsApp y análisis de bases). Web y cobro vienen en las fases siguientes.
 
 ## Cómo funciona
 
@@ -21,6 +21,10 @@ Sitio: [licitainteligente.cl](https://licitainteligente.cl) · El nombre interno
 5. **Resumen diario** (`licita resumen`): arma el mensaje con las mejores oportunidades.
 6. **WhatsApp** (`licita whatsapp-enviar` y `licita servidor`): envía el resumen diario como una plantilla con botones
    y responde los mensajes del usuario (detalle de cada licitación, baja/alta). Ver [docs/whatsapp.md](docs/whatsapp.md).
+7. **Análisis de bases** (`licita analizar` o enviando el PDF por WhatsApp): Claude Sonnet lee el PDF de las bases y
+   entrega requisitos que dejan fuera, documentos a presentar, garantías, criterios de evaluación, plazos, multas y
+   preguntas sugeridas para el foro. Después, el usuario puede hacer preguntas sobre esas bases por 24 horas.
+   Cada PDF se analiza una sola vez y el resultado se reutiliza para todos (el mismo archivo no vuelve a costar IA).
 
 Las órdenes de compra quedan guardadas para construir más adelante la inteligencia de precios.
 
@@ -52,6 +56,7 @@ licita empresa-agregar --nombre "Aseo Sur" \
   --regiones "Biobío,Ñuble" --monto-max 30000000
 licita calce --empresa 1
 licita resumen --empresa 1 --marcar
+licita analizar --pdf bases.pdf --codigo 1234-56-LE26
 ```
 
 ## Pruebas
@@ -75,7 +80,8 @@ así que no necesitan ticket ni clave.
 | `src/licita/resumen.py` | Textos del resumen diario y del detalle de cada licitación |
 | `src/licita/whatsapp.py` | Cliente de la WhatsApp Cloud API de Meta y verificación de firma |
 | `src/licita/notificaciones.py` | Envío del resumen diario cuidando la ventana gratuita de 24 h |
-| `src/licita/conversacion.py` | Respuestas a los mensajes entrantes (botones, números, baja/alta) |
+| `src/licita/conversacion.py` | Respuestas a los mensajes entrantes (botones, números, PDF de bases, preguntas, baja/alta) |
+| `src/licita/analisis.py` | Análisis de bases en PDF con Claude Sonnet, reutilización por archivo y límite mensual |
 | `src/licita/servidor.py` | Servidor web que recibe los webhooks de WhatsApp |
 | `src/licita/cli.py` | Línea de comandos |
 | `docs/modelo_financiero_licita.xlsx` | Modelo financiero (escenarios base y conservador) |
@@ -83,6 +89,6 @@ así que no necesitan ticket ni clave.
 ## Próximas fases
 
 - Probar con datos reales: validar formato de respuesta, volumen diario y límites del ticket.
-- Análisis de bases (PDF) con Claude Sonnet y caché compartido entre usuarios.
+- Descarga automática de las bases desde Mercado Público (hoy el usuario reenvía el PDF), si los términos de uso lo permiten.
 - Inteligencia de precios a partir de las órdenes de compra.
 - Web de registro, suscripción (Flow o Mercado Pago) y factura electrónica.

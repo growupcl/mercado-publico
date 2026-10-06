@@ -15,6 +15,9 @@ class Config:
     whatsapp_plantilla_resumen: str = "resumen_diario_licitaciones"
     whatsapp_idioma: str = "es"
     url_registro: str = ""
+    modelo_analisis: str = "claude-sonnet-5-5"
+    dir_documentos: str = "documentos"
+    limite_analisis_mes: int = 15
 
     @classmethod
     def desde_entorno(cls) -> "Config":
@@ -30,4 +33,7 @@ class Config:
             whatsapp_plantilla_resumen=os.environ.get("WHATSAPP_PLANTILLA_RESUMEN", "resumen_diario_licitaciones"),
             whatsapp_idioma=os.environ.get("WHATSAPP_IDIOMA", "es"),
             url_registro=os.environ.get("LICITA_URL_REGISTRO", ""),
+            modelo_analisis=os.environ.get("LICITA_MODELO_ANALISIS", "claude-sonnet-5-5"),
+            dir_documentos=os.environ.get("LICITA_DIR_DOCUMENTOS", "documentos"),
+            limite_analisis_mes=int(os.environ.get("LICITA_LIMITE_ANALISIS_MES", "15")),
         )

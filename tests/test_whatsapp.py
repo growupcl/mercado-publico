@@ -1,4 +1,5 @@
 import hashlib
+import itertools
 import hmac
 import json
 from datetime import date, datetime, timedelta
@@ -54,11 +55,15 @@ def escenario(Sesion, cliente_mp):
     return s, e
 
 
+_ids = itertools.count(1)
+
+
 def mensaje_entrante(texto=None, payload=None, de=TEL):
+    wamid = f"wamid.in{next(_ids)}"
     if payload is not None:
-        msg = {"from": de, "id": "wamid.in", "type": "button", "button": {"payload": payload, "text": "Ver"}}
+        msg = {"from": de, "id": wamid, "type": "button", "button": {"payload": payload, "text": "Ver"}}
     else:
-        msg = {"from": de, "id": "wamid.in", "type": "text", "text": {"body": texto}}
+        msg = {"from": de, "id": wamid, "type": "text", "text": {"body": texto}}
     return {"object": "whatsapp_business_account", "entry": [{"changes": [{"field": "messages", "value": {"messages": [msg]}}]}]}
 
 
@@ -194,6 +199,15 @@ def test_solo_responde_mensajes_dirigidos_al_numero_de_licita(escenario):
     assert procesar_webhook(s, wa, payload, phone_number_id="NUMERO_LICITA", momento=MOMENTO) == 1
 
 
+def test_no_responde_dos_veces_el_mismo_mensaje(escenario):
+    s, _ = escenario
+    wa = WhatsAppFalso()
+    payload = mensaje_entrante("hola")
+    assert procesar_webhook(s, wa, payload, momento=MOMENTO) == 1
+    assert procesar_webhook(s, wa, payload, momento=MOMENTO) == 0  # Meta reintentó el mismo webhook
+    assert len(wa.enviados) == 1
+
+
 def test_ignora_confirmaciones_de_lectura(escenario):
     s, _ = escenario
     wa = WhatsAppFalso()
@@ -228,3 +242,21 @@ def test_webhook_exige_firma_valida(Sesion):
 def test_app_sin_secreto_no_arranca(Sesion):
     with pytest.raises(ValueError, match="WHATSAPP_APP_SECRET"):
         crear_app(Sesion, WhatsAppFalso(), verify_token="x", app_secret="")
+
+
+def test_descargar_media_en_dos_pasos():
+    def handler(request):
+        assert request.headers["Authorization"] == "Bearer T"
+        if request.url.path.endswith("/MEDIA1"):
+            return httpx.Response(200, json={"url": "https://lookaside.fbsbx.com/archivo", "mime_type": "application/pdf", "file_size": 10})
+        return httpx.Response(200, content=b"%PDF-1.7 hola")
+
+    wa = ClienteWhatsApp("T", "1", http=httpx.Client(transport=httpx.MockTransport(handler)))
+    assert wa.descargar_media("MEDIA1") == (b"%PDF-1.7 hola", "application/pdf")
+
+
+def test_descargar_media_rechaza_archivos_grandes():
+    wa = ClienteWhatsApp("T", "1", http=httpx.Client(transport=httpx.MockTransport(
+        lambda r: httpx.Response(200, json={"url": "https://x", "file_size": 50_000_000}))))
+    with pytest.raises(ErrorWhatsApp, match="demasiado grande"):
+        wa.descargar_media("MEDIA1")

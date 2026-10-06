@@ -6,6 +6,7 @@ Ejemplos:
   licita empresa-agregar --nombre "Aseo Sur" --descripcion "Vendemos insumos de aseo..." --regiones "Biobío,Ñuble"
   licita calce --empresa 1
   licita resumen --empresa 1
+  licita analizar --pdf bases.pdf --codigo 1234-56-LE26
   licita whatsapp-enviar
   licita servidor --puerto 8000
 """
@@ -21,6 +22,7 @@ from sqlalchemy import select
 
 from .config import Config
 from .db import Empresa, crear_sesiones
+from .analisis import DocumentoInvalido, LimiteAlcanzado
 from .ia import ErrorIA
 from .mercadopublico import MercadoPublicoError
 from .whatsapp import ErrorWhatsApp, normalizar_telefono
@@ -129,6 +131,34 @@ def cmd_whatsapp_enviar(args, config: Config, Sesion) -> int:
     return 0
 
 
+def _servicio_analisis(config: Config):
+    from .analisis import AlmacenDocumentos, AnalizadorBases, ServicioAnalisis
+
+    return ServicioAnalisis(
+        AlmacenDocumentos(config.dir_documentos), AnalizadorBases(modelo=config.modelo_analisis),
+        limite_mensual=config.limite_analisis_mes,
+    )
+
+
+def cmd_analizar(args, config: Config, Sesion) -> int:
+    from pathlib import Path
+
+    from .analisis import textos_analisis
+
+    contenido = Path(args.pdf).read_bytes()
+    with Sesion() as s:
+        empresa = _empresa(s, args.empresa) if args.empresa else None
+        analisis, reutilizado = _servicio_analisis(config).analizar(
+            s, contenido, empresa=empresa, nombre_archivo=Path(args.pdf).name, codigo=args.codigo,
+        )
+        if reutilizado:
+            print("(Análisis reutilizado: este PDF ya se había analizado; no tuvo costo de IA.)\n")
+        else:
+            print(f"(Tokens: {analisis.tokens_entrada} de entrada, {analisis.tokens_salida} de salida.)\n")
+        print("\n\n".join(textos_analisis(analisis.resultado)))
+    return 0
+
+
 def cmd_servidor(args, config: Config, Sesion) -> int:
     import uvicorn
 
@@ -137,7 +167,7 @@ def cmd_servidor(args, config: Config, Sesion) -> int:
     app = crear_app(
         Sesion, _whatsapp(config), verify_token=config.whatsapp_verify_token,
         app_secret=config.whatsapp_app_secret, url_registro=config.url_registro,
-        phone_number_id=config.whatsapp_phone_number_id,
+        phone_number_id=config.whatsapp_phone_number_id, analisis=_servicio_analisis(config),
     )
     uvicorn.run(app, host=args.host, port=args.puerto)
     return 0
@@ -180,6 +210,12 @@ def construir_parser() -> argparse.ArgumentParser:
     s.add_argument("--marcar", action="store_true", help="Marca los calces como notificados")
     s.set_defaults(fn=cmd_resumen)
 
+    s = sub.add_parser("analizar", help="Analiza con IA un PDF de bases de licitación")
+    s.add_argument("--pdf", required=True, help="Ruta al PDF de las bases")
+    s.add_argument("--codigo", help="Código de la licitación (opcional)")
+    s.add_argument("--empresa", type=int, help="Empresa a la que se le descuenta del límite mensual (opcional)")
+    s.set_defaults(fn=cmd_analizar)
+
     s = sub.add_parser("whatsapp-enviar", help="Envía el resumen diario por WhatsApp a todas las empresas")
     s.add_argument("--umbral", type=int, default=60, help="Puntaje mínimo de calce")
     s.set_defaults(fn=cmd_whatsapp_enviar)
@@ -198,7 +234,7 @@ def main(argv: list[str] | None = None) -> int:
     Sesion = crear_sesiones(config.database_url)
     try:
         return args.fn(args, config, Sesion)
-    except (MercadoPublicoError, ErrorIA, ErrorWhatsApp, ValueError) as e:
+    except (MercadoPublicoError, ErrorIA, ErrorWhatsApp, DocumentoInvalido, LimiteAlcanzado, ValueError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
 

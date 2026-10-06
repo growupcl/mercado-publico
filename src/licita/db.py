@@ -77,6 +77,10 @@ class Empresa(Base):
     whatsapp_activo: Mapped[bool] = mapped_column(Boolean, default=True)
     # Último mensaje recibido del usuario: abre la ventana de 24 h en que responder es gratis.
     ultimo_mensaje_entrante: Mapped[datetime | None] = mapped_column(DateTime)
+    # Contexto de la conversación: última licitación vista y último análisis de bases enviado.
+    licitacion_activa: Mapped[str | None] = mapped_column(String(40))
+    analisis_activo_id: Mapped[int | None] = mapped_column(Integer)
+    contexto_actualizado_en: Mapped[datetime | None] = mapped_column(DateTime)
     creada_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
 
 
@@ -111,6 +115,47 @@ class MensajeWhatsApp(Base):
     tipo: Mapped[str] = mapped_column(String(20))  # "texto", "plantilla", "boton"
     contenido: Mapped[str] = mapped_column(Text, default="")
     wamid: Mapped[str] = mapped_column(String(120), default="")
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
+
+
+class Documento(Base):
+    """PDF de bases. Se identifica por su hash: el mismo archivo se analiza una sola vez."""
+
+    __tablename__ = "documentos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    sha256: Mapped[str] = mapped_column(String(64), unique=True)
+    nombre_archivo: Mapped[str] = mapped_column(String(255), default="")
+    ruta: Mapped[str] = mapped_column(Text)
+    tamano: Mapped[int] = mapped_column(Integer)
+    licitacion_codigo: Mapped[str | None] = mapped_column(String(40), index=True)
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
+
+
+class AnalisisBases(Base):
+    """Resultado del análisis con IA de un documento de bases, compartido entre usuarios."""
+
+    __tablename__ = "analisis_bases"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    documento_id: Mapped[int] = mapped_column(ForeignKey("documentos.id"), unique=True)
+    licitacion_codigo: Mapped[str | None] = mapped_column(String(40), index=True)
+    modelo: Mapped[str] = mapped_column(String(60))
+    resultado: Mapped[dict[str, Any]] = mapped_column(JSON)
+    tokens_entrada: Mapped[int] = mapped_column(Integer, default=0)
+    tokens_salida: Mapped[int] = mapped_column(Integer, default=0)
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
+
+
+class SolicitudAnalisis(Base):
+    """Cada análisis entregado a una empresa (para el límite mensual de su plan)."""
+
+    __tablename__ = "solicitudes_analisis"
+    __table_args__ = (UniqueConstraint("empresa_id", "analisis_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    empresa_id: Mapped[int] = mapped_column(ForeignKey("empresas.id"), index=True)
+    analisis_id: Mapped[int] = mapped_column(ForeignKey("analisis_bases.id"))
     creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
 
 

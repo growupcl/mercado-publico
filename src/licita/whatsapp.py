@@ -49,6 +49,7 @@ class ClienteWhatsApp:
         if not token or not phone_number_id:
             raise ErrorWhatsApp("Faltan WHATSAPP_TOKEN o WHATSAPP_PHONE_NUMBER_ID.")
         self._url = f"{GRAPH_URL}/{version}/{phone_number_id}/messages"
+        self._url_base = f"{GRAPH_URL}/{version}"
         self._http = http or httpx.Client(timeout=20)
         self._headers = {"Authorization": f"Bearer {token}"}
 
@@ -66,6 +67,22 @@ class ClienteWhatsApp:
                 detalle = r.text[:200]
             raise ErrorWhatsApp(f"WhatsApp respondió HTTP {r.status_code} ({detalle})")
         return r.json()["messages"][0]["id"]
+
+    def descargar_media(self, media_id: str, *, tamano_maximo: int = 32 * 1024 * 1024) -> tuple[bytes, str]:
+        """Pide a Meta la URL temporal del archivo y lo descarga con el mismo token."""
+        try:
+            info = self._http.get(f"{self._url_base}/{media_id}", headers=self._headers)
+            if info.status_code >= 400:
+                raise ErrorWhatsApp(f"No se pudo obtener el archivo {media_id} (HTTP {info.status_code})")
+            datos = info.json()
+            if int(datos.get("file_size") or 0) > tamano_maximo:
+                raise ErrorWhatsApp("El archivo es demasiado grande.")
+            archivo = self._http.get(datos["url"], headers=self._headers)
+        except httpx.TransportError as e:
+            raise ErrorWhatsApp(f"Error de red al descargar el archivo: {e}") from e
+        if archivo.status_code >= 400:
+            raise ErrorWhatsApp(f"No se pudo descargar el archivo (HTTP {archivo.status_code})")
+        return archivo.content, datos.get("mime_type", "")
 
     def enviar_texto(self, telefono: str, texto: str) -> str:
         """Texto libre. Solo funciona dentro de la ventana de 24 h (y ahí es gratis)."""
@@ -103,3 +120,4 @@ class ClienteWhatsApp:
             "type": "template",
             "template": {"name": nombre, "language": {"code": idioma}, "components": componentes},
         })
+

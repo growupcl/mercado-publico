@@ -23,7 +23,7 @@ Resultado: como máximo **una plantilla pagada al día por usuario**. Todo lo de
 
 ## Configuración en Meta (una vez)
 
-> ¿Usas la app de Meta de **Masivo App**? Sigue mejor la guía [whatsapp-masivo-app.md](whatsapp-masivo-app.md).
+> Licita se conecta a través de **Masivo App** (Tech Provider), con su propio portafolio de Meta: sigue la guía [whatsapp-masivo-app.md](whatsapp-masivo-app.md). Los pasos de abajo sirven solo si algún día Licita tiene su propia app de Meta.
 
 1. Crear una app de tipo **Business** en [developers.facebook.com](https://developers.facebook.com) y agregar el producto **WhatsApp**.
 2. Registrar el número de teléfono de Licita (no puede estar en uso en la app de WhatsApp normal) y verificar la empresa en el Business Manager de Meta.

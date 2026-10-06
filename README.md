@@ -35,7 +35,7 @@ set -a && source .env && set +a
 
 - **Ticket de Mercado Público**: se solicita con Clave Única en [chilecompra.cl/api](https://www.chilecompra.cl/api) y llega por correo.
 - **Clave de Claude**: en [console.anthropic.com](https://console.anthropic.com).
-- **WhatsApp** (opcional): ver [docs/whatsapp.md](docs/whatsapp.md), o [docs/whatsapp-masivo-app.md](docs/whatsapp-masivo-app.md) para usar la app de Meta de Masivo App.
+- **WhatsApp** (opcional): ver [docs/whatsapp.md](docs/whatsapp.md), y la guía de conexión a través de Masivo App: [docs/whatsapp-masivo-app.md](docs/whatsapp-masivo-app.md).
 
 Nota: si ya tenías una base `licita.db` de la fase 1, bórrala para que se cree con las tablas nuevas
 (todavía no hay migraciones; se agregarán antes de pasar a producción).

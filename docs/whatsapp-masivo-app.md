@@ -1,41 +1,70 @@
-# Configurar WhatsApp de Licita con la app de Meta de Masivo App
+# Configurar WhatsApp de Licita a través de Masivo App (Tech Provider)
 
-Esta guía corresponde a la **opción A**: Licita usa la app de Meta que Masivo App ya tiene certificada
-(Tech Provider), con un **número y una cuenta de WhatsApp Business propios de Licita**.
-Licita se conecta directo a la Cloud API de Meta, así que no hay cambios de código: solo configuración.
+Licita es una **empresa aparte**, así que tiene su **propio portafolio de negocio en Meta**, a su nombre.
+Se conecta a WhatsApp a través de la app de Masivo App, que es **Tech Provider**: Licita entra como un
+cliente más mediante el **registro integrado** (*Embedded Signup*) de Masivo.
 
-Para la descripción general de la integración y del cobro, ver [whatsapp.md](whatsapp.md).
+Licita se conecta directo a la Cloud API de Meta con el token que entrega ese registro, así que **no hay cambios de código**,
+solo configuración. Para la descripción general de la integración y del cobro, ver [whatsapp.md](whatsapp.md).
 
 ```
-Portafolio de negocio de Masivo App (ya verificado)
-└── App de Meta de Masivo App (Tech Provider)
-    ├── Cuentas de WhatsApp Business de Masivo y sus clientes (sin cambios)
-    └── Cuenta de WhatsApp Business "Licita"          ← nueva
-        └── Número de Licita                          ← nuevo
-            └── Webhook → https://<dominio-de-licita>/webhook/whatsapp
+Portafolio de Masivo App                       Portafolio de Licita SpA (nuevo, a su nombre)
+└── App de Meta de Masivo App  ──acceso──►     └── Cuenta de WhatsApp Business "Licita"
+    (Tech Provider)          (registro              └── Número de Licita
+                              integrado)                 └── Webhook → https://<dominio-de-licita>/webhook/whatsapp
 ```
+
+Qué gana Licita con esto:
+- **Riesgos separados:** una sanción de Meta a Licita no toca el portafolio de Masivo App ni a sus clientes, y al revés.
+- **Identidad correcta:** el nombre visible, la verificación y la facturación de Meta quedan a nombre de Licita SpA.
+- **Sin esperas de certificación:** Licita aprovecha la app ya aprobada de Masivo App y no necesita la suya.
+- **Salida fácil:** si algún día Licita quiere su propia app de Meta, se conecta la misma cuenta a esa app y basta cambiar el token.
 
 ## Antes de empezar
 
-- [ ] Acceso de **administrador** al portafolio de negocio de Masivo App y a su app en developers.facebook.com.
-- [ ] Un **número de teléfono nuevo** para Licita que reciba SMS o llamadas y que **no esté registrado en WhatsApp**
-      (ni en la app normal ni en WhatsApp Business). Si lo estaba, primero elimina esa cuenta desde el teléfono.
-- [ ] Un **sitio web de Licita**, aunque sea una página simple, donde se vea quién está detrás. Meta lo usa para aprobar el nombre visible.
+- [ ] **Licita SpA constituida**, con RUT, y un correo con dominio propio (por ejemplo `hola@licita.cl`).
+- [ ] Un **sitio web de Licita** con razón social, RUT o datos de contacto visibles. Meta lo usa para verificar la empresa y aprobar el nombre visible.
+- [ ] Un **número de teléfono nuevo** para Licita que reciba SMS o llamadas y que **no esté registrado en WhatsApp**.
 - [ ] Una **URL pública con HTTPS** donde correrá `licita servidor`. Para pruebas sirve un túnel como `cloudflared` o `ngrok`.
+- [ ] Un **acuerdo simple entre Licita SpA y la empresa de Masivo App**: servicio de conexión a WhatsApp y tratamiento de datos.
+      La app de Masivo tiene acceso técnico a los mensajes de Licita, y con la Ley 21.719 conviene dejarlo por escrito.
 
-## Paso 1. Crear la cuenta de WhatsApp Business de Licita
+¿La SpA todavía no está constituida? Ver [Si Licita aún no existe legalmente](#si-licita-aún-no-existe-legalmente) al final.
 
-1. Entra a **WhatsApp Manager** del portafolio de Masivo App (business.facebook.com → Cuentas → Cuentas de WhatsApp).
-2. Crea una **cuenta nueva** llamada `Licita`. No reutilices una cuenta de Masivo ni de sus clientes: así las plantillas,
-   la calidad del número y los costos de Licita quedan separados.
-3. Completa el perfil: nombre visible **Licita**, categoría (por ejemplo "Servicios profesionales"), descripción corta y sitio web.
-4. Anota el **ID de la cuenta de WhatsApp Business** (`WABA_ID`).
+## Paso 1. Crear y verificar el portafolio de negocio de Licita
 
-## Paso 2. Agregar y registrar el número
+1. Con la cuenta de Facebook del representante de Licita, entra a [business.facebook.com](https://business.facebook.com)
+   y crea el portafolio **Licita SpA**, con la razón social exacta, el sitio web y el correo del dominio de Licita.
+2. **Verifica el dominio** de Licita (Configuración del negocio → Seguridad de la marca → Dominios), con un registro DNS TXT o una metaetiqueta.
+3. **Inicia la verificación del negocio** (Centro de seguridad → Verificación del negocio). Para Chile suelen servir:
+   - Un documento que acredite la razón social y el RUT: escritura o certificado de constitución, o el e-RUT del SII.
+   - Un documento con la dirección: una boleta de servicios o un certificado a nombre de la empresa.
+   - El nombre, la dirección y el sitio web deben coincidir **exactamente** con lo que dicen los documentos.
+4. La verificación puede tardar desde horas hasta un par de semanas. Puedes avanzar con los pasos siguientes mientras tanto:
+   sin verificar se puede probar, pero con límites más bajos de envío y de números.
 
-1. En la cuenta de Licita, agrega el número y verifícalo con el código que llega por SMS o llamada.
-2. Anota el **ID del número de teléfono** (`PHONE_NUMBER_ID`). Va en `WHATSAPP_PHONE_NUMBER_ID`.
-3. Registra el número en la Cloud API, definiendo un PIN de 6 dígitos para la verificación en dos pasos (guárdalo en tu gestor de contraseñas):
+## Paso 2. Conectar Licita mediante el registro integrado de Masivo App
+
+Es el mismo flujo que usan los clientes de Masivo App:
+
+1. Abre el **enlace o botón de registro integrado** de Masivo App y entra con la cuenta de Facebook del administrador de **Licita**
+   (no con la de Masivo).
+2. En el asistente:
+   - Elige el portafolio **Licita SpA**.
+   - Crea una cuenta de WhatsApp Business nueva llamada **Licita**.
+   - Agrega el número nuevo y verifícalo con el código por SMS o llamada.
+   - Define el nombre visible **Licita** y la categoría (por ejemplo "Servicios profesionales").
+3. Al terminar, el backend de Masivo App hace lo mismo que con cualquier cliente:
+   - Canjea el código del registro por el **token de integración del negocio**, que da acceso solo a los activos de Licita.
+   - **Registra el número** en la Cloud API, con un PIN de 6 dígitos para la verificación en dos pasos.
+   - **Suscribe la app** a la cuenta de WhatsApp Business de Licita para recibir eventos (en el paso 5 se define la URL).
+4. Obtén y anota:
+   - El **token de integración del negocio** de Licita → `WHATSAPP_TOKEN`. Pídelo al backend de Masivo App o al registro del canje.
+     Es un secreto: compártelo por un canal seguro, nunca por chat ni correo sin cifrar.
+   - El **ID de la cuenta de WhatsApp Business** (`WABA_ID`).
+   - El **ID del número de teléfono** → `WHATSAPP_PHONE_NUMBER_ID`.
+
+Si el backend de Masivo App no registró el número, hazlo a mano con el token de Licita:
 
 ```bash
 curl -X POST "https://graph.facebook.com/v23.0/$PHONE_NUMBER_ID/register" \
@@ -43,62 +72,16 @@ curl -X POST "https://graph.facebook.com/v23.0/$PHONE_NUMBER_ID/register" \
   -d '{"messaging_product": "whatsapp", "pin": "123456"}'
 ```
 
-4. El nombre visible "Licita" queda **en revisión**. Mientras tanto se puede probar, pero conviene esperar la aprobación antes del piloto.
+## Paso 3. Método de pago a nombre de Licita
 
-## Paso 3. Crear un usuario del sistema solo para Licita
+Como cliente de un Tech Provider, Licita le paga **directo a Meta**:
 
-Por seguridad, Licita no debe usar el mismo token que Masivo App: si se filtrara, quedarían expuestos los números de tus clientes.
+1. En **WhatsApp Manager** del portafolio de Licita → Configuración de pagos, agrega la tarjeta de Licita SpA.
+2. Los cargos (unos US$0,02 por plantilla utility en Chile) quedan a nombre de Licita, sin pasar por Masivo App.
 
-1. En el portafolio: **Configuración del negocio → Usuarios → Usuarios del sistema → Agregar**, con el nombre `licita-backend` y el rol Empleado.
-2. **Asignar activos:**
-   - La app de Meta de Masivo App, con control total.
-   - **Solo** la cuenta de WhatsApp Business de Licita, con control total.
-3. **Generar token:** elige la app, vencimiento **Nunca** y los permisos `whatsapp_business_messaging` y `whatsapp_business_management`.
-4. Guarda el token en `WHATSAPP_TOKEN`. No lo subas al repositorio: el archivo `.env` ya está excluido en `.gitignore`.
+## Paso 4. Crear la plantilla del resumen diario
 
-## Paso 4. Método de pago
-
-1. En **WhatsApp Manager → Configuración de pagos** de la cuenta de Licita, asigna la tarjeta o línea de crédito del portafolio.
-2. Así Meta le cobra directo a Licita (unos US$0,02 por plantilla utility en Chile), sin recargo de intermediarios.
-
-## Paso 5. Webhook: que los mensajes de Licita lleguen a Licita
-
-La app de Masivo App ya tiene una URL de webhook para sus propios números. Para Licita hay dos caminos.
-
-### Camino recomendado: URL propia para la cuenta de Licita
-
-Meta permite que una cuenta de WhatsApp Business use una URL de webhook distinta de la principal de la app.
-Revisa la sección *Webhooks overrides* de la documentación de Meta por si cambió el formato.
-
-1. Levanta el servidor de Licita en su URL pública:
-
-```bash
-licita servidor --puerto 8000
-```
-
-2. Suscribe la app a la cuenta de Licita, indicando la URL y el token de verificación de Licita:
-
-```bash
-curl -X POST "https://graph.facebook.com/v23.0/$WABA_ID/subscribed_apps" \
-  -H "Authorization: Bearer $WHATSAPP_TOKEN" -H "Content-Type: application/json" \
-  -d '{"override_callback_uri": "https://<dominio-de-licita>/webhook/whatsapp",
-       "verify_token": "'"$WHATSAPP_VERIFY_TOKEN"'"}'
-```
-
-3. Meta llama a la URL para verificarla. Si `licita servidor` está corriendo, responde solo.
-
-### Alternativa: que Masivo App reenvíe los eventos
-
-Si prefieres no tocar la suscripción, el webhook de Masivo App puede reenviar a Licita los eventos cuyo
-`entry[].changes[].value.metadata.phone_number_id` sea el número de Licita. Para eso:
-
-- Reenvía el **cuerpo original sin modificar** y el encabezado **`X-Hub-Signature-256` original**. La firma
-  se calcula con el *app secret* de la app de Masivo, que es el mismo que usa Licita, así que la verificación sigue funcionando.
-- Licita además ignora los mensajes dirigidos a otros números (filtra por `WHATSAPP_PHONE_NUMBER_ID`).
-
-## Paso 6. Crear la plantilla del resumen diario
-
-Desde WhatsApp Manager (Plantillas de mensajes → Crear) o por la API:
+Las plantillas son de la cuenta de Licita. Créala desde WhatsApp Manager (Plantillas de mensajes → Crear) o por la API:
 
 ```bash
 curl -X POST "https://graph.facebook.com/v23.0/$WABA_ID/message_templates" \
@@ -126,19 +109,66 @@ curl -X POST "https://graph.facebook.com/v23.0/$WABA_ID/message_templates" \
 
 Mantén la plantilla **informativa**, sin promociones ni invitaciones a pagar. Si Meta la reclasifica como *marketing*, cuesta unas 4 veces más.
 
-## Paso 7. Variables de entorno de Licita
+## Paso 5. Webhook: que los mensajes de Licita lleguen a Licita
+
+Por defecto, Meta envía los eventos de la cuenta de Licita a la URL de webhook de la app de Masivo App. Hay dos formas de dirigirlos a Licita.
+
+### Opción recomendada: URL propia para la cuenta de Licita
+
+Meta permite que una cuenta de WhatsApp Business use una URL distinta de la principal de la app.
+Revisa la sección *Webhooks overrides* de la documentación de Meta por si cambió el formato.
+
+1. Levanta el servidor de Licita en su URL pública:
+
+```bash
+licita servidor --puerto 8000
+```
+
+2. Indica la URL y el token de verificación de Licita en la suscripción de la app a la cuenta de Licita:
+
+```bash
+curl -X POST "https://graph.facebook.com/v23.0/$WABA_ID/subscribed_apps" \
+  -H "Authorization: Bearer $WHATSAPP_TOKEN" -H "Content-Type: application/json" \
+  -d '{"override_callback_uri": "https://<dominio-de-licita>/webhook/whatsapp",
+       "verify_token": "'"$WHATSAPP_VERIFY_TOKEN"'"}'
+```
+
+3. Meta llama a la URL para verificarla. Si `licita servidor` está corriendo, responde solo.
+
+Ojo con la firma: Meta firma cada evento con el **app secret de la app de Masivo App**, y Licita necesita ese mismo
+valor en `WHATSAPP_APP_SECRET` para verificar que los mensajes vienen de Meta. Hoy controlas ambas empresas, así que
+es aceptable, pero queda una dependencia:
+- Guárdalo solo en el gestor de secretos del servidor de Licita.
+- Si Masivo App rota su app secret, hay que actualizarlo también en Licita.
+- Si las empresas llegan a tener dueños distintos, cambia a la opción de reenvío de abajo o crea una app de Meta propia para Licita.
+
+### Alternativa: Masivo App reenvía los eventos de Licita
+
+Úsala si no quieres que Licita conozca el app secret de Masivo App:
+
+1. El webhook de Masivo App identifica los eventos de Licita por `entry[].changes[].value.metadata.phone_number_id`.
+2. Los reenvía a `https://<dominio-de-licita>/webhook/whatsapp` con el **cuerpo original sin modificar**
+   y con una **firma nueva** calculada con un secreto compartido solo entre Masivo y Licita:
+   `X-Hub-Signature-256: sha256=HMAC_SHA256(secreto_compartido, cuerpo)`.
+3. En Licita, `WHATSAPP_APP_SECRET` toma ese secreto compartido. El código de Licita verifica la firma igual que si viniera de Meta.
+
+El costo de esta opción: si Masivo App se cae, Licita deja de recibir mensajes.
+
+Con cualquiera de las dos, Licita **ignora los mensajes dirigidos a otros números** (filtra por `WHATSAPP_PHONE_NUMBER_ID`).
+
+## Paso 6. Variables de entorno de Licita
 
 | Variable | De dónde sale |
 |---|---|
-| `WHATSAPP_TOKEN` | Token del usuario del sistema `licita-backend` (paso 3) |
+| `WHATSAPP_TOKEN` | Token de integración del negocio de Licita (paso 2) |
 | `WHATSAPP_PHONE_NUMBER_ID` | ID del número de Licita (paso 2) |
-| `WHATSAPP_APP_SECRET` | App secret de la app de Masivo App (Configuración de la app → Básica) |
+| `WHATSAPP_APP_SECRET` | App secret de la app de Masivo App (webhook propio) o el secreto compartido (reenvío) |
 | `WHATSAPP_VERIFY_TOKEN` | Un texto secreto que tú inventas, el mismo que usaste en el paso 5 |
 | `WHATSAPP_PLANTILLA_RESUMEN` | `resumen_diario_licitaciones` |
 | `WHATSAPP_IDIOMA` | `es` |
 | `LICITA_URL_REGISTRO` | Página de registro de Licita (se envía a números no registrados) |
 
-## Paso 8. Prueba de punta a punta
+## Paso 7. Prueba de punta a punta
 
 1. Registra una empresa de prueba con **tu propio celular**:
 
@@ -154,11 +184,12 @@ licita whatsapp-enviar
 ```
 
 3. Revisa en tu celular:
-   - [ ] Llega la plantilla con los botones **Ver todas** y **Ver la mejor**.
+   - [ ] Llega la plantilla con los botones **Ver todas** y **Ver la mejor**, enviada por **Licita**.
    - [ ] Al tocar **Ver la mejor**, llega el detalle de la licitación.
    - [ ] Al responder **1**, llega el detalle de la primera licitación.
    - [ ] Al escribir **BAJA**, se confirma la baja; con **ALTA**, se reactiva.
 4. Revisa los registros del servidor: cada mensaje entrante y saliente queda en la tabla `mensajes_whatsapp`.
+5. Confirma que en WhatsApp Manager el cargo aparece en el portafolio de **Licita SpA**, no en el de Masivo App.
 
 ## Cuidados para mantener el número sano
 
@@ -166,8 +197,17 @@ licita whatsapp-enviar
   En la web de registro habrá una casilla de consentimiento; durante el piloto, pide la confirmación por escrito.
 - **Calidad del número:** si muchos usuarios bloquean o reportan, Meta baja la calificación y limita los envíos.
   Por eso existe la palabra **BAJA** y por eso el resumen se envía solo cuando hay calces de al menos 60%.
-- **Límite de mensajes:** revisa en WhatsApp Manager el límite diario de conversaciones iniciadas por la empresa
-  que tiene el número. Para un piloto de 20 a 30 empresas sobra.
-- **Separación de Masivo App:** las plantillas, la calidad y los costos de Licita viven en su propia cuenta.
-  Si más adelante Licita se separa en otra empresa, la cuenta se puede migrar a un portafolio propio y conectarla con
-  el registro integrado (*Embedded Signup*) de Masivo App como un cliente más.
+- **Límite de mensajes:** revisa en WhatsApp Manager el límite diario de conversaciones iniciadas por la empresa.
+  Sube con la verificación del negocio y con un buen historial de calidad. Para un piloto de 20 a 30 empresas sobra.
+
+## Si Licita aún no existe legalmente
+
+Hay dos caminos:
+
+1. **Esperar la constitución** (en "Tu Empresa en un Día" puede ser cosa de días) y seguir esta guía desde el inicio. Es lo más limpio.
+2. **Partir el piloto en el portafolio de Masivo App** con una cuenta y un número propios de Licita, y migrar cuando exista la SpA:
+   - Meta permite **migrar un número** entre cuentas de WhatsApp Business de distintos portafolios. El número y su
+     calificación de calidad se mantienen.
+   - Las **plantillas no se migran**: hay que crearlas y aprobarlas de nuevo en la cuenta nueva.
+   - Mientras tanto, el riesgo queda compartido con Masivo App (ver la conversación de diseño). Con un piloto
+     pequeño, de mensajes informativos y con consentimiento, el riesgo es bajo.

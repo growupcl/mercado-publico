@@ -226,6 +226,18 @@ def cmd_whatsapp_plantillas(args, config: Config, Sesion) -> int:
     return 1 if errores else 0
 
 
+def cmd_migrar(args, config: Config, Sesion) -> int:
+    # crear_sesiones() ya aplicó las migraciones pendientes al iniciar el comando.
+    if args.nueva:
+        from .migrar import nueva_migracion
+
+        nueva_migracion(config.database_url, args.nueva)
+        print("Migración creada en src/licita/migraciones/versions/. Revísala antes de publicarla.")
+    else:
+        print("La base de datos está en la última versión.")
+    return 0
+
+
 def cmd_servidor(args, config: Config, Sesion) -> int:
     import uvicorn
 
@@ -329,6 +341,10 @@ def construir_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("suscripciones", help="Vence las suscripciones impagas y lista las que están por vencer")
     s.add_argument("--dias", type=int, default=3, help="Días de anticipación para listar las por vencer")
     s.set_defaults(fn=cmd_suscripciones)
+
+    s = sub.add_parser("migrar", help="Aplica las migraciones pendientes de la base de datos")
+    s.add_argument("--nueva", metavar="MENSAJE", help="Genera una migración nueva a partir de los cambios en los modelos")
+    s.set_defaults(fn=cmd_migrar)
 
     s = sub.add_parser("whatsapp-plantillas", help="Muestra las plantillas de WhatsApp o las envía a revisión de Meta")
     s.add_argument("--crear", action="store_true", help="Enviarlas a revisión (requiere WHATSAPP_WABA_ID)")

@@ -205,7 +205,13 @@ Ajústalos cuando veamos el volumen real.
 - [ ] La llave de GitHub del servidor es de **solo lectura**.
 - [ ] Postgres no queda expuesto a internet: solo la aplicación lo ve, dentro de Docker.
 
-## Antes de tener datos reales importantes
+## Cambios en la base de datos
 
-Hoy la base de datos se crea automáticamente al iniciar. Antes del próximo cambio de estructura con clientes reales
-agregaremos migraciones (Alembic), para actualizar sin perder datos.
+Calza usa migraciones (Alembic). Al publicar una versión nueva con `deploy/actualizar.sh`, la aplicación aplica sola
+las migraciones pendientes al iniciar, sin perder datos. Para revisarlo a mano:
+
+```bash
+docker compose exec app licita migrar
+```
+
+Antes de una actualización que cambie la base, conviene correr `deploy/respaldo.sh`.

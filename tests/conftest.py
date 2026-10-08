@@ -40,8 +40,12 @@ def Sesion():
 
     url = os.environ.get("LICITA_TEST_DATABASE_URL")
     if url:
+        from sqlalchemy import text
+
         motor = create_engine(url)
         Base.metadata.drop_all(motor)
+        with motor.begin() as conexion:  # para que cada prueba aplique las migraciones desde cero
+            conexion.execute(text("DROP TABLE IF EXISTS alembic_version"))
         motor.dispose()
     fabrica = crear_sesiones(url or "sqlite://")
     yield fabrica

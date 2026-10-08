@@ -91,6 +91,18 @@ crontab deploy/crontab            # tareas programadas
 deploy/actualizar.sh              # publicar una versión nueva
 ```
 
+## Base de datos y migraciones
+
+La estructura de la base se maneja con migraciones (Alembic, en `src/licita/migraciones/`). Calza aplica las
+pendientes al iniciar cualquier comando. Si cambias un modelo en `db.py`:
+
+```bash
+licita migrar --nueva "agrega campo X"    # genera la migración; revísala antes de publicarla
+```
+
+Las columnas nuevas obligatorias en tablas con datos necesitan un valor por defecto en la base (`server_default`).
+Una prueba automática falla si un modelo cambia sin su migración.
+
 ## Pruebas
 
 ```bash
@@ -122,6 +134,8 @@ así que no necesitan ticket ni clave. Para correrlas contra Postgres:
 | `src/licita/legal.py` | **Borrador** de términos y política de privacidad: revisar con un abogado antes del lanzamiento |
 | `src/licita/analisis.py` | Análisis de bases en PDF con Claude Sonnet, reutilización por archivo y límite mensual |
 | `src/licita/servidor.py` | Servidor web que recibe los webhooks de WhatsApp |
+| `src/licita/migrar.py` y `src/licita/migraciones/` | Migraciones de la base de datos (Alembic) |
+| `src/licita/plantillas_whatsapp.py` | Plantillas de WhatsApp (texto que se envía a aprobación y el que se usa) |
 | `src/licita/tareas.py` | Ciclo periódico: sincronizar, clasificar y buscar calces |
 | `src/licita/cli.py` | Línea de comandos |
 | `Dockerfile`, `compose.yaml`, `deploy/` | Despliegue: imagen, servicios, HTTPS, cron, respaldos y preparación del servidor |
@@ -134,4 +148,3 @@ así que no necesitan ticket ni clave. Para correrlas contra Postgres:
 - Carga del histórico de órdenes de compra desde datos-abiertos.chilecompra.cl, para tener precios de referencia desde el primer día.
 - Factura electrónica automática al confirmar cada pago (hoy queda marcada como pendiente de emitir).
 - Aviso por WhatsApp o correo cuando un cobro automático es rechazado.
-- Migraciones de base de datos (Alembic) antes de pasar a producción.

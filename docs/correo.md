@@ -12,7 +12,7 @@ través del SMTP de Google Workspace. Es un aviso transaccional: llega aunque el
    nombre "Calza servidor". Copia las 16 letras (sin espacios). Si no aparece la opción, en la consola de
    administración revisa que la verificación en dos pasos esté permitida para tu organización.
 4. **Si `hola@calza.cl` es un alias:** en Gmail → Configuración → Cuentas → **Enviar como** → agregar
-   `hola@calza.cl` (sin "tratar como alias" desmarcado). Sin este paso, Gmail cambia el remitente por tu usuario.
+   `hola@calza.cl` y deja marcada la opción "Tratar como alias". Sin este paso, Gmail cambia el remitente por tu usuario.
 5. **En el servidor**, en `/opt/calza/.env`:
 
    ```

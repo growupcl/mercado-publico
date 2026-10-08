@@ -173,6 +173,7 @@ crontab -l
 | 22:00 | Cotizaciones de las Compras Ágiles que cerraron (precios de referencia) |
 | 23:30 | Órdenes de compra del día (precios de referencia) |
 | Lunes 1:30 | Precios del histórico de órdenes de compra, mes actual y anterior ([historico-oc.md](historico-oc.md)) |
+| Domingo 4:00 | Limpieza de Compras Ágiles antiguas que no le sirvieron a ningún cliente |
 | 3:15 | Vencimiento de suscripciones impagas |
 | 2:45 | Respaldo de la base de datos (se guardan 14 días en `/var/backups/calza`) |
 

@@ -32,6 +32,8 @@ PLANES = {
 }
 PRECIO_FUNDADOR_PRO = 39_990
 PERIODICIDADES = {"mensual": 1, "anual": 12}
+# Precios anuales fijados a mano: el SII calcula el IVA desde el neto y con $215.900 la factura no cuadraba exacto.
+ANUAL_AJUSTADO = {("pyme", False): 215_890}
 
 
 def precio_mensual(plan: str, *, fundador: bool = False) -> int:
@@ -44,7 +46,7 @@ def monto(plan: str, periodicidad: str, *, fundador: bool = False) -> int:
     """Monto a pagar por el período, redondeado a la centena (como en el modelo financiero)."""
     mensual = precio_mensual(plan, fundador=fundador)
     if periodicidad == "anual":
-        return round(mensual * 12 * (1 - DESCUENTO_ANUAL), -2)
+        return ANUAL_AJUSTADO.get((plan, fundador and plan == "pro"), int(round(mensual * 12 * (1 - DESCUENTO_ANUAL), -2)))
     return mensual
 
 

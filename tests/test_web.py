@@ -107,7 +107,7 @@ def test_rut():
 
 
 def test_montos_de_los_planes():
-    assert monto("pyme", "mensual") == 19990 and monto("pyme", "anual") == 215900
+    assert monto("pyme", "mensual") == 19990 and monto("pyme", "anual") == 215890
     assert monto("pro", "anual") == 647900 and monto("pro", "mensual", fundador=True) == 39990
     assert monto("pro", "anual", fundador=True) == 431900
 
@@ -299,7 +299,7 @@ def test_cobro_rechazado_o_con_monto_distinto_no_extiende(web):
     mp.estados["PRE1"] = "authorized"
     _aviso(cliente, "subscription_preapproval", "PRE1")
     mp.cobros["1"] = CobroMP(id="1", suscripcion_id="PRE1", estado_pago="approved", monto=100)
-    mp.cobros["2"] = CobroMP(id="2", suscripcion_id="PRE1", estado_pago="rejected", monto=215900)
+    mp.cobros["2"] = CobroMP(id="2", suscripcion_id="PRE1", estado_pago="rejected", monto=215890)
     _aviso(cliente, "subscription_authorized_payment", "1")
     _aviso(cliente, "subscription_authorized_payment", "2")
     with Sesion() as s:
@@ -374,10 +374,10 @@ def test_cuenta_por_whatsapp_genera_enlace_nuevo(web):
 def test_desglose_de_iva_como_el_sii():
     from licita.planes import monto
 
-    for plan, periodicidad, fundador in (("pyme", "mensual", False), ("pro", "mensual", False), ("pro", "mensual", True),
-                                         ("pro", "anual", False), ("pro", "anual", True)):
+    for plan, periodicidad, fundador in (("pyme", "mensual", False), ("pyme", "anual", False), ("pro", "mensual", False),
+                                         ("pro", "mensual", True), ("pro", "anual", False), ("pro", "anual", True)):
         total = monto(plan, periodicidad, fundador=fundador)
         neto, iva = facturas.desglose_iva(total)
         assert neto + iva == total and iva == facturas.iva_de(neto)
-    # $215.900 no tiene un neto exacto: se usa el más cercano sin pasarse.
+    # Un monto sin neto exacto (como el antiguo $215.900): se usa el más cercano sin pasarse.
     assert facturas.desglose_iva(215_900) == (181_428, 34_471)

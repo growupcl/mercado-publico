@@ -51,8 +51,8 @@ la factura. Cada pago aprobado por Mercado Pago queda como **factura pendiente**
 
 - **"⚠ Faltan datos":** cuentas antiguas sin dirección o giro. Pídeselos al cliente antes de emitir.
 - **"⚠ diferencia de $1":** el SII calcula el IVA desde el neto y hay montos con IVA incluido que no se pueden
-  reproducir exactos. Hoy pasa solo con el **plan Pyme anual ($215.900)**: la factura queda en $215.899. Si
-  prefieres que cuadre exacto, conviene dejar ese precio en $215.890 o $215.910.
+  reproducir exactos. Los precios actuales cuadran todos (el Pyme anual se dejó en $215.890 por esto); si cambias
+  un precio, revisa que no aparezca este aviso.
 - **Reembolsos:** emite una nota de crédito en el mismo portal, referenciando la factura.
 
 ## Cuándo dejar el portal

@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
 
-from fastapi import APIRouter, Form, Request
+from fastapi import APIRouter, BackgroundTasks, Form, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
@@ -17,6 +17,7 @@ from . import legal
 from . import rut as rutlib
 from .db import MandatoPago, Pago, Suscripcion, ahora
 from .mercadopago import ClienteMercadoPago, ErrorMercadoPago, verificar_firma
+from .whatsapp import ClienteWhatsApp
 from .ia import AsistenteIA
 from .planes import DIAS_PRUEBA, PLANES, PRECIO_FUNDADOR_PRO, formato_pesos, monto
 from .suscripciones import (
@@ -47,6 +48,8 @@ def crear_router_web(
     mp_webhook_secreto: str = "",
     prestador: str = "Virtus SpA",
     permitir_sin_firma: bool = False,
+    wa: ClienteWhatsApp | None = None,
+    idioma_whatsapp: str = "es",
 ) -> APIRouter:
     if mp is not None and not mp_webhook_secreto and not permitir_sin_firma:
         raise ValueError("Falta MERCADOPAGO_WEBHOOK_SECRET: sin él no se puede verificar que los avisos vengan de Mercado Pago.")
@@ -129,6 +132,10 @@ def crear_router_web(
                     opciones.append({"plan": codigo, "nombre": plan.nombre, "periodicidad": periodicidad, "monto": valor,
                                      "fundador": fundador, "actual": actual})
             pagos = list(s.scalars(select(Pago).where(Pago.empresa_id == empresa.id).order_by(Pago.creado_en.desc()).limit(12)))
+            # Último cobro rechazado de la suscripción activa, si no hubo uno aprobado después.
+            rechazo = None
+            if mandato is not None and pagos and pagos[0].mandato_id == mandato.id and pagos[0].estado == "rechazado":
+                rechazo = _fecha(pagos[0].creado_en)
             restantes = max(0, (suscripcion.vigente_hasta - ahora()).days)
             nombres = {**{c: p.nombre for c, p in PLANES.items()}, "gratis": "Gratis", "consultora": "Consultoras"}
             return plantillas.TemplateResponse(request, "cuenta.html", {
@@ -137,6 +144,7 @@ def crear_router_web(
                 "nombre_mandato": nombres.get(mandato.plan) if mandato else "",
                 "opciones": opciones, "pagos": pagos, "token": token, "prestador": prestador,
                 "rut": rutlib.formatear(empresa.rut) if empresa.rut else "", "pagos_activos": mp is not None,
+                "rechazo": rechazo,
             })
 
     @router.post("/cuenta/{token}/suscribir")
@@ -173,8 +181,17 @@ def crear_router_web(
                 return mensaje(request, "No pudimos cancelar", "Inténtalo de nuevo en unos minutos o escríbenos a hola@calza.cl.", estado=502)
         return RedirectResponse(f"/cuenta/{token}", status_code=303)
 
+    def avisar_rechazos() -> None:
+        from .avisos import avisar_cobros_rechazados
+
+        try:
+            with Sesion() as s:
+                avisar_cobros_rechazados(s, wa, url_publica=url_publica, idioma=idioma_whatsapp)
+        except Exception:
+            log.exception("No se pudieron enviar los avisos de cobro rechazado")
+
     @router.post("/pagos/mercadopago/webhook")
-    async def webhook_mp(request: Request):
+    async def webhook_mp(request: Request, tareas: BackgroundTasks):
         """Avisos de Mercado Pago. Se verifica la firma y luego se consulta la API: nunca se confía en el aviso."""
         if mp is None:
             return PlainTextResponse("no configurado", status_code=503)
@@ -195,7 +212,9 @@ def crear_router_web(
                 if tipo == "subscription_preapproval":
                     actualizar_mandato(s, mp, data_id)
                 elif tipo == "subscription_authorized_payment":
-                    registrar_cobro(s, mp, data_id)
+                    pago = registrar_cobro(s, mp, data_id)
+                    if pago is not None and pago.estado == "rechazado" and wa is not None:
+                        tareas.add_task(avisar_rechazos)  # después de responder a Mercado Pago
             except ErrorMercadoPago as e:
                 log.error("No se pudo procesar el aviso de Mercado Pago (%s %s): %s", tipo, data_id, e)
                 return PlainTextResponse("error", status_code=502)  # Mercado Pago reintentará

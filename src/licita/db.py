@@ -250,6 +250,8 @@ class Pago(Base):
     mp_cobro_id: Mapped[str] = mapped_column(String(64), unique=True)  # authorized payment de Mercado Pago
     estado: Mapped[str] = mapped_column(String(12), default="pagado")  # pagado, rechazado
     pagado_en: Mapped[datetime | None] = mapped_column(DateTime)
+    # Cuándo se avisó al cliente que este cobro fue rechazado (None = aún no).
+    aviso_enviado_en: Mapped[datetime | None] = mapped_column(DateTime)
     factura_emitida: Mapped[bool] = mapped_column(Boolean, default=False)
     creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
 

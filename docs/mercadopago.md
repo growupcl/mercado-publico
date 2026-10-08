@@ -16,7 +16,12 @@ facturas (`LICITA_PRESTADOR=Virtus SpA`). Cuando exista Calza SpA, basta cambiar
    aprobado extiende el período 1 o 12 meses. Los avisos repetidos no extienden dos veces.
 5. Cambio de plan: al autorizarse la suscripción nueva, Calza cancela la anterior.
 6. Cancelación: desde "Mi cuenta". El cliente mantiene su plan hasta el fin del período pagado.
-7. Si el período termina sin cobro, `licita suscripciones` pasa la cuenta al plan gratis. Con renovación automática
+7. **Cobro rechazado:** Calza avisa al cliente por WhatsApp apenas Mercado Pago informa el rechazo (texto con el
+   enlace a su cuenta si escribió en las últimas 24 horas; si no, la plantilla `cobro_rechazado`), y muestra un aviso
+   en "Mi cuenta". Como Mercado Pago reintenta el cobro, se avisa como máximo una vez cada 3 días, y no se avisa si
+   el cliente canceló, se dio de baja de WhatsApp o un cobro posterior fue aprobado. Si WhatsApp falla, la tarea
+   diaria `licita suscripciones` lo reintenta.
+8. Si el período termina sin cobro, `licita suscripciones` pasa la cuenta al plan gratis. Con renovación automática
    espera 3 días, porque el cobro y su aviso pueden llegar con atraso.
 
 ## Configuración

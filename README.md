@@ -35,8 +35,8 @@ Sitio: [calza.cl](https://calza.cl) · El nombre interno del proyecto y del coma
    suscribe durante la prueba, el primer cobro es al terminar la prueba. Puede cambiar de plan o cancelar la
    renovación desde su cuenta. Precio fundador del plan Pro para los primeros 100 clientes, congelado de por vida.
    Al vencer sin pago, la cuenta pasa al plan gratis (`licita suscripciones`, una vez al día; con renovación
-   automática hay 3 días de gracia para que llegue el cobro). Durante el piloto factura **Virtus SpA**
-   (`LICITA_PRESTADOR`).
+   automática hay 3 días de gracia para que llegue el cobro). Si un cobro es rechazado, Calza avisa al cliente
+   por WhatsApp. Durante el piloto factura **Virtus SpA** (`LICITA_PRESTADOR`).
 
 Las órdenes de compra quedan guardadas para construir más adelante la inteligencia de precios.
 
@@ -128,6 +128,7 @@ así que no necesitan ticket ni clave. Para correrlas contra Postgres:
 | `src/licita/conversacion.py` | Respuestas a los mensajes entrantes (botones, números, PDF de bases, preguntas, baja/alta) |
 | `src/licita/precios.py` | Inteligencia de precios: referencias por producto, rango competitivo y proveedores frecuentes |
 | `src/licita/web.py` y `src/licita/plantillas/` | Sitio web: inicio, registro, cuenta, retorno de pagos, términos y privacidad |
+| `src/licita/avisos.py` | Avisos al cliente sobre su cuenta (cobro rechazado) |
 | `src/licita/suscripciones.py` | Registro, prueba gratuita, pagos, activación y vencimientos |
 | `src/licita/mercadopago.py` | Cliente de suscripciones de Mercado Pago y verificación de la firma de sus avisos |
 | `src/licita/planes.py` | Planes y precios (con IVA), descuento anual y precio fundador |
@@ -147,4 +148,4 @@ así que no necesitan ticket ni clave. Para correrlas contra Postgres:
 - Descarga automática de las bases desde Mercado Público (hoy el usuario reenvía el PDF), si los términos de uso lo permiten.
 - Carga del histórico de órdenes de compra desde datos-abiertos.chilecompra.cl, para tener precios de referencia desde el primer día.
 - Factura electrónica automática al confirmar cada pago (hoy queda marcada como pendiente de emitir).
-- Aviso por WhatsApp o correo cuando un cobro automático es rechazado.
+- Aviso por correo (además de WhatsApp) cuando un cobro automático es rechazado.

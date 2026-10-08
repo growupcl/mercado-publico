@@ -250,12 +250,13 @@ def cmd_servidor(args, config: Config, Sesion) -> int:
         from .mercadopago import ClienteMercadoPago
 
         mp = ClienteMercadoPago(config.mercadopago_access_token)
+    wa = _whatsapp(config) if config.whatsapp_token else None
     router_web = crear_router_web(
         Sesion, mp=mp, ia=AsistenteIA(modelo=config.modelo_clasificacion),
         url_publica=config.url_publica, whatsapp_publico=config.whatsapp_publico,
         mp_webhook_secreto=config.mercadopago_webhook_secret, prestador=config.prestador,
+        wa=wa, idioma_whatsapp=config.whatsapp_idioma,
     )
-    wa = _whatsapp(config) if config.whatsapp_token else None
     app = crear_app(
         Sesion, wa, verify_token=config.whatsapp_verify_token,
         app_secret=config.whatsapp_app_secret, url_registro=config.url_registro or f"{config.url_publica}/registro",
@@ -279,6 +280,11 @@ def cmd_suscripciones(args, config: Config, Sesion) -> int:
             print(f"Vencida → plan gratis: #{e.id} {e.nombre}")
         for e, sus in por_vencer(s, dias=args.dias):
             print(f"Por vencer ({sus.vigente_hasta:%d-%m-%Y}, {sus.estado}): #{e.id} {e.nombre} · {e.email}")
+        if config.whatsapp_token:
+            from .avisos import avisar_cobros_rechazados
+
+            enviados = avisar_cobros_rechazados(s, _whatsapp(config), url_publica=config.url_publica, idioma=config.whatsapp_idioma)
+            print(f"Avisos de cobro rechazado enviados: {enviados}")
     return 0
 
 
@@ -338,7 +344,7 @@ def construir_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("reconstruir-precios", help="Llena la tabla de precios con lo ya sincronizado")
     s.set_defaults(fn=cmd_reconstruir_precios)
 
-    s = sub.add_parser("suscripciones", help="Vence las suscripciones impagas y lista las que están por vencer")
+    s = sub.add_parser("suscripciones", help="Vence suscripciones impagas, lista las por vencer y avisa cobros rechazados")
     s.add_argument("--dias", type=int, default=3, help="Días de anticipación para listar las por vencer")
     s.set_defaults(fn=cmd_suscripciones)
 

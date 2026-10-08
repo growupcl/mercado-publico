@@ -39,7 +39,7 @@ Sitio: [calza.cl](https://calza.cl) · El nombre interno del proyecto y del coma
    renovación desde su cuenta. Precio fundador del plan Pro para los primeros 100 clientes, congelado de por vida.
    Al vencer sin pago, la cuenta pasa al plan gratis (`licita suscripciones`, una vez al día; con renovación
    automática hay 3 días de gracia para que llegue el cobro). Si un cobro es rechazado, Calza avisa al cliente
-   por WhatsApp. Durante el piloto factura **Virtus SpA** (`LICITA_PRESTADOR`).
+   por WhatsApp y por correo ([docs/correo.md](docs/correo.md)). Durante el piloto factura **Virtus SpA** (`LICITA_PRESTADOR`).
 10. **Compra Ágil** (`licita compra-agil`, cada 20 minutos, plan Pro): trae las Compras Ágiles recién publicadas desde
     la [API Compra Ágil v2](docs/compra-agil.md), pide el detalle solo de las que comparten palabras clave con un
     cliente Pro, las evalúa con IA y avisa **de inmediato** por WhatsApp las que calzan, porque en Compra Ágil suele
@@ -147,7 +147,8 @@ así que no necesitan ticket ni clave. Para correrlas contra Postgres:
 | `src/licita/conversacion.py` | Respuestas a los mensajes entrantes (botones, números, PDF de bases, preguntas, baja/alta) |
 | `src/licita/precios.py` | Inteligencia de precios: referencias por producto, rango competitivo y proveedores frecuentes |
 | `src/licita/web.py` y `src/licita/plantillas/` | Sitio web: inicio, registro, cuenta, retorno de pagos, términos y privacidad |
-| `src/licita/avisos.py` | Avisos al cliente sobre su cuenta (cobro rechazado) |
+| `src/licita/avisos.py` | Avisos al cliente sobre su cuenta (cobro rechazado), por WhatsApp y correo |
+| `src/licita/correo.py` | Envío de correos por SMTP (Google Workspace) |
 | `src/licita/suscripciones.py` | Registro, prueba gratuita, pagos, activación y vencimientos |
 | `src/licita/mercadopago.py` | Cliente de suscripciones de Mercado Pago y verificación de la firma de sus avisos |
 | `src/licita/planes.py` | Planes y precios (con IVA), descuento anual y precio fundador |
@@ -168,4 +169,3 @@ así que no necesitan ticket ni clave. Para correrlas contra Postgres:
 - Descarga automática de las bases: no hay vía oficial y los términos apuntan en contra; se consultó a ChileCompra
   (ver [docs/descarga-de-bases.md](docs/descarga-de-bases.md)). Hoy el usuario reenvía el PDF o Word.
 - Factura electrónica automática al confirmar cada pago (hoy se emite a mano en el portal del SII, ver docs/facturacion.md).
-- Aviso por correo (además de WhatsApp) cuando un cobro automático es rechazado.

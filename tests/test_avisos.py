@@ -9,6 +9,7 @@ from licita.db import Empresa, MensajeWhatsApp, Pago, Suscripcion, ahora
 from licita.mercadopago import CobroMP
 from licita.servidor import crear_app
 from licita.web import crear_router_web
+from licita.correo import ClienteCorreo, ErrorCorreo
 from licita.whatsapp import ErrorWhatsApp
 from test_web import SECRETO, IAFalsa, MPFalso, _aviso, _registrar, _suscribir
 
@@ -29,6 +30,18 @@ class WAFalso:
             raise ErrorWhatsApp("caído")
         self.enviados.append(("plantilla", nombre, parametros, payloads_botones))
         return "w"
+
+
+class CorreoFalso:
+    def __init__(self):
+        self.enviados = []
+        self.falla = False
+
+    def enviar(self, para, asunto, texto, html=None):
+        if self.falla:
+            raise ErrorCorreo("SMTP caído")
+        self.enviados.append((para, asunto, texto, html))
+        return "<id@calza.cl>"
 
 
 @pytest.fixture
@@ -99,7 +112,7 @@ def test_no_avisa_si_un_cobro_posterior_se_aprobo_o_si_cancelo(entorno):
     _aviso(cliente, "subscription_authorized_payment", "OK1")
     wa.falla = False
     with Sesion() as s:
-        assert avisar_cobros_rechazados(s, wa, url_publica="https://calza.cl") == 0
+        assert avisar_cobros_rechazados(s, wa, url_publica="https://calza.cl").total == 0
     assert wa.enviados == []
     assert "No pudimos cobrar tu plan" not in cliente.get(f"/cuenta/{token}").text
 
@@ -116,7 +129,7 @@ def test_si_whatsapp_falla_se_reintenta_despues(entorno):
         assert s.query(Pago).one().aviso_enviado_en is None
     wa.falla = False
     with Sesion() as s:
-        assert avisar_cobros_rechazados(s, wa, url_publica="https://calza.cl") == 1
+        assert avisar_cobros_rechazados(s, wa, url_publica="https://calza.cl").whatsapp == 1
 
 
 def test_respeta_la_baja_de_whatsapp(entorno):
@@ -126,3 +139,127 @@ def test_respeta_la_baja_de_whatsapp(entorno):
         s.commit()
     _rechazo(cliente, mp, "R1")
     assert wa.enviados == []
+
+
+# --- Aviso por correo ---
+
+@pytest.fixture
+def con_correo(Sesion):
+    mp, wa, correo = MPFalso(), WAFalso(), CorreoFalso()
+    router = crear_router_web(Sesion, mp=mp, ia=IAFalsa(), url_publica="https://calza.cl", mp_webhook_secreto=SECRETO,
+                              wa=wa, correo=correo)
+    cliente = TestClient(crear_app(Sesion, router_web=router))
+    _, token = _registrar(cliente)
+    _suscribir(cliente, token, "pyme", "mensual")
+    mp.estados["PRE1"] = "authorized"
+    _aviso(cliente, "subscription_preapproval", "PRE1")
+    return cliente, Sesion, mp, wa, correo
+
+
+def test_cobro_rechazado_avisa_por_whatsapp_y_por_correo(con_correo):
+    cliente, Sesion, mp, wa, correo = con_correo
+    _rechazo(cliente, mp, "R1")
+    assert len(wa.enviados) == 1
+    [(para, asunto, texto, html)] = correo.enviados
+    assert para == "contacto@aseosur.cl" and asunto == "No pudimos cobrar tu plan Pyme mensual de Calza"
+    with Sesion() as s:
+        sus = s.query(Suscripcion).one()
+        limite = fecha_larga(sus.vigente_hasta + timedelta(days=DIAS_GRACIA_RENOVACION))
+        pago = s.query(Pago).one()
+        assert pago.aviso_enviado_en is not None and pago.aviso_correo_en is not None
+    assert f"antes del {limite}" in texto and f"antes del {limite}" in html
+    # El enlace del correo abre la cuenta.
+    enlace = texto.split("https://calza.cl/cuenta/")[1].split()[0]
+    assert cliente.get(f"/cuenta/{enlace}").status_code == 200
+    assert f'href="https://calza.cl/cuenta/{enlace}"' in html
+
+
+def test_si_el_correo_falla_se_reintenta_solo_el_correo(con_correo):
+    cliente, Sesion, mp, wa, correo = con_correo
+    correo.falla = True
+    _rechazo(cliente, mp, "R1")
+    assert len(wa.enviados) == 1 and correo.enviados == []
+    correo.falla = False
+    with Sesion() as s:
+        r = avisar_cobros_rechazados(s, wa, url_publica="https://calza.cl", correo=correo)
+    assert (r.whatsapp, r.correos) == (0, 1) and len(wa.enviados) == 1
+
+
+def test_con_baja_de_whatsapp_igual_llega_el_correo(con_correo):
+    cliente, Sesion, mp, wa, correo = con_correo
+    with Sesion() as s:
+        s.query(Empresa).one().whatsapp_activo = False
+        s.commit()
+    _rechazo(cliente, mp, "R1")
+    assert wa.enviados == [] and len(correo.enviados) == 1
+
+
+def test_no_repite_correos_en_los_reintentos_ni_avisa_cobros_viejos(con_correo):
+    cliente, Sesion, mp, wa, correo = con_correo
+    _rechazo(cliente, mp, "R1")
+    _rechazo(cliente, mp, "R2")  # reintento de Mercado Pago el mismo día
+    assert len(correo.enviados) == 1
+    with Sesion() as s:
+        s.query(Pago).filter_by(mp_cobro_id="R2").one().aviso_correo_en = None
+        viejo = s.query(Pago).filter_by(mp_cobro_id="R2").one()
+        viejo.creado_en = ahora() - timedelta(days=8)
+        s.commit()
+        assert avisar_cobros_rechazados(s, wa, url_publica="https://calza.cl", correo=correo).total == 0
+        assert s.query(Pago).filter_by(mp_cobro_id="R2").one().aviso_correo_en is not None
+
+
+def test_correo_html_escapa_el_nombre():
+    from licita.avisos import correo_cobro_rechazado
+
+    e = Empresa(nombre="Aseo <Sur> & Cía", descripcion="x")
+    _, texto, html = correo_cobro_rechazado(e, "Pro mensual", "1 de noviembre de 2026", "https://calza.cl/cuenta/abc")
+    assert "Aseo &lt;Sur&gt; &amp; Cía" in html and "Hola Aseo <Sur> & Cía:" in texto
+
+
+class SMTPFalso:
+    instancias = []
+
+    def __init__(self, host, puerto, timeout=None):
+        self.host, self.puerto, self.pasos = host, puerto, []
+        SMTPFalso.instancias.append(self)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        self.pasos.append("quit")
+
+    def starttls(self, context=None):
+        self.pasos.append("starttls")
+
+    def login(self, usuario, clave):
+        self.pasos.append(("login", usuario))
+
+    def send_message(self, m):
+        self.pasos.append(("enviar", m["From"], m["To"], m["Subject"]))
+        self.mensaje = m
+
+
+def test_cliente_smtp_usa_starttls_y_remitente(monkeypatch):
+    import smtplib
+
+    monkeypatch.setattr(smtplib, "SMTP", SMTPFalso)
+    c = ClienteCorreo("smtp.gmail.com", 587, "matias@calza.cl", "clave-app", "hola@calza.cl")
+    mid = c.enviar("cliente@pyme.cl", "Asunto", "Texto", "<p>Texto</p>")
+    smtp = SMTPFalso.instancias[-1]
+    assert (smtp.host, smtp.puerto) == ("smtp.gmail.com", 587)
+    assert smtp.pasos[:2] == ["starttls", ("login", "matias@calza.cl")]
+    assert smtp.pasos[2] == ("enviar", "Calza <hola@calza.cl>", "cliente@pyme.cl", "Asunto")
+    assert mid.endswith("@calza.cl>") and smtp.mensaje["Reply-To"] == "hola@calza.cl"
+    assert smtp.mensaje.get_body(("html",)).get_content().strip() == "<p>Texto</p>"
+
+
+def test_error_smtp_se_informa(monkeypatch):
+    import smtplib
+
+    def caido(*a, **k):
+        raise smtplib.SMTPAuthenticationError(535, b"Username and Password not accepted")
+
+    monkeypatch.setattr(smtplib, "SMTP", caido)
+    with pytest.raises(ErrorCorreo, match="cliente@pyme.cl"):
+        ClienteCorreo("smtp.gmail.com", 587, "u", "c", "hola@calza.cl").enviar("cliente@pyme.cl", "a", "b")

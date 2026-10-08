@@ -24,6 +24,11 @@ class Config:
     mercadopago_access_token: str = ""
     mercadopago_webhook_secret: str = ""
     prestador: str = "Virtus SpA"
+    smtp_host: str = "smtp.gmail.com"
+    smtp_puerto: int = 587
+    smtp_usuario: str = ""
+    smtp_clave: str = ""
+    correo_remitente: str = "hola@calza.cl"
 
     @classmethod
     def desde_entorno(cls) -> "Config":
@@ -48,4 +53,9 @@ class Config:
             mercadopago_access_token=os.environ.get("MERCADOPAGO_ACCESS_TOKEN", ""),
             mercadopago_webhook_secret=os.environ.get("MERCADOPAGO_WEBHOOK_SECRET", ""),
             prestador=os.environ.get("LICITA_PRESTADOR", "Virtus SpA"),
+            smtp_host=os.environ.get("SMTP_HOST", "smtp.gmail.com"),
+            smtp_puerto=int(os.environ.get("SMTP_PUERTO", "587")),
+            smtp_usuario=os.environ.get("SMTP_USUARIO", ""),
+            smtp_clave=os.environ.get("SMTP_CLAVE", ""),
+            correo_remitente=os.environ.get("CORREO_REMITENTE", "hola@calza.cl"),
         )

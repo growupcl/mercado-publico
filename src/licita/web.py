@@ -15,6 +15,7 @@ from sqlalchemy.orm import sessionmaker
 
 from . import legal
 from . import rut as rutlib
+from .correo import ClienteCorreo
 from .db import MandatoPago, Pago, Suscripcion, ahora
 from .mercadopago import ClienteMercadoPago, ErrorMercadoPago, verificar_firma
 from .whatsapp import ClienteWhatsApp
@@ -50,6 +51,7 @@ def crear_router_web(
     permitir_sin_firma: bool = False,
     wa: ClienteWhatsApp | None = None,
     idioma_whatsapp: str = "es",
+    correo: ClienteCorreo | None = None,
 ) -> APIRouter:
     if mp is not None and not mp_webhook_secreto and not permitir_sin_firma:
         raise ValueError("Falta MERCADOPAGO_WEBHOOK_SECRET: sin él no se puede verificar que los avisos vengan de Mercado Pago.")
@@ -188,7 +190,7 @@ def crear_router_web(
 
         try:
             with Sesion() as s:
-                avisar_cobros_rechazados(s, wa, url_publica=url_publica, idioma=idioma_whatsapp)
+                avisar_cobros_rechazados(s, wa, url_publica=url_publica, correo=correo, idioma=idioma_whatsapp)
         except Exception:
             log.exception("No se pudieron enviar los avisos de cobro rechazado")
 
@@ -215,7 +217,7 @@ def crear_router_web(
                     actualizar_mandato(s, mp, data_id)
                 elif tipo == "subscription_authorized_payment":
                     pago = registrar_cobro(s, mp, data_id)
-                    if pago is not None and pago.estado == "rechazado" and wa is not None:
+                    if pago is not None and pago.estado == "rechazado" and (wa is not None or correo is not None):
                         tareas.add_task(avisar_rechazos)  # después de responder a Mercado Pago
             except ErrorMercadoPago as e:
                 log.error("No se pudo procesar el aviso de Mercado Pago (%s %s): %s", tipo, data_id, e)

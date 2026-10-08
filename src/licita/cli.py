@@ -25,6 +25,7 @@ from sqlalchemy import select
 from .config import Config
 from .db import Empresa, crear_sesiones
 from .analisis import DocumentoInvalido, LimiteAlcanzado
+from .correo import ErrorCorreo
 from .mercadopago import ErrorMercadoPago
 from .ia import ErrorIA
 from .mercadopublico import MercadoPublicoError
@@ -153,6 +154,15 @@ def cmd_whatsapp_enviar(args, config: Config, Sesion) -> int:
     return 0
 
 
+def _correo(config: Config):
+    """Cliente de correo si SMTP está configurado; None si no."""
+    if not config.smtp_usuario or not config.smtp_clave:
+        return None
+    from .correo import ClienteCorreo
+
+    return ClienteCorreo(config.smtp_host, config.smtp_puerto, config.smtp_usuario, config.smtp_clave, config.correo_remitente)
+
+
 def _servicio_analisis(config: Config):
     from .analisis import AlmacenDocumentos, AnalizadorBases, ServicioAnalisis
 
@@ -255,7 +265,7 @@ def cmd_servidor(args, config: Config, Sesion) -> int:
         Sesion, mp=mp, ia=AsistenteIA(modelo=config.modelo_clasificacion),
         url_publica=config.url_publica, whatsapp_publico=config.whatsapp_publico,
         mp_webhook_secreto=config.mercadopago_webhook_secret, prestador=config.prestador,
-        wa=wa, idioma_whatsapp=config.whatsapp_idioma,
+        wa=wa, idioma_whatsapp=config.whatsapp_idioma, correo=_correo(config),
     )
     app = crear_app(
         Sesion, wa, verify_token=config.whatsapp_verify_token,
@@ -267,6 +277,8 @@ def cmd_servidor(args, config: Config, Sesion) -> int:
         print("Aviso: WhatsApp no está configurado; el servidor solo atiende el sitio web.")
     if mp is None:
         print("Aviso: Mercado Pago no está configurado; los pagos en línea están desactivados.")
+    if _correo(config) is None:
+        print("Aviso: el correo (SMTP_USUARIO/SMTP_CLAVE) no está configurado; los avisos de cuenta van solo por WhatsApp.")
     # Detrás de Caddy (HTTPS): confiar en sus encabezados para conocer el esquema y la IP real.
     uvicorn.run(app, host=args.host, port=args.puerto, proxy_headers=True, forwarded_allow_ips="*")
     return 0
@@ -280,11 +292,12 @@ def cmd_suscripciones(args, config: Config, Sesion) -> int:
             print(f"Vencida → plan gratis: #{e.id} {e.nombre}")
         for e, sus in por_vencer(s, dias=args.dias):
             print(f"Por vencer ({sus.vigente_hasta:%d-%m-%Y}, {sus.estado}): #{e.id} {e.nombre} · {e.email}")
-        if config.whatsapp_token:
+        wa, correo = (_whatsapp(config) if config.whatsapp_token else None), _correo(config)
+        if wa or correo:
             from .avisos import avisar_cobros_rechazados
 
-            enviados = avisar_cobros_rechazados(s, _whatsapp(config), url_publica=config.url_publica, idioma=config.whatsapp_idioma)
-            print(f"Avisos de cobro rechazado enviados: {enviados}")
+            r = avisar_cobros_rechazados(s, wa, url_publica=config.url_publica, correo=correo, idioma=config.whatsapp_idioma)
+            print(f"Avisos de cobro rechazado enviados: {r.whatsapp} por WhatsApp, {r.correos} por correo")
     return 0
 
 
@@ -391,6 +404,15 @@ def _hay_palabras_clave(s) -> bool:
     return any(e.palabras_clave for e in s.scalars(select(Empresa).where(Empresa.plan != "gratis")))
 
 
+def cmd_correo_prueba(args, config: Config, Sesion) -> int:
+    correo = _correo(config)
+    if correo is None:
+        raise ValueError("Configura SMTP_USUARIO y SMTP_CLAVE en .env (ver docs/correo.md).")
+    correo.enviar(args.para, "Prueba de correo de Calza", "Si recibiste este correo, el envío desde Calza funciona.")
+    print(f"Correo de prueba enviado a {args.para} desde {config.correo_remitente}.")
+    return 0
+
+
 def construir_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="licita", description="Copiloto de licitaciones de Mercado Público")
     sub = p.add_subparsers(dest="comando", required=True)
@@ -474,6 +496,10 @@ def construir_parser() -> argparse.ArgumentParser:
     s.add_argument("--folio", help="Con --emitida: folio que entregó el SII")
     s.set_defaults(fn=cmd_facturas)
 
+    s = sub.add_parser("correo-prueba", help="Envía un correo de prueba para revisar la configuración SMTP")
+    s.add_argument("para", help="Dirección de destino")
+    s.set_defaults(fn=cmd_correo_prueba)
+
     s = sub.add_parser("migrar", help="Aplica las migraciones pendientes de la base de datos")
     s.add_argument("--nueva", metavar="MENSAJE", help="Genera una migración nueva a partir de los cambios en los modelos")
     s.set_defaults(fn=cmd_migrar)
@@ -503,7 +529,7 @@ def main(argv: list[str] | None = None) -> int:
     Sesion = crear_sesiones(config.database_url)
     try:
         return args.fn(args, config, Sesion)
-    except (MercadoPublicoError, ErrorIA, ErrorWhatsApp, ErrorMercadoPago, DocumentoInvalido, LimiteAlcanzado, ValueError) as e:
+    except (MercadoPublicoError, ErrorIA, ErrorWhatsApp, ErrorMercadoPago, ErrorCorreo, DocumentoInvalido, LimiteAlcanzado, ValueError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
 

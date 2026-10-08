@@ -261,8 +261,10 @@ class Pago(Base):
     mp_cobro_id: Mapped[str] = mapped_column(String(64), unique=True)  # authorized payment de Mercado Pago
     estado: Mapped[str] = mapped_column(String(12), default="pagado")  # pagado, rechazado
     pagado_en: Mapped[datetime | None] = mapped_column(DateTime)
-    # Cuándo se avisó al cliente que este cobro fue rechazado (None = aún no).
+    # Cuándo se resolvió el aviso de este cobro rechazado por WhatsApp y por correo (None = pendiente).
+    # Queda con fecha también cuando no correspondía avisar por ese canal, para no volver a evaluarlo.
     aviso_enviado_en: Mapped[datetime | None] = mapped_column(DateTime)
+    aviso_correo_en: Mapped[datetime | None] = mapped_column(DateTime)
     factura_emitida: Mapped[bool] = mapped_column(Boolean, default=False)
     factura_folio: Mapped[str] = mapped_column(String(20), default="", server_default="")
     factura_emitida_en: Mapped[datetime | None] = mapped_column(DateTime)

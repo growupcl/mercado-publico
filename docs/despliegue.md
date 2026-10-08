@@ -140,6 +140,7 @@ Completa al menos:
 | `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_SECRET` | Ver [mercadopago.md](mercadopago.md) |
 | `LICITA_PRESTADOR` | `Virtus SpA` |
 | `WHATSAPP_*`, `LICITA_WHATSAPP_PUBLICO` | Ver [whatsapp-masivo-app.md](whatsapp-masivo-app.md) |
+| `SMTP_USUARIO`, `SMTP_CLAVE` | Correo de avisos desde hola@calza.cl. Ver [correo.md](correo.md) |
 
 Lo que aún no tengas (ticket, WhatsApp, Mercado Pago) puede quedar vacío: el sitio funciona igual y esas partes
 se activan al completar la variable y reiniciar (`docker compose up -d`).

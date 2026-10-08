@@ -350,6 +350,47 @@ def cmd_compra_agil_precios(args, config: Config, Sesion) -> int:
     return 1 if r.errores else 0
 
 
+def cmd_historico_oc(args, config: Config, Sesion) -> int:
+    from pathlib import Path
+
+    from .calce import interes_de_clientes
+    from .db import hoy_en_chile
+    from .historico import importar_archivo, importar_meses, meses_hacia_atras
+
+    def informar(etiqueta, r):
+        print(f"{etiqueta}: {r.lineas:,} líneas de {r.ordenes:,} órdenes · {r.guardados:,} precios nuevos · "
+              f"{r.ya_estaban:,} ya estaban · {r.filtrados:,} de otros rubros · {r.descartados:,} descartados".replace(",", "."))
+
+    with Sesion() as s:
+        interes = None if args.todo else interes_de_clientes(s)
+        if interes is not None and not _hay_palabras_clave(s):
+            print("Aviso: no hay clientes con palabras clave; no se guardará nada. Usa --todo para cargar todos los rubros.")
+        if args.archivo:
+            for ruta in args.archivo:
+                informar(ruta, importar_archivo(s, Path(ruta), interes=interes))
+            return 0
+        if args.hasta:
+            anio, mes = (int(x) for x in args.hasta.split("-"))
+            hasta = date(anio, mes, 1)
+        else:
+            hasta = hoy_en_chile()
+        meses = meses_hacia_atras(hasta, args.meses)
+
+        def al_terminar(anio, mes, r):
+            if r is None:
+                print(f"{anio}-{mes:02d}: ChileCompra aún no publica este mes")
+            else:
+                informar(f"{anio}-{mes:02d}", r)
+            sys.stdout.flush()
+
+        informar("Total", importar_meses(s, meses, interes=interes, al_terminar_mes=al_terminar))
+    return 0
+
+
+def _hay_palabras_clave(s) -> bool:
+    return any(e.palabras_clave for e in s.scalars(select(Empresa).where(Empresa.plan != "gratis")))
+
+
 def construir_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="licita", description="Copiloto de licitaciones de Mercado Público")
     sub = p.add_subparsers(dest="comando", required=True)
@@ -412,6 +453,13 @@ def construir_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("precios", help="Precios de referencia para los ítems de una licitación")
     s.add_argument("--codigo", required=True, help="Código de la licitación")
     s.set_defaults(fn=cmd_precios)
+
+    s = sub.add_parser("historico-oc", help="Carga precios del histórico de órdenes de compra (datos abiertos de ChileCompra)")
+    s.add_argument("--meses", type=int, default=2, help="Cuántos meses hacia atrás (24 para la carga inicial)")
+    s.add_argument("--hasta", metavar="AAAA-MM", help="Último mes a cargar (por defecto, el actual)")
+    s.add_argument("--archivo", nargs="+", help="Importa .zip o .csv ya descargados en vez de descargarlos")
+    s.add_argument("--todo", action="store_true", help="Guarda todos los rubros, no solo los de los clientes (ocupa mucho espacio)")
+    s.set_defaults(fn=cmd_historico_oc)
 
     s = sub.add_parser("reconstruir-precios", help="Llena la tabla de precios con lo ya sincronizado")
     s.set_defaults(fn=cmd_reconstruir_precios)

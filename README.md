@@ -28,7 +28,9 @@ Sitio: [calza.cl](https://calza.cl) · El nombre interno del proyecto y del coma
 8. **Inteligencia de precios** (`licita precios` o escribiendo *PRECIOS* en WhatsApp, plan Pro): para cada ítem de una
    licitación muestra cuánto ha pagado el Estado (mediana y rango habitual de los últimos 24 meses), un rango de precio
    competitivo, quién suele ganar y si el presupuesto alcanza a precios de mercado. Se alimenta de las órdenes de compra
-   y de las licitaciones adjudicadas que trae `licita sync --ordenes`; no usa IA, así que no tiene costo variable.
+   y de las licitaciones adjudicadas que trae `licita sync --ordenes`, y del **histórico de órdenes de compra** de los
+   datos abiertos de ChileCompra (`licita historico-oc`, ver [docs/historico-oc.md](docs/historico-oc.md)); no usa IA,
+   así que no tiene costo variable.
 9. **Sitio web, registro y pagos** (`licita servidor`): página de inicio con los planes, registro con 14 días de prueba
    del plan Pro sin tarjeta, cuenta con enlace privado (sin contraseñas; por WhatsApp se pide con *CUENTA*) y
    **suscripción con Mercado Pago** (tarjeta de crédito o débito) que cobra sola cada mes o cada año. Si el cliente se
@@ -77,6 +79,7 @@ licita resumen --empresa 1 --marcar
 licita analizar --pdf bases.pdf --codigo 1234-56-LE26
 licita precios --codigo 1234-56-LE26
 licita compra-agil                 # Compras Ágiles nuevas, calce y alertas urgentes (plan Pro)
+licita historico-oc --meses 24     # precios del histórico de órdenes de compra (carga inicial; luego cada semana)
 licita compra-agil-precios         # cotizaciones de las Compras Ágiles que cerraron (una vez al día)
 licita ciclo                       # sincroniza, clasifica y busca calces para todas las empresas activas
 licita servidor --puerto 8000      # sitio web en http://localhost:8000 y webhook de WhatsApp
@@ -133,6 +136,7 @@ así que no necesitan ticket ni clave. Para correrlas contra Postgres:
 | `src/licita/db.py` | Modelos de base de datos: licitaciones, órdenes de compra, empresas y calces |
 | `src/licita/compra_agil.py` | Cliente de la API Compra Ágil v2 y sincronización (se guardan como licitaciones tipo COT) |
 | `src/licita/alertas.py` | Alertas urgentes de Compra Ágil por WhatsApp (plan Pro) |
+| `src/licita/historico.py` | Carga de precios desde el histórico mensual de órdenes de compra (datos abiertos) |
 | `src/licita/sync.py` | Sincronización diaria hacia la base de datos propia |
 | `src/licita/ia.py` | Clasificación, extracción de perfil y evaluación de calce con Claude (salidas estructuradas) |
 | `src/licita/calce.py` | Prefiltro sin IA y búsqueda de calces |
@@ -160,6 +164,5 @@ así que no necesitan ticket ni clave. Para correrlas contra Postgres:
 
 - Probar el puntaje con IA y el análisis de bases con datos reales (el formato de la API, el volumen diario y el enlace a la ficha ya están validados).
 - Descarga automática de las bases desde Mercado Público (hoy el usuario reenvía el PDF), si los términos de uso lo permiten.
-- Carga del histórico de órdenes de compra desde datos-abiertos.chilecompra.cl, para tener precios de referencia desde el primer día.
 - Factura electrónica automática al confirmar cada pago (hoy se emite a mano en el portal del SII, ver docs/facturacion.md).
 - Aviso por correo (además de WhatsApp) cuando un cobro automático es rechazado.

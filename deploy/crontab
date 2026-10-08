@@ -18,6 +18,9 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # 23:30: órdenes de compra del día (alimentan la inteligencia de precios).
 30 23 * * *     /opt/calza/deploy/tareas.sh sync --ordenes --max-detalles 1500
 
+# Lunes 1:30: precios del histórico de órdenes de compra (mes actual y anterior, que ChileCompra sigue completando).
+30 1 * * 1      /opt/calza/deploy/tareas.sh historico-oc --meses 2
+
 # 3:15: vence suscripciones impagas y lista las próximas a vencer.
 15 3 * * *      /opt/calza/deploy/tareas.sh suscripciones
 

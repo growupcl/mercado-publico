@@ -27,6 +27,7 @@ from .resumen import formato_pesos
 FUENTE_COTIZACION = "cotizacion_ca"
 FUENTES_PAGADAS = ("orden_de_compra", "adjudicacion")
 MINIMO_OBSERVACIONES = 3
+MAXIMO_SIN_CODIGO = 20_000
 MESES_HISTORIA = 24
 SIMILITUD_MINIMA = 0.5
 
@@ -217,7 +218,11 @@ def _observaciones(
     texto = tokens(f"{item.get('producto', '')} {item.get('descripcion', '')}")
     if not texto:
         return [], True
-    candidatas = session.scalars(base.where(Precio.codigo_producto.startswith(codigo[:6]))) if len(codigo) >= 6 else session.scalars(base)
+    if len(codigo) >= 6:
+        candidatas = session.scalars(base.where(Precio.codigo_producto.startswith(codigo[:6])))
+    else:
+        # Sin código de producto: con el histórico cargado la tabla tiene millones de filas, se miran las más recientes.
+        candidatas = session.scalars(base.order_by(Precio.fecha.desc()).limit(MAXIMO_SIN_CODIGO))
     parecidas = [p for p in candidatas if texto and len(texto & tokens(p.producto)) / len(texto) >= SIMILITUD_MINIMA]
     return parecidas, True
 

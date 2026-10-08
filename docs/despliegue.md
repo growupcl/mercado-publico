@@ -171,6 +171,7 @@ crontab -l
 | Días hábiles, cada 20 min de 8:00 a 20:40 | Compras Ágiles nuevas y alertas urgentes del plan Pro ([compra-agil.md](compra-agil.md)) |
 | 22:00 | Cotizaciones de las Compras Ágiles que cerraron (precios de referencia) |
 | 23:30 | Órdenes de compra del día (precios de referencia) |
+| Lunes 1:30 | Precios del histórico de órdenes de compra, mes actual y anterior ([historico-oc.md](historico-oc.md)) |
 | 3:15 | Vencimiento de suscripciones impagas |
 | 2:45 | Respaldo de la base de datos (se guardan 14 días en `/var/backups/calza`) |
 
@@ -178,6 +179,12 @@ El registro de cada tarea queda en `/opt/calza/logs/tareas.log`.
 
 Los límites `--max-detalles` del crontab cuidan el límite diario de consultas del ticket de Mercado Público.
 Ajústalos cuando veamos el volumen real.
+
+Cuando registres a los primeros clientes, haz la **carga inicial de precios** (unos 60 a 90 minutos):
+
+```bash
+deploy/tareas.sh historico-oc --meses 24
+```
 
 ## 8. Conectar WhatsApp y Mercado Pago
 

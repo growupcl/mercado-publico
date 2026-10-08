@@ -75,8 +75,8 @@ def leer_mensaje(msg: dict[str, Any]) -> tuple[str, str]:
 
 INVITACION_BASES = (
     "\n\n💲 Escribe *PRECIOS* para ver cuánto ha pagado el Estado por estos productos."
-    "\n📄 ¿Quieres saber qué piden exactamente? Descarga el PDF de las bases desde la ficha y "
-    "envíamelo aquí: te digo requisitos, garantías, plazos y cómo se evalúa."
+    "\n📄 ¿Quieres saber qué piden exactamente? Descarga las bases (PDF o Word) desde la ficha y "
+    "envíamelas aquí: te digo requisitos, garantías, plazos y cómo se evalúa."
 )
 
 
@@ -94,7 +94,7 @@ def invitacion_compra_agil(lic: Licitacion) -> str:
         lista = "\n".join(f"• {nombre}" for nombre in adjuntos[:5])
         mas = f"\n• … y {len(adjuntos) - 5} más" if len(adjuntos) > 5 else ""
         texto += (f"\n📎 Tiene {len(adjuntos)} adjunto{'s' if len(adjuntos) > 1 else ''}:\n{lista}{mas}\n"
-                  "Muchas veces el detalle de lo que piden está ahí. Descarga los PDF desde la ficha y envíamelos aquí: "
+                  "Muchas veces el detalle de lo que piden está ahí. Descárgalos desde la ficha (PDF o Word) y envíamelos aquí: "
                   "te digo qué piden y qué revisar antes de cotizar.")
     else:
         texto += "\n📄 Si tienes documentos de esta compra, envíamelos aquí y te digo qué piden."
@@ -200,8 +200,12 @@ def procesar_documento(
         enviar("Por ahora no puedo analizar documentos. Inténtalo más tarde.")
         return
     documento = msg.get("document", {})
-    if documento.get("mime_type") != "application/pdf":
-        enviar("Solo puedo analizar bases en *PDF*. Descárgalas desde la ficha de la licitación y envíamelas aquí.")
+    tipo = tipo_de_archivo(documento.get("mime_type", ""), documento.get("filename", ""))
+    if tipo == "doc":
+        enviar("Ese es un Word antiguo (.doc) y no puedo leerlo. Ábrelo y guárdalo como *.docx* o *PDF*, y envíamelo de nuevo.")
+        return
+    if tipo is None:
+        enviar("Solo puedo analizar bases en *PDF* o *Word (.docx)*. Descárgalas desde la ficha de la licitación y envíamelas aquí.")
         return
     codigo = detectar_codigo(documento.get("caption"), documento.get("filename"))
     if codigo is None and empresa.licitacion_activa and _contexto_vigente(empresa, momento):
@@ -228,6 +232,23 @@ def procesar_documento(
     lic = session.get(Licitacion, resultado.licitacion_codigo) if resultado.licitacion_codigo else None
     for texto in textos_analisis(resultado.resultado, titulo=lic.nombre if lic else ""):
         enviar(texto)
+
+
+MIME_PDF = "application/pdf"
+MIME_DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+MIME_DOC = "application/msword"
+
+
+def tipo_de_archivo(mime: str, nombre: str) -> str | None:
+    """"pdf", "docx", "doc" (no soportado) o None. Algunos teléfonos envían un tipo genérico: se mira la extensión."""
+    nombre = nombre.lower()
+    if mime == MIME_PDF or nombre.endswith(".pdf"):
+        return "pdf"
+    if mime == MIME_DOCX or nombre.endswith(".docx"):
+        return "docx"
+    if mime == MIME_DOC or nombre.endswith(".doc"):
+        return "doc"
+    return None
 
 
 def procesar_webhook(

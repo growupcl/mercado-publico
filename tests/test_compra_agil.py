@@ -275,5 +275,5 @@ def test_el_detalle_de_una_compra_agil_invita_a_ver_precios(Sesion):
         [detalle] = responder(s, e, "boton", f"DETALLE:{GUANTES}", momento=MOMENTO)
         assert "Escribe *PRECIOS* para ver a cuánto cotiza la competencia" in detalle
         assert "📎 Tiene 2 adjuntos:\n• Especificaciones técnicas CESFAM.pdf\n• Anexo cotización.docx" in detalle
-        assert "Descarga los PDF desde la ficha y envíamelos aquí" in detalle and "PDF de las bases" not in detalle
+        assert "Descárgalos desde la ficha (PDF o Word) y envíamelos aquí" in detalle and "PDF de las bases" not in detalle
         assert detalle.count("PRECIOS") == 1

@@ -23,12 +23,15 @@ from sqlalchemy.orm import Session
 
 from .db import AnalisisBases, Documento, Empresa, Licitacion, SolicitudAnalisis, ahora
 from .ia import ErrorIA
+from .word import WordInvalido, es_doc_antiguo, es_docx, texto_de_docx
 
 MODELO_ANALISIS = "claude-sonnet-5-5"
 # Límite de la API para PDFs enviados en la solicitud.
 TAMANO_MAXIMO = 32 * 1024 * 1024
 # El mismo esfuerzo en el análisis y en las preguntas: cambiarlo invalida la caché del PDF.
 ESFUERZO = "medium"
+# Unos 2 millones de caracteres (~500 mil tokens): bases muy por sobre lo habitual. Evita gastar en archivos enormes.
+MAXIMO_TEXTO_WORD = 2_000_000
 # Ej.: 1056854-11-LE26, 1511-62-L126, 1002772-108-LP26, 2345-12-O126 y Compra Ágil 1057539-228-COT26
 PATRON_CODIGO = re.compile(r"\b\d{1,8}-\d{1,5}-(?:COT\d{2}|[A-Z][A-Z0-9]\d{2})\b", re.IGNORECASE)
 
@@ -100,15 +103,16 @@ class AnalizadorBases:
         self._cliente = cliente or anthropic.Anthropic()
         self.modelo = modelo
 
-    def _contenido(self, pdf: bytes, texto: str) -> list[dict]:
+    def _contenido(self, documento: bytes, texto: str) -> list[dict]:
+        if es_docx(documento):
+            # Word: se envía el texto extraído (párrafos y tablas) como documento de texto plano.
+            fuente = {"type": "text", "media_type": "text/plain", "data": texto_de_docx(documento)}
+        else:
+            fuente = {"type": "base64", "media_type": "application/pdf", "data": base64.b64encode(documento).decode()}
         return [{
             "role": "user",
             "content": [
-                {
-                    "type": "document",
-                    "source": {"type": "base64", "media_type": "application/pdf", "data": base64.b64encode(pdf).decode()},
-                    "cache_control": {"type": "ephemeral"},
-                },
+                {"type": "document", "source": fuente, "cache_control": {"type": "ephemeral"}},
                 {"type": "text", "text": texto},
             ],
         }]
@@ -123,10 +127,10 @@ class AnalizadorBases:
             "fallbacks": "default",
         }
 
-    def analizar(self, pdf: bytes, contexto: str = "") -> tuple[ResultadoAnalisis, int, int]:
+    def analizar(self, documento: bytes, contexto: str = "") -> tuple[ResultadoAnalisis, int, int]:
         texto = INSTRUCCIONES_ANALISIS + (f"\n\nDatos de la licitación según Mercado Público:\n{contexto}" if contexto else "")
         respuesta = self._cliente.beta.messages.parse(
-            max_tokens=16000, messages=self._contenido(pdf, texto), output_format=ResultadoAnalisis,
+            max_tokens=16000, messages=self._contenido(documento, texto), output_format=ResultadoAnalisis,
             **self._parametros_comunes(),
         )
         _revisar(respuesta)
@@ -135,10 +139,10 @@ class AnalizadorBases:
         uso = respuesta.usage
         return respuesta.parsed_output, uso.input_tokens, uso.output_tokens
 
-    def preguntar(self, pdf: bytes, pregunta: str) -> str:
+    def preguntar(self, documento: bytes, pregunta: str) -> str:
         texto = f"{INSTRUCCIONES_PREGUNTA}\n\n<pregunta>\n{pregunta}\n</pregunta>"
         respuesta = self._cliente.beta.messages.create(
-            max_tokens=2000, messages=self._contenido(pdf, texto), **self._parametros_comunes(),
+            max_tokens=2000, messages=self._contenido(documento, texto), **self._parametros_comunes(),
         )
         _revisar(respuesta)
         texto_respuesta = "\n".join(b.text for b in respuesta.content if b.type == "text").strip()
@@ -155,7 +159,7 @@ def _revisar(respuesta) -> None:
 
 
 class AlmacenDocumentos:
-    """Guarda los PDF en disco, nombrados por su hash."""
+    """Guarda los documentos (PDF o Word) en disco, nombrados por su hash."""
 
     def __init__(self, directorio: str | Path) -> None:
         self._dir = Path(directorio)
@@ -163,7 +167,7 @@ class AlmacenDocumentos:
     def guardar(self, contenido: bytes) -> tuple[str, str]:
         sha = hashlib.sha256(contenido).hexdigest()
         self._dir.mkdir(parents=True, exist_ok=True)
-        ruta = self._dir / f"{sha}.pdf"
+        ruta = self._dir / f"{sha}.{'docx' if es_docx(contenido) else 'pdf'}"
         if not ruta.exists():
             ruta.write_bytes(contenido)
         return sha, str(ruta)
@@ -211,10 +215,7 @@ class ServicioAnalisis:
     ) -> tuple[AnalisisBases, bool]:
         """Devuelve (análisis, reutilizado). Reutilizado = ya existía y no costó IA."""
         momento = momento or ahora()
-        if not contenido.startswith(b"%PDF"):
-            raise DocumentoInvalido("El archivo no es un PDF.")
-        if len(contenido) > TAMANO_MAXIMO:
-            raise DocumentoInvalido("El PDF supera los 32 MB que podemos analizar.")
+        validar_documento(contenido)
 
         existente = self.buscar_existente(session, contenido)
         ya_solicitado = empresa is not None and existente is not None and session.scalar(
@@ -250,6 +251,27 @@ class ServicioAnalisis:
     def preguntar(self, session: Session, analisis: AnalisisBases, pregunta: str) -> str:
         documento = session.get(Documento, analisis.documento_id)
         return self.analizador.preguntar(self.almacen.leer(documento.ruta), pregunta)
+
+
+def validar_documento(contenido: bytes) -> None:
+    """Acepta PDF y Word (.docx). Lanza DocumentoInvalido con un mensaje para el usuario."""
+    if es_doc_antiguo(contenido):
+        raise DocumentoInvalido("es un Word antiguo (.doc). Ábrelo y guárdalo como .docx o PDF, y envíamelo de nuevo.")
+    if contenido.startswith(b"%PDF"):
+        if len(contenido) > TAMANO_MAXIMO:
+            raise DocumentoInvalido("el PDF supera los 32 MB que podemos analizar.")
+        return
+    if es_docx(contenido):
+        try:
+            texto = texto_de_docx(contenido)
+        except WordInvalido as e:
+            raise DocumentoInvalido(str(e)) from e
+        if len(texto.strip()) < 200:
+            raise DocumentoInvalido("el Word casi no tiene texto (puede ser un formulario vacío o solo imágenes).")
+        if len(texto) > MAXIMO_TEXTO_WORD:
+            raise DocumentoInvalido("el Word es demasiado extenso para analizarlo de una vez.")
+        return
+    raise DocumentoInvalido("solo puedo leer documentos en PDF o Word (.docx).")
 
 
 def detectar_codigo(*textos: str | None) -> str | None:

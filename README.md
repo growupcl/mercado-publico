@@ -21,7 +21,8 @@ Sitio: [calza.cl](https://calza.cl) · El nombre interno del proyecto y del coma
 5. **Resumen diario** (`licita resumen`): arma el mensaje con las mejores oportunidades.
 6. **WhatsApp** (`licita whatsapp-enviar` y `licita servidor`): envía el resumen diario como una plantilla con botones
    y responde los mensajes del usuario (detalle de cada licitación, baja/alta). Ver [docs/whatsapp.md](docs/whatsapp.md).
-7. **Análisis de bases** (`licita analizar` o enviando el PDF por WhatsApp): Claude Sonnet lee el PDF de las bases y
+7. **Análisis de bases** (`licita analizar` o enviando el archivo por WhatsApp): Claude Sonnet lee las bases en PDF o
+   Word (.docx; se extrae el texto con sus tablas) y
    entrega requisitos que dejan fuera, documentos a presentar, garantías, criterios de evaluación, plazos, multas y
    preguntas sugeridas para el foro. Después, el usuario puede hacer preguntas sobre esas bases por 24 horas.
    Cada PDF se analiza una sola vez y el resultado se reutiliza para todos (el mismo archivo no vuelve a costar IA).
@@ -151,6 +152,7 @@ así que no necesitan ticket ni clave. Para correrlas contra Postgres:
 | `src/licita/mercadopago.py` | Cliente de suscripciones de Mercado Pago y verificación de la firma de sus avisos |
 | `src/licita/planes.py` | Planes y precios (con IVA), descuento anual y precio fundador |
 | `src/licita/legal.py` | **Borrador** de términos y política de privacidad: revisar con un abogado antes del lanzamiento |
+| `src/licita/word.py` | Extrae el texto (párrafos y tablas) de documentos Word .docx |
 | `src/licita/analisis.py` | Análisis de bases en PDF con Claude Sonnet, reutilización por archivo y límite mensual |
 | `src/licita/servidor.py` | Servidor web que recibe los webhooks de WhatsApp |
 | `src/licita/migrar.py` y `src/licita/migraciones/` | Migraciones de la base de datos (Alembic) |
@@ -164,6 +166,6 @@ así que no necesitan ticket ni clave. Para correrlas contra Postgres:
 
 - Probar el puntaje con IA y el análisis de bases con datos reales (el formato de la API, el volumen diario y el enlace a la ficha ya están validados).
 - Descarga automática de las bases: no hay vía oficial y los términos apuntan en contra; se consultó a ChileCompra
-  (ver [docs/descarga-de-bases.md](docs/descarga-de-bases.md)). Hoy el usuario reenvía el PDF.
+  (ver [docs/descarga-de-bases.md](docs/descarga-de-bases.md)). Hoy el usuario reenvía el PDF o Word.
 - Factura electrónica automática al confirmar cada pago (hoy se emite a mano en el portal del SII, ver docs/facturacion.md).
 - Aviso por correo (además de WhatsApp) cuando un cobro automático es rechazado.

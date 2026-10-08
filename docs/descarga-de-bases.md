@@ -48,4 +48,4 @@ Enviar desde hola@calza.cl a **api@chilecompra.cl**:
 - **Si hay un servicio oficial:** se integra al ciclo y el análisis de bases llega solo con cada alerta o resumen.
 - **Si autorizan la descarga desde la ficha:** se implementa con las condiciones que indiquen (volumen, pausas,
   identificación) y solo para los procesos que le interesan a un cliente.
-- **Si no:** se mantiene el reenvío por WhatsApp. Una mejora posible es aceptar también adjuntos en Word.
+- **Si no:** se mantiene el reenvío por WhatsApp (PDF o Word .docx; los .doc antiguos se piden como .docx o PDF).

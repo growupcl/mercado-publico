@@ -444,8 +444,8 @@ def construir_parser() -> argparse.ArgumentParser:
     s.add_argument("--marcar", action="store_true", help="Marca los calces como notificados")
     s.set_defaults(fn=cmd_resumen)
 
-    s = sub.add_parser("analizar", help="Analiza con IA un PDF de bases de licitación")
-    s.add_argument("--pdf", required=True, help="Ruta al PDF de las bases")
+    s = sub.add_parser("analizar", help="Analiza con IA las bases de una licitación (PDF o Word .docx)")
+    s.add_argument("--pdf", "--archivo", dest="pdf", required=True, help="Ruta a las bases (PDF o Word .docx)")
     s.add_argument("--codigo", help="Código de la licitación (opcional)")
     s.add_argument("--empresa", type=int, help="Empresa a la que se le descuenta del límite mensual (opcional)")
     s.set_defaults(fn=cmd_analizar)

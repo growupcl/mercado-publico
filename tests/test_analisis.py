@@ -196,7 +196,7 @@ def test_flujo_completo_detalle_pdf_y_pregunta(base, servicio):
     wa = WhatsAppConArchivos()
 
     procesar_webhook(s, wa, _webhook({"type": "text", "text": {"body": "1"}}), analisis=srv, momento=MOMENTO)
-    assert "envíamelo aquí" in wa.enviados[-1]
+    assert "envíamelas aquí" in wa.enviados[-1]
     assert e.licitacion_activa == "1234-56-LE26"
 
     wa.enviados.clear()
@@ -229,12 +229,15 @@ def test_pdf_repetido_no_avisa_espera_ni_gasta_ia(base, servicio):
     assert len([c for c in claude.llamadas if c[0] == "parse"]) == 1
 
 
-def test_archivo_que_no_es_pdf(base, servicio):
+def test_archivos_que_no_se_pueden_leer(base, servicio):
     s, _ = base
-    srv, _ = servicio
+    srv, claude = servicio
     wa = WhatsAppConArchivos()
-    procesar_webhook(s, wa, _pdf("bases.docx", mime="application/msword"), analisis=srv, momento=MOMENTO)
-    assert "Solo puedo analizar bases en *PDF*" in wa.enviados[0]
+    procesar_webhook(s, wa, _pdf("bases.doc", mime="application/msword"), analisis=srv, momento=MOMENTO)
+    assert "Word antiguo (.doc)" in wa.enviados[0] and "*.docx*" in wa.enviados[0]
+    procesar_webhook(s, wa, _pdf("planilla.xlsx", mime="application/vnd.ms-excel"), analisis=srv, momento=MOMENTO)
+    assert "Solo puedo analizar bases en *PDF* o *Word (.docx)*" in wa.enviados[1]
+    assert claude.llamadas == []
 
 
 def test_limite_alcanzado_por_whatsapp(base, tmp_path):

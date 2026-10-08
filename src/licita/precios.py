@@ -3,6 +3,8 @@
 Fuentes (tabla `precios`, se llena al sincronizar):
 - Órdenes de compra: precio unitario neto efectivamente pagado.
 - Licitaciones adjudicadas: precio unitario del proveedor ganador.
+- Cotizaciones de Compra Ágil: lo que ofrecieron los proveedores (no necesariamente lo que se pagó). Se muestran
+  aparte, junto con la cotización más baja de cada proceso, que en Compra Ágil suele ser la que gana.
 
 Se compara por código de producto de ChileCompra (clasificador ONU). Si hay pocos datos,
 se usan productos parecidos de la misma familia (mismos 6 primeros dígitos del código).
@@ -22,6 +24,8 @@ from .calce import tokens
 from .db import Licitacion, OrdenCompra, Precio, ahora
 from .resumen import formato_pesos
 
+FUENTE_COTIZACION = "cotizacion_ca"
+FUENTES_PAGADAS = ("orden_de_compra", "adjudicacion")
 MINIMO_OBSERVACIONES = 3
 MESES_HISTORIA = 24
 SIMILITUD_MINIMA = 0.5
@@ -81,6 +85,38 @@ def registrar_precios_adjudicacion(session: Session, lic: Licitacion) -> int:
     return nuevos
 
 
+def registrar_cotizaciones_compra_agil(session: Session, lic: Licitacion, proveedores: list[dict]) -> int:
+    """Guarda las cotizaciones admisibles de una Compra Ágil (proveedores_cotizando del detalle).
+
+    Reemplaza las anteriores del mismo proceso: en un segundo llamado la API muestra las cotizaciones nuevas.
+    """
+    unidades = {str(it.get("codigo_producto") or ""): it.get("unidad") or "" for it in lic.items}
+    filas = []
+    for prov in proveedores:
+        if (prov.get("justificacion_inadmisibilidad") or "").strip() or prov.get("activo") is False:
+            continue  # inadmisible o retirada: su precio no compite
+        for prod in prov.get("productos_cotizados") or []:
+            precio = prod.get("precio_unitario")
+            if not isinstance(precio, (int, float)) or precio <= 0:
+                continue
+            codigo = str(prod.get("codigo_producto") or "")
+            filas.append((prov, prod, codigo, float(precio)))
+    if not filas:
+        return 0
+    for anterior in session.scalars(select(Precio).where(Precio.fuente == FUENTE_COTIZACION, Precio.referencia == lic.codigo)):
+        session.delete(anterior)
+    session.flush()
+    for posicion, (prov, prod, codigo, precio) in enumerate(filas):
+        session.add(Precio(
+            fuente=FUENTE_COTIZACION, referencia=lic.codigo, posicion=posicion, codigo_producto=codigo,
+            producto=" ".join(filter(None, [prod.get("nombre_producto"), prod.get("descripcion")])).strip(),
+            unidad=unidades.get(codigo, ""), precio_unitario=precio, cantidad=_cantidad(prod.get("cantidad")),
+            proveedor_rut=prov.get("rut_proveedor") or "", proveedor_nombre=prov.get("razon_social") or "",
+            organismo=lic.organismo, region=lic.region, fecha=lic.fecha_cierre,
+        ))
+    return len(filas)
+
+
 def reconstruir_precios(session: Session) -> int:
     """Recorre lo ya sincronizado y llena la tabla de precios (útil la primera vez)."""
     nuevos = sum(registrar_precios_orden(session, oc) for oc in session.scalars(select(OrdenCompra)))
@@ -113,15 +149,35 @@ class ReferenciaPrecio:
 
 
 @dataclass
+class ReferenciaCotizaciones:
+    """A cuánto cotizan los proveedores en Compras Ágiles del mismo producto."""
+
+    cotizaciones: int
+    procesos: int
+    mediana: float
+    p25: float
+    p75: float
+    ganadora_mediana: float  # mediana de la cotización más baja de cada proceso
+    ganadora_p25: float
+    ganadora_p75: float
+    por_similitud: bool
+
+
+@dataclass
 class InformePrecios:
     codigo: str
     nombre: str
     monto_estimado: float | None
     referencias: list[tuple[dict, ReferenciaPrecio | None]] = field(default_factory=list)
+    cotizaciones: list[ReferenciaCotizaciones | None] = field(default_factory=list)  # una por ítem, en el mismo orden
+
+    def cotizacion(self, i: int) -> ReferenciaCotizaciones | None:
+        return self.cotizaciones[i] if i < len(self.cotizaciones) else None
 
     @property
     def cobertura(self) -> tuple[int, int]:
-        return sum(1 for _, r in self.referencias if r), len(self.referencias)
+        con = sum(1 for i, (_, r) in enumerate(self.referencias) if r or self.cotizacion(i))
+        return con, len(self.referencias)
 
     @property
     def total_mediano(self) -> float | None:
@@ -148,9 +204,11 @@ def _sin_atipicos(valores: list[float]) -> list[float]:
     return filtrados or valores
 
 
-def _observaciones(session: Session, item: dict, desde: datetime) -> tuple[list[Precio], bool]:
+def _observaciones(
+    session: Session, item: dict, desde: datetime, fuentes: tuple[str, ...] = FUENTES_PAGADAS
+) -> tuple[list[Precio], bool]:
     codigo = str(item.get("codigo_producto") or "")
-    base = select(Precio).where((Precio.fecha.is_(None)) | (Precio.fecha >= desde))
+    base = select(Precio).where((Precio.fecha.is_(None)) | (Precio.fecha >= desde), Precio.fuente.in_(fuentes))
     if codigo:
         exactas = list(session.scalars(base.where(Precio.codigo_producto == codigo)))
         if len(exactas) >= MINIMO_OBSERVACIONES:
@@ -186,34 +244,69 @@ def referencia_item(
     )
 
 
+def referencia_cotizaciones(
+    session: Session, item: dict, *, momento: datetime | None = None, meses: int = MESES_HISTORIA
+) -> ReferenciaCotizaciones | None:
+    momento = momento or ahora()
+    obs, por_similitud = _observaciones(session, item, momento - timedelta(days=30 * meses), (FUENTE_COTIZACION,))
+    if len(obs) < MINIMO_OBSERVACIONES:
+        return None
+    validos = set(_sin_atipicos([p.precio_unitario for p in obs]))
+    obs = [p for p in obs if p.precio_unitario in validos]
+    mas_bajas: dict[str, float] = {}
+    for p in obs:
+        mas_bajas[p.referencia] = min(p.precio_unitario, mas_bajas.get(p.referencia, p.precio_unitario))
+    if len(mas_bajas) < 2:
+        return None  # un solo proceso no alcanza para hablar de "lo habitual"
+    p25, mediana, p75 = _cuartiles(sorted(p.precio_unitario for p in obs))
+    g25, gmediana, g75 = _cuartiles(sorted(mas_bajas.values()))
+    return ReferenciaCotizaciones(
+        cotizaciones=len(obs), procesos=len(mas_bajas), mediana=mediana, p25=p25, p75=p75,
+        ganadora_mediana=gmediana, ganadora_p25=g25, ganadora_p75=g75, por_similitud=por_similitud,
+    )
+
+
 def informe_precios(session: Session, lic: Licitacion, *, momento: datetime | None = None) -> InformePrecios:
     informe = InformePrecios(codigo=lic.codigo, nombre=lic.nombre, monto_estimado=lic.monto_estimado)
     for item in lic.items:
         informe.referencias.append((item, referencia_item(session, item, region=lic.region, momento=momento)))
+        informe.cotizaciones.append(referencia_cotizaciones(session, item, momento=momento))
     return informe
 
 
 def texto_precios(informe: InformePrecios, *, maximo_items: int = 8) -> str:
     con, total = informe.cobertura
     lineas = [f"💲 *Precios de referencia: {informe.nombre}*", f"Compras públicas de los últimos {MESES_HISTORIA} meses.", ""]
+    if any(informe.cotizaciones):
+        lineas[1] = f"Compras públicas y cotizaciones de Compra Ágil de los últimos {MESES_HISTORIA} meses."
     if con == 0:
         lineas.append("Todavía no tengo suficientes compras anteriores de estos productos para darte una referencia confiable.")
         return "\n".join(lineas)
     mostrados = 0
-    for item, ref in informe.referencias:
-        if ref is None or mostrados >= maximo_items:
+    for i, (item, ref) in enumerate(informe.referencias):
+        cot = informe.cotizacion(i)
+        if (ref is None and cot is None) or mostrados >= maximo_items:
             continue
         mostrados += 1
-        cantidad = f" × {ref.cantidad:g}" if ref.cantidad else ""
-        bajo, alto = ref.rango_competitivo
-        lineas += [
-            f"{mostrados}. *{ref.producto}*{cantidad}",
-            f"   Mediana: {formato_pesos(ref.mediana)} c/u · habitual {formato_pesos(ref.p25)} – {formato_pesos(ref.p75)} ({ref.observaciones} compras)",
-            f"   👉 Precio competitivo: {formato_pesos(bajo)} – {formato_pesos(alto)}",
-        ]
-        if ref.proveedores_frecuentes:
-            lineas.append("   Suelen ganar: " + ", ".join(f"{n} ({c})" for n, c in ref.proveedores_frecuentes))
-        if ref.por_similitud:
+        cantidad = _cantidad(item.get("cantidad"))
+        producto = item.get("producto") or item.get("categoria") or ""
+        lineas.append(f"{mostrados}. *{producto}*" + (f" × {cantidad:g}" if cantidad else ""))
+        if ref:
+            bajo, alto = ref.rango_competitivo
+            lineas += [
+                f"   Mediana: {formato_pesos(ref.mediana)} c/u · habitual {formato_pesos(ref.p25)} – {formato_pesos(ref.p75)} ({ref.observaciones} compras)",
+                f"   👉 Precio competitivo: {formato_pesos(bajo)} – {formato_pesos(alto)}",
+            ]
+            if ref.proveedores_frecuentes:
+                lineas.append("   Suelen ganar: " + ", ".join(f"{n} ({c})" for n, c in ref.proveedores_frecuentes))
+        if cot:
+            lineas += [
+                f"   ⚡ En Compra Ágil cotizan {formato_pesos(cot.p25)} – {formato_pesos(cot.p75)} c/u "
+                f"({cot.cotizaciones} cotizaciones en {cot.procesos} procesos)",
+                f"   🏁 La más baja de cada proceso suele ser {formato_pesos(cot.ganadora_p25)} – {formato_pesos(cot.ganadora_p75)} "
+                f"(mediana {formato_pesos(cot.ganadora_mediana)})",
+            ]
+        if (ref and ref.por_similitud) or (cot and cot.por_similitud):
             lineas.append("   (Referencia con productos parecidos: revisa que sean comparables)")
         lineas.append("")
     if con < total:

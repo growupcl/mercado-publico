@@ -12,6 +12,9 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # Días hábiles a las 8:00: resumen diario por WhatsApp (después del ciclo de las 7:00).
 0 8 * * 1-5     /opt/calza/deploy/tareas.sh whatsapp-enviar
 
+# 22:00: cotizaciones de las Compras Ágiles que cerraron (precios de referencia; ~40 min).
+0 22 * * *      /opt/calza/deploy/tareas.sh compra-agil-precios
+
 # 23:30: órdenes de compra del día (alimentan la inteligencia de precios).
 30 23 * * *     /opt/calza/deploy/tareas.sh sync --ordenes --max-detalles 1500
 

@@ -336,6 +336,20 @@ def cmd_compra_agil(args, config: Config, Sesion) -> int:
     return 1 if r.errores else 0
 
 
+def cmd_compra_agil_precios(args, config: Config, Sesion) -> int:
+    from .calce import interes_de_clientes
+    from .compra_agil import ClienteCompraAgil, actualizar_precios_compra_agil
+    from .planes import PLANES_CON_PRECIOS
+
+    with Sesion() as s:
+        interes = interes_de_clientes(s, planes=PLANES_CON_PRECIOS)
+        r = actualizar_precios_compra_agil(s, ClienteCompraAgil(config.ticket), interes=interes,
+                                           horas=args.horas, max_detalles=args.max_detalles)
+    print(f"Compras Ágiles cerradas revisadas: {r.cerradas} · detalles: {r.detalles} "
+          f"({r.pendientes} quedaron para otro día) · con cotizaciones: {r.con_cotizaciones} · precios guardados: {r.cotizaciones}")
+    return 1 if r.errores else 0
+
+
 def construir_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="licita", description="Copiloto de licitaciones de Mercado Público")
     sub = p.add_subparsers(dest="comando", required=True)
@@ -372,6 +386,11 @@ def construir_parser() -> argparse.ArgumentParser:
     s.add_argument("--max-detalles", type=int, default=25, help="Máximo de detalles a pedir (cada uno demora ~20 s)")
     s.add_argument("--sin-alertas", action="store_true", help="Solo sincroniza y evalúa; no envía WhatsApp")
     s.set_defaults(fn=cmd_compra_agil)
+
+    s = sub.add_parser("compra-agil-precios", help="Guarda las cotizaciones de las Compras Ágiles que cerraron (precios de referencia)")
+    s.add_argument("--horas", type=int, default=26, help="Revisa las que cambiaron en estas últimas horas")
+    s.add_argument("--max-detalles", type=int, default=100, help="Máximo de detalles a pedir (cada uno demora ~20 s)")
+    s.set_defaults(fn=cmd_compra_agil_precios)
 
     s = sub.add_parser("calce", help="Busca y evalúa licitaciones para una empresa")
     s.add_argument("--empresa", type=int, required=True)

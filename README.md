@@ -40,7 +40,9 @@ Sitio: [calza.cl](https://calza.cl) · El nombre interno del proyecto y del coma
 10. **Compra Ágil** (`licita compra-agil`, cada 20 minutos, plan Pro): trae las Compras Ágiles recién publicadas desde
     la [API Compra Ágil v2](docs/compra-agil.md), pide el detalle solo de las que comparten palabras clave con un
     cliente Pro, las evalúa con IA y avisa **de inmediato** por WhatsApp las que calzan, porque en Compra Ágil suele
-    ganar quien cotiza primero. Máximo 3 alertas al día por cliente, de 8:00 a 21:00.
+    ganar quien cotiza primero. Máximo 3 alertas al día por cliente, de 8:00 a 21:00. De noche
+    (`licita compra-agil-precios`) guarda las cotizaciones de las que cerraron, y *PRECIOS* muestra a cuánto cotiza la
+    competencia y cuál suele ser la cotización más baja (la que gana).
 
 Las órdenes de compra quedan guardadas para construir más adelante la inteligencia de precios.
 
@@ -75,6 +77,7 @@ licita resumen --empresa 1 --marcar
 licita analizar --pdf bases.pdf --codigo 1234-56-LE26
 licita precios --codigo 1234-56-LE26
 licita compra-agil                 # Compras Ágiles nuevas, calce y alertas urgentes (plan Pro)
+licita compra-agil-precios         # cotizaciones de las Compras Ágiles que cerraron (una vez al día)
 licita ciclo                       # sincroniza, clasifica y busca calces para todas las empresas activas
 licita servidor --puerto 8000      # sitio web en http://localhost:8000 y webhook de WhatsApp
 licita suscripciones               # vence las suscripciones impagas (programar una vez al día)
@@ -159,5 +162,4 @@ así que no necesitan ticket ni clave. Para correrlas contra Postgres:
 - Descarga automática de las bases desde Mercado Público (hoy el usuario reenvía el PDF), si los términos de uso lo permiten.
 - Carga del histórico de órdenes de compra desde datos-abiertos.chilecompra.cl, para tener precios de referencia desde el primer día.
 - Factura electrónica automática al confirmar cada pago (hoy se emite a mano en el portal del SII, ver docs/facturacion.md).
-- Precios de Compra Ágil: guardar las cotizaciones de cada proceso cerrado para mostrar a cuánto cotiza la competencia.
 - Aviso por correo (además de WhatsApp) cuando un cobro automático es rechazado.

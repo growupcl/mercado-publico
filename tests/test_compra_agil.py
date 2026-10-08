@@ -8,9 +8,12 @@ from conftest import cargar
 from licita.alertas import enviar_alertas_compra_agil
 from licita.analisis import detectar_codigo
 from licita.calce import candidatas
-from licita.compra_agil import ClienteCompraAgil, CuotaAgotada, normalizar_compra_agil, sincronizar_compras_agiles
+from licita.compra_agil import (
+    ClienteCompraAgil, CuotaAgotada, actualizar_precios_compra_agil, normalizar_compra_agil, sincronizar_compras_agiles,
+)
 from licita.conversacion import responder
-from licita.db import Calce, Empresa, Licitacion, hora_chile
+from licita.db import Calce, Empresa, Licitacion, Precio, hora_chile
+from licita.precios import FUENTE_COTIZACION, informe_precios, referencia_item, texto_precios
 from licita.ia import AsistenteIA, EvaluacionCalce, EvaluacionesCalce, clasificar_pendientes
 from licita.tareas import ciclo_compra_agil
 from test_whatsapp import WhatsAppFalso
@@ -34,7 +37,8 @@ class APIFalsa:
             return httpx.Response(401, json={"success": "NOK", "payload": None, "errors": [{"codigo": "401", "mensaje": "Falta el ticket"}]})
         partes = request.url.path.rstrip("/").split("/")
         if partes[-1] == "compra-agil":
-            return httpx.Response(200, json=cargar("compra_agil_listado.json"))
+            abiertas = request.url.params.get("estado") == "publicada"
+            return httpx.Response(200, json=cargar("compra_agil_listado.json" if abiertas else "compra_agil_cerradas.json"))
         if self.estado_detalle != 200:
             return httpx.Response(self.estado_detalle, json={"success": "NOK", "payload": None, "errors": [{"codigo": str(self.estado_detalle)}]})
         try:
@@ -217,3 +221,56 @@ def test_sin_clientes_pro_no_consulta_la_api(Sesion):
         _empresa(s, plan="pyme")
         r = ciclo_compra_agil(s, _cliente(api), ia, None, momento=MOMENTO)
     assert api.pedidos == [] and r.sync is None
+
+
+# --- Precios: cotizaciones de las Compras Ágiles cerradas ---
+
+def test_guarda_cotizaciones_admisibles_de_las_cerradas_que_interesan(Sesion):
+    api = APIFalsa()
+    with Sesion() as s:
+        r = actualizar_precios_compra_agil(s, _cliente(api), interes=lambda t: "guantes" in t.lower(), momento=MOMENTO)
+        assert (r.cerradas, r.detalles, r.con_cotizaciones, r.cotizaciones) == (3, 2, 2, 6)
+        params = next(p.url.params for p in api.pedidos if "cambio_desde" in p.url.params)
+        assert params["estado"] == "cerrada,desierta,proveedor_seleccionado"
+        assert (params["cambio_desde"], params["cambio_hasta"]) == ("2026-10-06T08:00:00Z", "2026-10-07T10:00:00Z")
+        assert s.get(Licitacion, "7777-3-COT26") is None  # fumigación: no le interesa a nadie, no se guarda
+        assert s.get(Licitacion, "5555-1-COT26").estado_codigo == 7
+        precios = s.query(Precio).filter_by(fuente=FUENTE_COTIZACION).all()
+        assert "BARATO SPA" not in {p.proveedor_nombre for p in precios}  # inadmisible
+        bolsa = next(p for p in precios if p.codigo_producto == "47121701" and p.precio_unitario == 1500)
+        assert (bolsa.unidad, bolsa.proveedor_rut, bolsa.referencia) == ("Paquete", "76.111.111-1", "6666-2-COT26")
+
+        # Otra vuelta no repite detalles ni duplica precios.
+        r = actualizar_precios_compra_agil(s, _cliente(api), interes=lambda t: True, momento=MOMENTO)
+        assert r.detalles == 0 and s.query(Precio).filter_by(fuente=FUENTE_COTIZACION).count() == 6
+
+
+def test_informe_muestra_a_cuanto_cotiza_la_competencia(Sesion):
+    with Sesion() as s:
+        actualizar_precios_compra_agil(s, _cliente(APIFalsa()), interes=lambda t: True, momento=MOMENTO)
+        sincronizar_compras_agiles(s, _cliente(APIFalsa()), interes=lambda t: True, momento=MOMENTO)
+        lic = s.get(Licitacion, GUANTES)
+        informe = informe_precios(s, lic, momento=MOMENTO)
+        guantes = informe.cotizacion(0)
+        assert (guantes.cotizaciones, guantes.procesos) == (4, 2)
+        assert (guantes.p25, guantes.p75) == (4725, 5050)
+        # La más baja de cada proceso (4.500 y 4.800) es la referencia para ganar.
+        assert (guantes.ganadora_p25, guantes.ganadora_mediana, guantes.ganadora_p75) == (4575, 4650, 4725)
+        # Las cotizaciones no se mezclan con lo que efectivamente pagó el Estado.
+        assert referencia_item(s, lic.items[0], momento=MOMENTO) is None
+        texto = texto_precios(informe)
+        assert "cotizaciones de Compra Ágil" in texto
+        assert "⚡ En Compra Ágil cotizan $4.725 – $5.050 c/u (4 cotizaciones en 2 procesos)" in texto
+        assert "🏁 La más baja de cada proceso suele ser $4.575 – $4.725 (mediana $4.650)" in texto
+        # Bolsas: un solo proceso con cotizaciones no alcanza para una referencia.
+        assert informe.cotizacion(1) is None and informe.cobertura == (1, 2)
+
+
+def test_el_detalle_de_una_compra_agil_invita_a_ver_precios(Sesion):
+    with Sesion() as s:
+        sincronizar_compras_agiles(s, _cliente(APIFalsa()), interes=lambda t: True, momento=MOMENTO)
+        e = _empresa(s, ultimo_mensaje_entrante=MOMENTO)
+        s.add(Calce(empresa_id=e.id, licitacion_codigo=GUANTES, puntaje=90, razon="Es tu rubro."))
+        s.commit()
+        [detalle] = responder(s, e, "boton", f"DETALLE:{GUANTES}", momento=MOMENTO)
+        assert "Escribe *PRECIOS* para ver a cuánto cotiza la competencia" in detalle

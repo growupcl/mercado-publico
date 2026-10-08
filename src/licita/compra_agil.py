@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 
 from .db import Licitacion, hora_chile
 from .mercadopublico import MercadoPublicoError, parsear_fecha, parsear_monto
+from .precios import registrar_cotizaciones_compra_agil
 
 log = logging.getLogger(__name__)
 
@@ -120,6 +121,21 @@ class ClienteCompraAgil:
                 return
             params["numero_pagina"] += 1
         log.warning("Compra Ágil: se alcanzó el máximo de %s páginas; quedan publicaciones sin revisar", max_paginas)
+
+    def cambiadas(self, desde: datetime, hasta: datetime, estados: str, *, max_paginas: int = 40) -> Iterator[dict[str, Any]]:
+        """Compras Ágiles en esos estados que cambiaron entre dos horas de Chile."""
+        params = {
+            "estado": estados, "cambio_desde": desde.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "cambio_hasta": hasta.strftime("%Y-%m-%dT%H:%M:%SZ"), "ordenar_por": "FechaUltimaModificacion",
+            "tamano_pagina": 50, "numero_pagina": 1,
+        }
+        while params["numero_pagina"] <= max_paginas:
+            items, paginacion = self.listar(**params)
+            yield from items
+            if not items or params["numero_pagina"] >= int(paginacion.get("total_paginas") or 1):
+                return
+            params["numero_pagina"] += 1
+        log.warning("Compra Ágil: se alcanzó el máximo de %s páginas de cambios", max_paginas)
 
     def detalle(self, codigo: str) -> dict[str, Any] | None:
         return self._get(f"{BASE_URL}/{codigo}")
@@ -256,4 +272,71 @@ def sincronizar_compras_agiles(
             guardar(session, normalizar_compra_agil(raw))
             resumen.detalles += 1
             session.commit()
+    return resumen
+
+
+ESTADOS_CERRADOS = "cerrada,desierta,proveedor_seleccionado"
+
+
+@dataclass
+class ResumenPreciosCompraAgil:
+    cerradas: int = 0  # Compras Ágiles cerradas revisadas en el listado
+    detalles: int = 0
+    con_cotizaciones: int = 0
+    cotizaciones: int = 0  # precios guardados
+    pendientes: int = 0
+    errores: int = 0
+
+
+def actualizar_precios_compra_agil(
+    session: Session,
+    cliente: ClienteCompraAgil,
+    *,
+    interes: Callable[[str], bool],
+    momento: datetime | None = None,
+    horas: int = 26,
+    max_detalles: int = 100,
+) -> ResumenPreciosCompraAgil:
+    """Guarda las cotizaciones de las Compras Ágiles que cerraron en el último día y le interesan a algún cliente.
+
+    También actualiza el estado de las que ya teníamos (dejan de figurar como publicadas). Corre una vez al día.
+    """
+    resumen = ResumenPreciosCompraAgil()
+    hasta = hora_chile(momento)
+    por_revisar: list[Licitacion] = []
+    for raw in cliente.cambiadas(hasta - timedelta(hours=horas), hasta, ESTADOS_CERRADOS):
+        resumen.cerradas += 1
+        codigo, nombre = raw.get("codigo"), raw.get("nombre") or ""
+        if not codigo:
+            continue
+        existente = session.get(Licitacion, codigo)
+        if existente is None and not interes(nombre):
+            continue  # no se guarda lo que no le sirve a nadie
+        lic, _ = guardar(session, normalizar_compra_agil(raw))
+        if lic.raw.get("precios_estado") != lic.estado_codigo and interes(lic.nombre):
+            por_revisar.append(lic)
+    session.commit()
+
+    # Primero las que ya seguíamos (se avisaron o se evaluaron), luego las más recientes.
+    por_revisar.sort(key=lambda lic: (not tiene_detalle(lic), -(lic.fecha_cierre or datetime.min).timestamp()))
+    resumen.pendientes = max(0, len(por_revisar) - max_detalles)
+    for lic in por_revisar[:max_detalles]:
+        try:
+            raw = cliente.detalle(lic.codigo)
+        except CuotaAgotada:
+            raise
+        except MercadoPublicoError as e:
+            log.warning("No se pudo obtener el detalle de %s: %s", lic.codigo, e)
+            resumen.errores += 1
+            continue
+        if raw is None:
+            continue
+        lic, _ = guardar(session, normalizar_compra_agil(raw))
+        resumen.detalles += 1
+        n = registrar_cotizaciones_compra_agil(session, lic, raw.get("proveedores_cotizando") or [])
+        if n:
+            resumen.con_cotizaciones += 1
+            resumen.cotizaciones += n
+        lic.raw = dict(lic.raw) | {"precios_estado": lic.estado_codigo}
+        session.commit()
     return resumen

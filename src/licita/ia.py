@@ -7,6 +7,8 @@ se comparte entre todos los usuarios.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+
 import json
 from typing import Literal, Sequence
 
@@ -64,19 +66,32 @@ Para cada licitación entrega:
 Considera rubro, productos o servicios pedidos, región y monto respecto del perfil. No inventes datos que no estén en la información recibida."""
 
 
+@contextmanager
+def sin_credenciales_como_error():
+    """Sin ANTHROPIC_API_KEY el SDK lanza TypeError al armar la solicitud; se convierte en ErrorIA para que los
+    ciclos lo registren y sigan (por ejemplo, sincronizando) en vez de caerse."""
+    try:
+        yield
+    except TypeError as e:
+        if "authentication" in str(e).lower():
+            raise ErrorIA("Falta ANTHROPIC_API_KEY: no se puede usar la IA.") from e
+        raise
+
+
 class AsistenteIA:
     def __init__(self, cliente: anthropic.Anthropic | None = None, *, modelo: str = "claude-haiku-4-5") -> None:
         self._cliente = cliente or anthropic.Anthropic()
         self._modelo = modelo
 
     def _parse(self, sistema: str, contenido: str, formato: type[BaseModel], max_tokens: int):
-        respuesta = self._cliente.messages.parse(
-            model=self._modelo,
-            max_tokens=max_tokens,
-            system=sistema,
-            messages=[{"role": "user", "content": contenido}],
-            output_format=formato,
-        )
+        with sin_credenciales_como_error():
+            respuesta = self._cliente.messages.parse(
+                model=self._modelo,
+                max_tokens=max_tokens,
+                system=sistema,
+                messages=[{"role": "user", "content": contenido}],
+                output_format=formato,
+            )
         if respuesta.stop_reason == "refusal":
             raise ErrorIA("El modelo rechazó la solicitud.")
         if respuesta.stop_reason == "max_tokens":

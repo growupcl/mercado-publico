@@ -13,12 +13,16 @@ def terminos(prestador: str) -> list:
     ]),
     ("El servicio", [
         "Calza es un servicio que revisa la información pública de Mercado Público y le envía a cada empresa las "
-        "licitaciones que coinciden con su perfil, junto con análisis y referencias generados con apoyo de inteligencia artificial.",
+        "licitaciones y Compras Ágiles que coinciden con su perfil, junto con análisis y referencias generados con apoyo de inteligencia artificial.",
+        "Las alertas urgentes de Compra Ágil (plan Pro) se envían en horario hábil y con un máximo diario. Calza no "
+        "garantiza avisar todas las Compras Ágiles publicadas ni hacerlo antes de su cierre.",
         "Calza es un servicio independiente y no está afiliado a ChileCompra ni a Mercado Público.",
     ]),
     ("Alcance de la información", [
         "Los resúmenes, puntajes de calce, análisis de bases y precios de referencia son una ayuda para decidir. "
         "No reemplazan la lectura de las bases oficiales ni constituyen asesoría legal. Calza no garantiza la adjudicación de ninguna licitación.",
+        "Los precios de referencia se calculan con compras y cotizaciones públicas anteriores; las cotizaciones de Compra "
+        "Ágil son ofertas de otros proveedores, no precios pagados.",
         "Ante cualquier diferencia, prevalece lo publicado en www.mercadopublico.cl.",
     ]),
     ("Prueba, planes y pagos", [
@@ -32,6 +36,7 @@ def terminos(prestador: str) -> list:
     ]),
     ("Uso aceptable", [
         "No puedes revender el servicio ni usarlo para enviar comunicaciones no solicitadas.",
+        "Solo envíanos documentos que tengas derecho a compartir (por ejemplo, bases y anexos publicados por el comprador).",
     ]),
     ("Contacto", ["hola@calza.cl"]),
     ]
@@ -43,17 +48,24 @@ def privacidad(prestador: str) -> list:
         f"Durante el período piloto, el responsable del tratamiento de tus datos es {prestador}, que presta el servicio Calza.",
     ]),
     ("Qué datos recopilamos", [
-        "Datos de tu empresa (nombre, RUT, razón social, giro), datos de contacto (correo y WhatsApp), la descripción de tu "
-        "negocio y tus preferencias, los documentos que nos envías (por ejemplo, bases de licitación) y los mensajes que intercambias con Calza.",
+        "Datos de tu empresa (nombre, RUT, razón social, giro, dirección y comuna), datos de contacto (correo y WhatsApp), "
+        "la descripción de tu negocio y tus preferencias, los documentos que nos envías (por ejemplo, bases de licitación en PDF o Word), "
+        "los mensajes que intercambias con Calza y el historial de pagos de tu suscripción (no los datos de tu tarjeta).",
     ]),
     ("Para qué los usamos", [
         "Para seleccionar las licitaciones que te calzan, enviarte el resumen diario, responder tus consultas, emitir tu factura y administrar tu cuenta.",
         "La descripción de tu negocio, los documentos y tus preguntas se procesan con proveedores de inteligencia artificial "
-        "y de mensajería (Anthropic y Meta/WhatsApp) solo para prestar el servicio. Los pagos los procesa Mercado Pago: "
-        "Calza no ve ni guarda los datos de tu tarjeta.",
+        "y de mensajería (Anthropic y Meta/WhatsApp) solo para prestar el servicio. Los correos se envían con Google Workspace. "
+        "Los pagos los procesa Mercado Pago: Calza no ve ni guarda los datos de tu tarjeta.",
+        "Los documentos se guardan para no volver a analizarlos (el mismo archivo se analiza una sola vez) y para responder "
+        "tus preguntas sobre ellos.",
     ]),
     ("WhatsApp", [
         "Solo te escribimos si lo autorizaste al registrarte. Puedes dejar de recibir mensajes en cualquier momento escribiendo BAJA.",
+    ]),
+    ("Correo", [
+        "Te escribimos por correo solo por temas de tu cuenta, como un cobro rechazado de tu suscripción. "
+        "Estos avisos llegan aunque hayas pedido la baja de WhatsApp, porque son necesarios para administrar tu cuenta.",
     ]),
     ("Tus derechos", [
         "Puedes solicitar acceso, rectificación, eliminación u oposición al tratamiento de tus datos escribiendo a hola@calza.cl.",

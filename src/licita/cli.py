@@ -16,6 +16,7 @@ Ejemplos:
 from __future__ import annotations
 
 import argparse
+import os
 import logging
 import sys
 from datetime import date
@@ -261,8 +262,10 @@ def cmd_servidor(args, config: Config, Sesion) -> int:
 
         mp = ClienteMercadoPago(config.mercadopago_access_token)
     wa = _whatsapp(config) if config.whatsapp_token else None
+    # Sin credenciales de Claude el SDK falla en cada llamada: el sitio funciona igual, sin IA.
+    hay_ia = bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"))
     router_web = crear_router_web(
-        Sesion, mp=mp, ia=AsistenteIA(modelo=config.modelo_clasificacion),
+        Sesion, mp=mp, ia=AsistenteIA(modelo=config.modelo_clasificacion) if hay_ia else None,
         url_publica=config.url_publica, whatsapp_publico=config.whatsapp_publico,
         mp_webhook_secreto=config.mercadopago_webhook_secret, prestador=config.prestador,
         wa=wa, idioma_whatsapp=config.whatsapp_idioma, correo=_correo(config),
@@ -270,11 +273,13 @@ def cmd_servidor(args, config: Config, Sesion) -> int:
     app = crear_app(
         Sesion, wa, verify_token=config.whatsapp_verify_token,
         app_secret=config.whatsapp_app_secret, url_registro=config.url_registro or f"{config.url_publica}/registro",
-        phone_number_id=config.whatsapp_phone_number_id, analisis=_servicio_analisis(config) if wa else None,
+        phone_number_id=config.whatsapp_phone_number_id, analisis=_servicio_analisis(config) if wa and hay_ia else None,
         url_publica=config.url_publica, router_web=router_web,
     )
     if wa is None:
         print("Aviso: WhatsApp no está configurado; el servidor solo atiende el sitio web.")
+    if not hay_ia:
+        print("Aviso: falta ANTHROPIC_API_KEY; el registro usa las palabras de la descripción y no se analizan bases.")
     if mp is None:
         print("Aviso: Mercado Pago no está configurado; los pagos en línea están desactivados.")
     if _correo(config) is None:
@@ -413,6 +418,15 @@ def cmd_correo_prueba(args, config: Config, Sesion) -> int:
     return 0
 
 
+def cmd_limpiar(args, config: Config, Sesion) -> int:
+    from .compra_agil import limpiar_compras_agiles
+
+    with Sesion() as s:
+        n = limpiar_compras_agiles(s, dias=args.dias)
+    print(f"Compras Ágiles antiguas eliminadas: {n}")
+    return 0
+
+
 def construir_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="licita", description="Copiloto de licitaciones de Mercado Público")
     sub = p.add_subparsers(dest="comando", required=True)
@@ -499,6 +513,10 @@ def construir_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("correo-prueba", help="Envía un correo de prueba para revisar la configuración SMTP")
     s.add_argument("para", help="Dirección de destino")
     s.set_defaults(fn=cmd_correo_prueba)
+
+    s = sub.add_parser("limpiar", help="Borra Compras Ágiles cerradas hace tiempo que no le sirvieron a ningún cliente")
+    s.add_argument("--dias", type=int, default=60, help="Antigüedad mínima desde el cierre")
+    s.set_defaults(fn=cmd_limpiar)
 
     s = sub.add_parser("migrar", help="Aplica las migraciones pendientes de la base de datos")
     s.add_argument("--nueva", metavar="MENSAJE", help="Genera una migración nueva a partir de los cambios en los modelos")

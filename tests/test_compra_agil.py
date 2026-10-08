@@ -277,3 +277,18 @@ def test_el_detalle_de_una_compra_agil_invita_a_ver_precios(Sesion):
         assert "📎 Tiene 2 adjuntos:\n• Especificaciones técnicas CESFAM.pdf\n• Anexo cotización.docx" in detalle
         assert "Descárgalos desde la ficha (PDF o Word) y envíamelos aquí" in detalle and "PDF de las bases" not in detalle
         assert detalle.count("PRECIOS") == 1
+
+
+def test_limpieza_borra_solo_las_antiguas_sin_calce(Sesion):
+    from licita.compra_agil import limpiar_compras_agiles
+
+    with Sesion() as s:
+        sincronizar_compras_agiles(s, _cliente(APIFalsa()), interes=lambda t: True, momento=MOMENTO)
+        e = _empresa(s)
+        s.add(Calce(empresa_id=e.id, licitacion_codigo=GUANTES, puntaje=90, razon="x"))
+        s.commit()
+        assert limpiar_compras_agiles(s, momento=MOMENTO) == 0  # todavía no pasan 60 días
+        despues = MOMENTO + timedelta(days=70)
+        assert limpiar_compras_agiles(s, momento=despues) == 2
+        assert s.get(Licitacion, GUANTES) is not None  # tiene un calce: se conserva
+        assert s.get(Licitacion, SOPORTE) is None and s.get(Licitacion, LICEO) is None

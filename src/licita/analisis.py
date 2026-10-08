@@ -22,7 +22,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .db import AnalisisBases, Documento, Empresa, Licitacion, SolicitudAnalisis, ahora
-from .ia import ErrorIA
+from .ia import ErrorIA, sin_credenciales_como_error
 from .word import WordInvalido, es_doc_antiguo, es_docx, texto_de_docx
 
 MODELO_ANALISIS = "claude-sonnet-5-5"
@@ -129,10 +129,11 @@ class AnalizadorBases:
 
     def analizar(self, documento: bytes, contexto: str = "") -> tuple[ResultadoAnalisis, int, int]:
         texto = INSTRUCCIONES_ANALISIS + (f"\n\nDatos de la licitación según Mercado Público:\n{contexto}" if contexto else "")
-        respuesta = self._cliente.beta.messages.parse(
-            max_tokens=16000, messages=self._contenido(documento, texto), output_format=ResultadoAnalisis,
-            **self._parametros_comunes(),
-        )
+        with sin_credenciales_como_error():
+            respuesta = self._cliente.beta.messages.parse(
+                max_tokens=16000, messages=self._contenido(documento, texto), output_format=ResultadoAnalisis,
+                **self._parametros_comunes(),
+            )
         _revisar(respuesta)
         if respuesta.parsed_output is None:
             raise ErrorIA("El modelo no devolvió el análisis en el formato esperado.")
@@ -141,9 +142,10 @@ class AnalizadorBases:
 
     def preguntar(self, documento: bytes, pregunta: str) -> str:
         texto = f"{INSTRUCCIONES_PREGUNTA}\n\n<pregunta>\n{pregunta}\n</pregunta>"
-        respuesta = self._cliente.beta.messages.create(
-            max_tokens=2000, messages=self._contenido(documento, texto), **self._parametros_comunes(),
-        )
+        with sin_credenciales_como_error():
+            respuesta = self._cliente.beta.messages.create(
+                max_tokens=2000, messages=self._contenido(documento, texto), **self._parametros_comunes(),
+            )
         _revisar(respuesta)
         texto_respuesta = "\n".join(b.text for b in respuesta.content if b.type == "text").strip()
         if not texto_respuesta:

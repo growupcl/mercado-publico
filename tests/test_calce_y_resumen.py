@@ -131,3 +131,23 @@ def test_puntaje_prefiltro_ignora_tildes_y_plurales(Sesion, cliente_mp):
     e = Empresa(nombre="X", descripcion="", regiones=[], palabras_clave=["guante", "LIMPIEZA"])
     from licita.db import Licitacion
     assert puntaje_prefiltro(e, s.get(Licitacion, "1234-56-LE26")) == 1.0
+
+
+def test_sin_clave_de_claude_el_error_es_controlado(monkeypatch, tmp_path):
+    import anthropic
+    import pytest
+
+    from licita.ia import ErrorIA
+
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
+    monkeypatch.delenv("ANTHROPIC_PROFILE", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))  # sin perfiles guardados en el disco
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    try:
+        cliente = anthropic.Anthropic()
+    except Exception:  # según la versión del SDK, el error puede aparecer al crear el cliente
+        pytest.skip("el SDK falla al crear el cliente sin credenciales")
+    e = Empresa(nombre="A", descripcion="Vendemos guantes")
+    with pytest.raises(ErrorIA, match="ANTHROPIC_API_KEY"):
+        AsistenteIA(cliente).extraer_perfil(e.descripcion)

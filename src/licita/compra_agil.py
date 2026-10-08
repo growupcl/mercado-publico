@@ -19,10 +19,10 @@ from datetime import datetime, timedelta
 from typing import Any, Callable, Iterator
 
 import httpx
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from .db import Licitacion, hora_chile
+from .db import Calce, Licitacion, hora_chile
 from .mercadopublico import MercadoPublicoError, parsear_fecha, parsear_monto
 from .precios import registrar_cotizaciones_compra_agil
 
@@ -342,3 +342,20 @@ def actualizar_precios_compra_agil(
         lic.raw = dict(lic.raw) | {"precios_estado": lic.estado_codigo}
         session.commit()
     return resumen
+
+
+def limpiar_compras_agiles(session: Session, *, dias: int = 60, momento: datetime | None = None) -> int:
+    """Borra las Compras Ágiles que cerraron hace más de `dias` y que no se le mostraron a ningún cliente.
+
+    Se guardan unas 2.400 al día; sin limpieza la tabla crece sin aportar nada. Sus precios (cotizaciones) se
+    conservan: viven en la tabla de precios. Las que tienen un calce se mantienen para el historial del cliente.
+    """
+    limite = hora_chile(momento) - timedelta(days=dias)
+    resultado = session.execute(
+        delete(Licitacion).where(
+            Licitacion.tipo == TIPO, Licitacion.fecha_cierre < limite,
+            Licitacion.codigo.not_in(select(Calce.licitacion_codigo)),
+        )
+    )
+    session.commit()
+    return resultado.rowcount or 0

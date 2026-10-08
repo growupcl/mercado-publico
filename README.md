@@ -37,6 +37,10 @@ Sitio: [calza.cl](https://calza.cl) · El nombre interno del proyecto y del coma
    Al vencer sin pago, la cuenta pasa al plan gratis (`licita suscripciones`, una vez al día; con renovación
    automática hay 3 días de gracia para que llegue el cobro). Si un cobro es rechazado, Calza avisa al cliente
    por WhatsApp. Durante el piloto factura **Virtus SpA** (`LICITA_PRESTADOR`).
+10. **Compra Ágil** (`licita compra-agil`, cada 20 minutos, plan Pro): trae las Compras Ágiles recién publicadas desde
+    la [API Compra Ágil v2](docs/compra-agil.md), pide el detalle solo de las que comparten palabras clave con un
+    cliente Pro, las evalúa con IA y avisa **de inmediato** por WhatsApp las que calzan, porque en Compra Ágil suele
+    ganar quien cotiza primero. Máximo 3 alertas al día por cliente, de 8:00 a 21:00.
 
 Las órdenes de compra quedan guardadas para construir más adelante la inteligencia de precios.
 
@@ -70,6 +74,7 @@ licita calce --empresa 1
 licita resumen --empresa 1 --marcar
 licita analizar --pdf bases.pdf --codigo 1234-56-LE26
 licita precios --codigo 1234-56-LE26
+licita compra-agil                 # Compras Ágiles nuevas, calce y alertas urgentes (plan Pro)
 licita ciclo                       # sincroniza, clasifica y busca calces para todas las empresas activas
 licita servidor --puerto 8000      # sitio web en http://localhost:8000 y webhook de WhatsApp
 licita suscripciones               # vence las suscripciones impagas (programar una vez al día)
@@ -123,6 +128,8 @@ así que no necesitan ticket ni clave. Para correrlas contra Postgres:
 |---|---|
 | `src/licita/mercadopublico.py` | Cliente de la API de Mercado Público (reintentos, pausa entre consultas) y normalización de datos |
 | `src/licita/db.py` | Modelos de base de datos: licitaciones, órdenes de compra, empresas y calces |
+| `src/licita/compra_agil.py` | Cliente de la API Compra Ágil v2 y sincronización (se guardan como licitaciones tipo COT) |
+| `src/licita/alertas.py` | Alertas urgentes de Compra Ágil por WhatsApp (plan Pro) |
 | `src/licita/sync.py` | Sincronización diaria hacia la base de datos propia |
 | `src/licita/ia.py` | Clasificación, extracción de perfil y evaluación de calce con Claude (salidas estructuradas) |
 | `src/licita/calce.py` | Prefiltro sin IA y búsqueda de calces |
@@ -151,5 +158,6 @@ así que no necesitan ticket ni clave. Para correrlas contra Postgres:
 - Probar el puntaje con IA y el análisis de bases con datos reales (el formato de la API, el volumen diario y el enlace a la ficha ya están validados).
 - Descarga automática de las bases desde Mercado Público (hoy el usuario reenvía el PDF), si los términos de uso lo permiten.
 - Carga del histórico de órdenes de compra desde datos-abiertos.chilecompra.cl, para tener precios de referencia desde el primer día.
-- Factura electrónica automática al confirmar cada pago (hoy queda marcada como pendiente de emitir).
+- Factura electrónica automática al confirmar cada pago (hoy se emite a mano en el portal del SII, ver docs/facturacion.md).
+- Precios de Compra Ágil: guardar las cotizaciones de cada proceso cerrado para mostrar a cuánto cotiza la competencia.
 - Aviso por correo (además de WhatsApp) cuando un cobro automático es rechazado.

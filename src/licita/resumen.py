@@ -7,9 +7,10 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .db import Calce, Empresa, Licitacion, ahora
+from .db import Calce, Empresa, Licitacion, ahora, hora_chile
 
 URL_FICHA = "https://www.mercadopublico.cl/fichaLicitacion.html?idLicitacion={codigo}"
+URL_FICHA_COMPRA_AGIL = "https://buscador.mercadopublico.cl/ficha?code={codigo}"
 
 Fila = tuple[Calce, Licitacion]
 
@@ -20,6 +21,18 @@ def formato_pesos(monto: float | None) -> str:
     return "$" + f"{round(monto):,}".replace(",", ".")
 
 
+def es_compra_agil(lic: Licitacion) -> bool:
+    return lic.tipo == "COT"
+
+
+def url_ficha(lic: Licitacion) -> str:
+    return (URL_FICHA_COMPRA_AGIL if es_compra_agil(lic) else URL_FICHA).format(codigo=lic.codigo)
+
+
+def titulo(lic: Licitacion) -> str:
+    return f"⚡ Compra Ágil: {lic.nombre}" if es_compra_agil(lic) else lic.nombre
+
+
 def formato_cierre(lic: Licitacion) -> str:
     return lic.fecha_cierre.strftime("%d-%m-%Y %H:%M") if lic.fecha_cierre else "sin fecha"
 
@@ -28,7 +41,7 @@ def seleccionar_calces(
     session: Session, empresa: Empresa, *, umbral: int = 60, maximo: int = 5, momento: datetime | None = None
 ) -> list[Fila]:
     """Mejores calces aún no notificados de licitaciones que siguen abiertas."""
-    momento = momento or ahora()
+    cierre_minimo = hora_chile(momento)  # los cierres están en hora de Chile
     return [
         tuple(fila)
         for fila in session.execute(
@@ -38,7 +51,7 @@ def seleccionar_calces(
                 Calce.empresa_id == empresa.id,
                 Calce.notificado.is_(False),
                 Calce.puntaje >= umbral,
-                (Licitacion.fecha_cierre.is_(None)) | (Licitacion.fecha_cierre > momento),
+                (Licitacion.fecha_cierre.is_(None)) | (Licitacion.fecha_cierre > cierre_minimo),
             )
             .order_by(Calce.puntaje.desc(), Licitacion.fecha_cierre)
             .limit(maximo)
@@ -80,7 +93,7 @@ def texto_resumen(empresa: Empresa, filas: list[Fila]) -> str:
     for i, (calce, lic) in enumerate(filas, 1):
         lugar = " · ".join(p for p in (lic.organismo, lic.region) if p)
         lineas += [
-            f"{i}. *{lic.nombre}* ({calce.puntaje}% de calce)",
+            f"{i}. *{titulo(lic)}* ({calce.puntaje}% de calce)",
             f"   {lugar}",
             f"   Monto estimado: {formato_pesos(lic.monto_estimado)} · Cierra: {formato_cierre(lic)}",
             f"   {calce.razon}",
@@ -92,7 +105,7 @@ def texto_resumen(empresa: Empresa, filas: list[Fila]) -> str:
 
 def texto_detalle(calce: Calce, lic: Licitacion) -> str:
     clasif = lic.clasificacion or {}
-    lineas = [f"*{lic.nombre}*", f"Código: {lic.codigo} · Calce: {calce.puntaje}%", ""]
+    lineas = [f"*{titulo(lic)}*", f"Código: {lic.codigo} · Calce: {calce.puntaje}%", ""]
     if clasif.get("resumen"):
         lineas += [clasif["resumen"], ""]
     lineas += [
@@ -100,6 +113,9 @@ def texto_detalle(calce: Calce, lic: Licitacion) -> str:
         f"💰 Monto estimado: {formato_pesos(lic.monto_estimado)}",
         f"⏰ Cierra: {formato_cierre(lic)}",
     ]
+    plazo = (lic.raw or {}).get("plazo_entrega_dias") if es_compra_agil(lic) else None
+    if plazo:
+        lineas.append(f"🚚 Plazo de entrega: {plazo} días")
     if lic.items:
         lineas += ["", "📦 Qué piden:"]
         for it in lic.items[:5]:
@@ -110,7 +126,7 @@ def texto_detalle(calce: Calce, lic: Licitacion) -> str:
     requisitos = clasif.get("requisitos_destacados") or []
     if requisitos:
         lineas += ["", "⚠️ Ojo con:"] + [f"• {r}" for r in requisitos[:4]]
-    lineas += ["", f"✅ Por qué te sirve: {calce.razon}", "", f"Ficha completa: {URL_FICHA.format(codigo=lic.codigo)}"]
+    lineas += ["", f"✅ Por qué te sirve: {calce.razon}", "", f"Ficha completa: {url_ficha(lic)}"]
     return "\n".join(lineas)
 
 

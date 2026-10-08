@@ -18,6 +18,7 @@ import anthropic
 from .analisis import DocumentoInvalido, LimiteAlcanzado, ServicioAnalisis, detectar_codigo, textos_analisis
 from .db import AnalisisBases, Calce, Empresa, Licitacion, MensajeWhatsApp, ahora
 from .ia import ErrorIA
+from .planes import PLANES_CON_PRECIOS
 from .precios import informe_precios, texto_precios
 from .notificaciones import VENTANA, registrar
 from .suscripciones import generar_token
@@ -71,7 +72,6 @@ def leer_mensaje(msg: dict[str, Any]) -> tuple[str, str]:
     return tipo or "desconocido", ""
 
 
-PLANES_CON_PRECIOS = {"pro", "consultora"}
 
 INVITACION_BASES = (
     "\n\n💲 Escribe *PRECIOS* para ver cuánto ha pagado el Estado por estos productos."

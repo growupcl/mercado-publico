@@ -1,0 +1,145 @@
+{
+ "_nota": "Listado de ejemplo con la forma de la guía oficial (§6.1). Datos ficticios.",
+ "success": "OK",
+ "trace": null,
+ "errors": null,
+ "payload": {
+  "items": [
+   {
+    "codigo": "1057539-228-COT26",
+    "nombre": "Guantes de nitrilo y bolsas de basura para CESFAM",
+    "estado": {
+     "id_estado": 2,
+     "codigo": "publicada",
+     "glosa": "Publicada"
+    },
+    "convocatoria": {
+     "estado_convocatoria": 1,
+     "descripcion": "Primer llamado"
+    },
+    "documentos": [],
+    "fechas": {
+     "fecha_publicacion": "2026-10-07 09:40",
+     "fecha_cierre": "2026-10-08 15:00",
+     "fecha_ultimo_cambio": "2026-10-07 09:40",
+     "fecha_cancelacion": null
+    },
+    "montos": {
+     "moneda": "CLP",
+     "monto_disponible": 1200000,
+     "monto_disponible_clp": 1200000
+    },
+    "institucion": {
+     "organismo_comprador": "I MUNICIPALIDAD DE CONCEPCION",
+     "rut": "69.150.100-0",
+     "unidad_compra": "Adquisiciones",
+     "region": 8,
+     "nombre_region": "Región del Biobío"
+    },
+    "resumen": {
+     "total_ofertas_recibidas": 0
+    },
+    "motivos": {
+     "motivo_cancelacion": null,
+     "motivo_desierta": null,
+     "motivo_seleccion": null
+    },
+    "links": {
+     "detalle": "/v2/compra-agil/1057539-228-COT26"
+    }
+   },
+   {
+    "codigo": "2494-141-COT26",
+    "nombre": "Servicio de soporte de equipos computacionales",
+    "estado": {
+     "id_estado": 2,
+     "codigo": "publicada",
+     "glosa": "Publicada"
+    },
+    "convocatoria": {
+     "estado_convocatoria": 1,
+     "descripcion": "Primer llamado"
+    },
+    "documentos": [],
+    "fechas": {
+     "fecha_publicacion": "2026-10-07 09:20",
+     "fecha_cierre": "2026-10-09 12:00",
+     "fecha_ultimo_cambio": "2026-10-07 09:20",
+     "fecha_cancelacion": null
+    },
+    "montos": {
+     "moneda": "CLP",
+     "monto_disponible": 2400000,
+     "monto_disponible_clp": 2400000
+    },
+    "institucion": {
+     "organismo_comprador": "MUNICIPALIDAD DE ÑUÑOA",
+     "rut": "69.150.100-0",
+     "unidad_compra": "Adquisiciones",
+     "region": 13,
+     "nombre_region": "Región Metropolitana de Santiago"
+    },
+    "resumen": {
+     "total_ofertas_recibidas": 0
+    },
+    "motivos": {
+     "motivo_cancelacion": null,
+     "motivo_desierta": null,
+     "motivo_seleccion": null
+    },
+    "links": {
+     "detalle": "/v2/compra-agil/2494-141-COT26"
+    }
+   },
+   {
+    "codigo": "3333-10-COT26",
+    "nombre": "Bolsas de basura para liceo",
+    "estado": {
+     "id_estado": 2,
+     "codigo": "publicada",
+     "glosa": "Publicada"
+    },
+    "convocatoria": {
+     "estado_convocatoria": 1,
+     "descripcion": "Primer llamado"
+    },
+    "documentos": [],
+    "fechas": {
+     "fecha_publicacion": "2026-10-07 08:05",
+     "fecha_cierre": "2026-10-07 10:30",
+     "fecha_ultimo_cambio": "2026-10-07 08:05",
+     "fecha_cancelacion": null
+    },
+    "montos": {
+     "moneda": "CLP",
+     "monto_disponible": 150000,
+     "monto_disponible_clp": 150000
+    },
+    "institucion": {
+     "organismo_comprador": "SERVICIO LOCAL DE EDUCACION ANDALIEN SUR",
+     "rut": "69.150.100-0",
+     "unidad_compra": "Adquisiciones",
+     "region": 8,
+     "nombre_region": null
+    },
+    "resumen": {
+     "total_ofertas_recibidas": 0
+    },
+    "motivos": {
+     "motivo_cancelacion": null,
+     "motivo_desierta": null,
+     "motivo_seleccion": null
+    },
+    "links": {
+     "detalle": "/v2/compra-agil/3333-10-COT26"
+    }
+   }
+  ],
+  "paginacion": {
+   "total_paginas": 1,
+   "numero_pagina": 1,
+   "tamano_pagina": 50,
+   "total_resultados": 3
+  }
+ }
+}

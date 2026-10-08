@@ -72,10 +72,14 @@ ALERTA_COMPRA_AGIL = Plantilla(
             "El plazo para cotizar cierra el {{4}}. Toca el botón para ver el detalle."),
     ejemplos=("Aseo Sur", "Compra de guantes de nitrilo para CESFAM", "95", "09-10-2026 18:00"),
     botones=("Ver detalle",),
-    uso="Aviso urgente de Compra Ágil (plan Pro). Se usará cuando se implemente Compra Ágil.",
+    uso="Aviso urgente de Compra Ágil (plan Pro), apenas se confirma el calce.",
 )
 
 PLANTILLAS = {p.nombre: p for p in (RESUMEN_DIARIO, RESUMEN_DIARIO_SIMPLE, COBRO_RECHAZADO, ALERTA_COMPRA_AGIL)}
 
 # Qué responde Calza cuando el usuario toca cada botón (el payload se define al enviar).
-PAYLOADS_RESUMEN = {"resumen_diario_licitaciones": ("VER_TODAS", "DETALLE:{codigo}"), "resumen_diario_simple": ("VER_TODAS",)}
+PAYLOADS_RESUMEN = {
+    "resumen_diario_licitaciones": ("VER_TODAS", "DETALLE:{codigo}"),
+    "resumen_diario_simple": ("VER_TODAS",),
+    "alerta_compra_agil": ("DETALLE:{codigo}",),
+}

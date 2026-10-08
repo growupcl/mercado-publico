@@ -31,6 +31,9 @@ PLANES = {
     )),
 }
 PRECIO_FUNDADOR_PRO = 39_990
+# Planes con precios de referencia y alertas urgentes de Compra Ágil (la prueba gratuita es Pro).
+PLANES_CON_PRECIOS = ("pro", "consultora")
+PLANES_CON_COMPRA_AGIL = ("pro", "consultora")
 PERIODICIDADES = {"mensual": 1, "anual": 12}
 # Precios anuales fijados a mano: el SII calcula el IVA desde el neto y con $215.900 la factura no cuadraba exacto.
 ANUAL_AJUSTADO = {("pyme", False): 215_890}

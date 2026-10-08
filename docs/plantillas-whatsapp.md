@@ -15,7 +15,7 @@ a Meta y el que usa el sistema. Las pruebas automáticas revisan las reglas que 
 | `resumen_diario_licitaciones` | Resumen diario cuando la ventana de 24 h está cerrada | Ver todas · Ver la mejor | **Sí** |
 | `resumen_diario_simple` | Respaldo con menos variables, por si Meta rechaza la principal | Ver licitaciones | Recomendada |
 | `cobro_rechazado` | Mercado Pago no pudo cobrar la suscripción (ya se envía automáticamente) | Ver mi cuenta | Recomendada |
-| `alerta_compra_agil` | Aviso urgente de Compra Ágil (plan Pro) | Ver detalle | Más adelante (se aprueba ahora para tenerla lista) |
+| `alerta_compra_agil` | Aviso urgente de Compra Ágil (plan Pro) | Ver detalle | **Sí**, si vendes el plan Pro (alertas urgentes) |
 
 ### `resumen_diario_licitaciones`
 > Hola {{1}}, hoy encontramos {{2}} que calzan con tu negocio. La mejor: {{3}} ({{4}}% de calce), cierra el {{5}}. Toca un botón para ver el detalle.

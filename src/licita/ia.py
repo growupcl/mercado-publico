@@ -138,7 +138,9 @@ def clasificar_pendientes(session, ia: AsistenteIA, *, limite: int = 100) -> tup
 
     pendientes = session.scalars(
         select(Licitacion)
-        .where(Licitacion.clasificacion.is_(None), Licitacion.estado_codigo == 5)
+        # Las Compras Ágiles no se clasifican: son muchas, cortas y su calce usa el detalle directamente.
+        .where(Licitacion.clasificacion.is_(None), Licitacion.estado_codigo == 5,
+               (Licitacion.tipo.is_(None)) | (Licitacion.tipo != "COT"))
         .order_by(Licitacion.fecha_publicacion.desc())
         .limit(limite)
     ).all()

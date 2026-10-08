@@ -1,0 +1,80 @@
+{
+ "success": "OK",
+ "trace": null,
+ "errors": null,
+ "payload": {
+  "codigo": "1057539-228-COT26",
+  "nombre": "Guantes de nitrilo y bolsas de basura para CESFAM",
+  "estado": {
+   "id_estado": 2,
+   "codigo": "publicada",
+   "glosa": "Publicada"
+  },
+  "convocatoria": {
+   "estado_convocatoria": 1,
+   "descripcion": "Primer llamado",
+   "fecha_cierre_primer_llamado": "2026-10-08 15:00",
+   "fecha_cierre_segundo_llamado": null
+  },
+  "documentos": [],
+  "fechas": {
+   "fecha_publicacion": "2026-10-07 09:40",
+   "fecha_cierre": "2026-10-08 15:00",
+   "fecha_ultimo_cambio": "2026-10-07 09:40",
+   "fecha_cancelacion": null
+  },
+  "institucion": {
+   "organismo_comprador": "I MUNICIPALIDAD DE CONCEPCION",
+   "rut": "69.150.100-0",
+   "unidad_compra": "Adquisiciones",
+   "region": 8,
+   "nombre_region": "Región del Biobío"
+  },
+  "resumen": {
+   "multa_sancion": 0,
+   "total_ofertas_recibidas": 0,
+   "total_demandas": 0
+  },
+  "motivos": {
+   "motivo_cancelacion": null,
+   "motivo_desierta": null,
+   "motivo_seleccion": null
+  },
+  "descripcion": "Se requieren guantes de nitrilo talla M y bolsas de basura 80x110 para el CESFAM Tucapel.",
+  "entrega": {
+   "direccion_entrega": "Av. Los Carrera 1200, Concepción",
+   "plazo_entrega_dias": 2
+  },
+  "presupuesto": {
+   "moneda": "CLP",
+   "tipo_presupuesto": "Disponible",
+   "presupuesto_estimado": 1200000,
+   "monto_disponible": 1200000,
+   "monto_disponible_clp": 1200000,
+   "valor_cambio_moneda": null,
+   "fecha_cambio_moneda": null
+  },
+  "productos_solicitados": [
+   {
+    "nombre": "Guantes de nitrilo",
+    "codigo_producto": 42132203,
+    "descripcion": "Talla M, caja de 100 unidades",
+    "cantidad": 40,
+    "unidad_medida": "Caja"
+   },
+   {
+    "nombre": "Bolsas de basura",
+    "codigo_producto": 47121701,
+    "descripcion": "80x110, paquete de 10",
+    "cantidad": 200,
+    "unidad_medida": "Paquete"
+   }
+  ],
+  "proveedores_cotizando": [],
+  "id_orden_compra": null,
+  "flags": {
+   "considera_requisitos_medioambientales": false,
+   "considera_requisitos_impacto_social_economico": false
+  }
+ }
+}

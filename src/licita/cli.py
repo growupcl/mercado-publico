@@ -313,6 +313,29 @@ def cmd_facturas(args, config: Config, Sesion) -> int:
     return 0
 
 
+def cmd_compra_agil(args, config: Config, Sesion) -> int:
+    from .compra_agil import ClienteCompraAgil
+    from .tareas import ciclo_compra_agil
+
+    cliente = ClienteCompraAgil(config.ticket) if config.ticket else None
+    wa = _whatsapp(config) if config.whatsapp_token and not args.sin_alertas else None
+    with Sesion() as s:
+        r = ciclo_compra_agil(s, cliente, _ia(config), wa, idioma=config.whatsapp_idioma, max_detalles=args.max_detalles)
+    if r.sync:
+        print(f"Compras Ágiles: {r.sync.nuevas} nuevas, {r.sync.actualizadas} actualizadas, "
+              f"{r.sync.detalles} detalles ({r.sync.pendientes} interesantes quedaron sin detalle)")
+    print(f"Calces nuevos: {r.calces}")
+    if r.alertas:
+        if r.alertas.fuera_de_horario:
+            print("Alertas: fuera de horario (8:00 a 21:00), no se envió nada")
+        else:
+            print(f"Alertas enviadas: {r.alertas.alertas} ({r.alertas.plantillas} plantillas, {r.alertas.textos} textos, "
+                  f"{r.alertas.errores} errores)")
+    for e in r.errores:
+        print(f"Error: {e}", file=sys.stderr)
+    return 1 if r.errores else 0
+
+
 def construir_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="licita", description="Copiloto de licitaciones de Mercado Público")
     sub = p.add_subparsers(dest="comando", required=True)
@@ -344,6 +367,11 @@ def construir_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("ciclo", help="Sincroniza, clasifica y busca calces para todas las empresas activas")
     s.add_argument("--max-detalles", type=int, help="Máximo de detalles de licitaciones a pedir por día sincronizado")
     s.set_defaults(fn=cmd_ciclo)
+
+    s = sub.add_parser("compra-agil", help="Compras Ágiles nuevas, calce con IA y alertas urgentes por WhatsApp (plan Pro)")
+    s.add_argument("--max-detalles", type=int, default=25, help="Máximo de detalles a pedir (cada uno demora ~20 s)")
+    s.add_argument("--sin-alertas", action="store_true", help="Solo sincroniza y evalúa; no envía WhatsApp")
+    s.set_defaults(fn=cmd_compra_agil)
 
     s = sub.add_parser("calce", help="Busca y evalúa licitaciones para una empresa")
     s.add_argument("--empresa", type=int, required=True)

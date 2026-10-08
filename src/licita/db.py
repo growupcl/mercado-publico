@@ -16,6 +16,15 @@ def ahora() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
+def hora_chile(momento: datetime | None = None) -> datetime:
+    """Hora de Chile (sin zona) que corresponde a un instante UTC; por defecto, ahora.
+
+    Mercado Público informa las fechas en hora de Chile, así que los cierres se comparan contra esta hora.
+    """
+    momento = momento or ahora()
+    return momento.replace(tzinfo=timezone.utc).astimezone(ZONA_CHILE).replace(tzinfo=None)
+
+
 def hoy_en_chile() -> date:
     """Fecha actual en Chile, sin depender de la zona horaria del servidor."""
     return datetime.now(ZONA_CHILE).date()

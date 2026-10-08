@@ -6,6 +6,9 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # Cada 2 horas, de 7:00 a 21:00: licitaciones nuevas, clasificación con IA y calces.
 0 7-21/2 * * *  /opt/calza/deploy/tareas.sh ciclo --max-detalles 400
 
+# Días hábiles, cada 20 minutos de 8:00 a 20:40: Compras Ágiles nuevas y alertas urgentes (plan Pro).
+*/20 8-20 * * 1-5  /opt/calza/deploy/tareas.sh compra-agil
+
 # Días hábiles a las 8:00: resumen diario por WhatsApp (después del ciclo de las 7:00).
 0 8 * * 1-5     /opt/calza/deploy/tareas.sh whatsapp-enviar
 

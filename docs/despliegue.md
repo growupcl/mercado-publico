@@ -11,7 +11,7 @@ NIC Chile (registro de calza.cl y licitainteligente.cl)
                           │                                          └── Postgres
                           └── correo (MX, SPF, DKIM) ────► Google Workspace (hola@calza.cl)
 
-Cron en el VPS: ciclo cada 2 h · resumen 8:00 · órdenes 23:30 · suscripciones 3:15 · respaldo 2:45
+Cron en el VPS: ciclo cada 2 h · Compra Ágil cada 20 min · resumen 8:00 · órdenes 23:30 · suscripciones 3:15 · respaldo 2:45
 ```
 
 Calza queda **separada del hosting de tus clientes**: nada depende de Nebox.
@@ -168,6 +168,7 @@ crontab -l
 |---|---|
 | Cada 2 horas, de 7:00 a 21:00 | Licitaciones nuevas, clasificación con IA y calces |
 | Días hábiles, 8:00 | Resumen diario por WhatsApp |
+| Días hábiles, cada 20 min de 8:00 a 20:40 | Compras Ágiles nuevas y alertas urgentes del plan Pro ([compra-agil.md](compra-agil.md)) |
 | 23:30 | Órdenes de compra del día (precios de referencia) |
 | 3:15 | Vencimiento de suscripciones impagas |
 | 2:45 | Respaldo de la base de datos (se guardan 14 días en `/var/backups/calza`) |

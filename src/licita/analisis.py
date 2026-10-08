@@ -29,8 +29,8 @@ MODELO_ANALISIS = "claude-sonnet-5-5"
 TAMANO_MAXIMO = 32 * 1024 * 1024
 # El mismo esfuerzo en el análisis y en las preguntas: cambiarlo invalida la caché del PDF.
 ESFUERZO = "medium"
-# Ej.: 1056854-11-LE26, 1511-62-L126, 1002772-108-LP26, 2345-12-O126
-PATRON_CODIGO = re.compile(r"\b\d{1,8}-\d{1,5}-[A-Z][A-Z0-9]\d{2}\b", re.IGNORECASE)
+# Ej.: 1056854-11-LE26, 1511-62-L126, 1002772-108-LP26, 2345-12-O126 y Compra Ágil 1057539-228-COT26
+PATRON_CODIGO = re.compile(r"\b\d{1,8}-\d{1,5}-(?:COT\d{2}|[A-Z][A-Z0-9]\d{2})\b", re.IGNORECASE)
 
 
 class Requisito(BaseModel):

@@ -15,10 +15,12 @@ from typing import Callable
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .db import Calce, Empresa, Licitacion, ahora
+from .db import Calce, Empresa, Licitacion, hora_chile
 from .ia import AsistenteIA
+from .planes import PLANES_CON_COMPRA_AGIL
 
 ESTADO_PUBLICADA = 5
+TIPO_COMPRA_AGIL = "COT"
 
 STOPWORDS = {
     "a", "al", "con", "de", "del", "el", "en", "la", "las", "lo", "los", "para", "por", "que", "se",
@@ -66,11 +68,15 @@ def region_compatible(empresa: Empresa, lic: Licitacion) -> bool:
     return any(_compacto(r) in region for r in empresa.regiones)
 
 
-def interes_de_clientes(session: Session) -> Callable[[str], bool]:
-    """Filtro para órdenes de compra: True si el texto comparte alguna palabra clave con un cliente activo."""
+def interes_de_clientes(session: Session, *, planes: tuple[str, ...] | None = None) -> Callable[[str], bool]:
+    """True si el texto comparte alguna palabra clave con un cliente activo (de esos planes, si se indican).
+
+    Filtra las órdenes de compra que vale la pena guardar y las Compras Ágiles cuyo detalle vale la pena pedir.
+    """
+    consulta = select(Empresa).where(Empresa.plan.in_(planes)) if planes else select(Empresa).where(Empresa.plan != "gratis")
     claves = {
         _raiz(t)
-        for e in session.scalars(select(Empresa).where(Empresa.plan != "gratis"))
+        for e in session.scalars(consulta)
         for kw in e.palabras_clave for t in tokens(kw)
     }
     return lambda texto: bool(claves & {_raiz(t) for t in tokens(texto)})
@@ -104,27 +110,49 @@ def puntaje_prefiltro(empresa: Empresa, lic: Licitacion) -> float:
     return (completas + 0.25 * parciales) / len(frases)
 
 
+def _evaluable(empresa: Empresa, lic: Licitacion) -> bool:
+    """Las Compras Ágiles son del plan Pro y se evalúan solo cuando ya tienen el detalle (productos)."""
+    if lic.tipo != TIPO_COMPRA_AGIL:
+        return True
+    return empresa.plan in PLANES_CON_COMPRA_AGIL and bool((lic.raw or {}).get("detalle"))
+
+
 def candidatas(
-    session: Session, empresa: Empresa, *, momento: datetime | None = None, limite: int = 20, minimo: float = 0.05
+    session: Session,
+    empresa: Empresa,
+    *,
+    momento: datetime | None = None,
+    limite: int = 20,
+    minimo: float = 0.05,
+    solo_compra_agil: bool = False,
 ) -> list[tuple[Licitacion, float]]:
-    momento = momento or ahora()
+    # Mercado Público informa los cierres en hora de Chile.
+    cierre_minimo = hora_chile(momento)
     ya_evaluadas = select(Calce.licitacion_codigo).where(Calce.empresa_id == empresa.id)
     consulta = select(Licitacion).where(
         Licitacion.estado_codigo == ESTADO_PUBLICADA,
-        (Licitacion.fecha_cierre.is_(None)) | (Licitacion.fecha_cierre > momento),
+        (Licitacion.fecha_cierre.is_(None)) | (Licitacion.fecha_cierre > cierre_minimo),
         Licitacion.codigo.not_in(ya_evaluadas),
     )
-    puntuadas = [(lic, puntaje_prefiltro(empresa, lic)) for lic in session.scalars(consulta)]
+    if solo_compra_agil:
+        consulta = consulta.where(Licitacion.tipo == TIPO_COMPRA_AGIL)
+    puntuadas = [(lic, puntaje_prefiltro(empresa, lic)) for lic in session.scalars(consulta) if _evaluable(empresa, lic)]
     puntuadas = [(lic, p) for lic, p in puntuadas if p >= minimo]
     puntuadas.sort(key=lambda par: par[1], reverse=True)
     return puntuadas[:limite]
 
 
 def buscar_calces(
-    session: Session, empresa: Empresa, ia: AsistenteIA, *, momento: datetime | None = None, limite: int = 20
+    session: Session,
+    empresa: Empresa,
+    ia: AsistenteIA,
+    *,
+    momento: datetime | None = None,
+    limite: int = 20,
+    solo_compra_agil: bool = False,
 ) -> list[Calce]:
     """Evalúa con IA las mejores candidatas y guarda el resultado."""
-    seleccion = candidatas(session, empresa, momento=momento, limite=limite)
+    seleccion = candidatas(session, empresa, momento=momento, limite=limite, solo_compra_agil=solo_compra_agil)
     if not seleccion:
         return []
     prefiltro = {lic.codigo: p for lic, p in seleccion}

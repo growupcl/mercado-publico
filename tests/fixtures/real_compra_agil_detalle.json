@@ -1,0 +1,147 @@
+{
+ "_origen": "Respuesta real de GET /v2/compra-agil/{codigo} (6-oct-2026, datos públicos), tomada de las capturas del proyecto MIT ssolis-ti/compra-agil-mcp. Se recortaron proveedores y sus datos de contacto.",
+ "success": "OK",
+ "trace": null,
+ "errors": null,
+ "payload": {
+  "codigo": "744835-588-COT26",
+  "nombre": "CARPA DE LONA - ROLLO DE CUERDA - GUANTES DE NITRILO ( DIRECC. AMBIENTAL - Dpto. Aseo)",
+  "estado": {
+   "codigo": "desierta",
+   "glosa": "Desierta",
+   "id_estado": 6
+  },
+  "convocatoria": {
+   "estado_convocatoria": 1,
+   "descripcion": "Primer llamado",
+   "fecha_cierre_primer_llamado": "2026-09-30 13:15",
+   "fecha_cierre_segundo_llamado": "2026-10-05 13:19"
+  },
+  "documentos": [
+   {
+    "id": 1925965,
+    "nombre": "Solicitud N 1000-A 15-76-2026.pdf"
+   }
+  ],
+  "fechas": {
+   "fecha_publicacion": "2026-09-25 13:10",
+   "fecha_cierre": "2026-09-30 13:15",
+   "fecha_ultimo_cambio": "2026-10-01 11:10",
+   "fecha_cancelacion": null
+  },
+  "institucion": {
+   "organismo_comprador": "I MUNICIPALIDAD DE LO ESPEJO",
+   "rut": "69.255.100-1",
+   "unidad_compra": "Departamento de Adquisiciones",
+   "region": 13,
+   "nombre_region": "Región Metropolitana de Santiago"
+  },
+  "resumen": {
+   "multa_sancion": 0,
+   "total_ofertas_recibidas": 5,
+   "total_demandas": 0
+  },
+  "motivos": {
+   "motivo_cancelacion": null,
+   "motivo_desierta": "Memorándum Nº1000/A-254/1218/2026 de fecha 28-09-2026 la Dirección de Desarrollo Ambiental, indica que hubo una modificación presupuestaria que se vio afectada el presupuesto estimado con un monto menor al estimado en esta cotización, por lo que se declarar desierta esta Compra Ágil."
+  },
+  "entrega": {
+   "direccion_entrega": "Avda. Cardenal Raúl Silva Henríquez # 8321, Comuna Lo Espejo ",
+   "plazo_entrega_dias": 3
+  },
+  "presupuesto": {
+   "moneda": "CLP",
+   "tipo_presupuesto": "Disponible",
+   "presupuesto_estimado": 998592,
+   "monto_disponible": 998592,
+   "monto_disponible_clp": 998592,
+   "valor_cambio_moneda": null,
+   "fecha_cambio_moneda": null
+  },
+  "productos_solicitados": [
+   {
+    "nombre": "Carpas",
+    "codigo_producto": 30221001,
+    "descripcion": "* Revisar Solicitud N° 1000/A-15/76/2026, anexada.\n* Revisar y cumplir con el detalle del documento adjunto\n* Revisar y acatar los antecedentes del requerimiento \n",
+    "cantidad": 1,
+    "unidad_medida": "000"
+   }
+  ],
+  "proveedores_cotizando": [
+   {
+    "rut_proveedor": "78.496.521-K",
+    "razon_social": "ZIMAX SOLUCIONES SPA",
+    "productos_cotizados": [
+     {
+      "codigo_producto": 30221001,
+      "nombre_producto": "Carpas",
+      "descripcion": "* Revisar Solicitud N° 1000/A-15/76/2026, anexada.\n* Revisar y cumplir con el detalle del documento adjunto\n* Revisar y acatar los antecedentes del requerimiento \n",
+      "cantidad": 1,
+      "precio_unitario": 547800,
+      "monto_total_producto": 547800
+     }
+    ],
+    "id_cotizacion": 575954233,
+    "codigo_sucursal_empresa": "1550554",
+    "codigo_empresa": "2129240",
+    "es_emt": 1,
+    "descripcion": "[descripción del proveedor omitida]",
+    "fecha_vigencia": "2026-10-28T21:47:48Z",
+    "fecha_creacion": "2026-09-28T22:59:22.800Z",
+    "valor_neto": 547800,
+    "total_impuesto": 104082,
+    "monto_despacho": 0,
+    "monto_total": 651882,
+    "proveedor_seleccionado": 0,
+    "descripcion_cotizacion": "[descripción del proveedor omitida]",
+    "estado": 3,
+    "justificacion_inadmisibilidad": "Memorándum Nº 1000/A-254/13218/2026 de fecha 28-09-2026, existe una modificación presupuestaria",
+    "estado_por_comprador": null,
+    "activo": null,
+    "id_oc": null,
+    "nombre_impuesto": "IVA",
+    "porcentaje_impuesto": 19
+   },
+   {
+    "rut_proveedor": "78.035.995-1",
+    "razon_social": "COMERCIAL 1 TECH SPA",
+    "productos_cotizados": [
+     {
+      "codigo_producto": 30221001,
+      "nombre_producto": "Carpas",
+      "descripcion": "* Revisar Solicitud N° 1000/A-15/76/2026, anexada.\n* Revisar y cumplir con el detalle del documento adjunto\n* Revisar y acatar los antecedentes del requerimiento \n",
+      "cantidad": 1,
+      "precio_unitario": 783045,
+      "monto_total_producto": 783045
+     }
+    ],
+    "id_cotizacion": 575980993,
+    "codigo_sucursal_empresa": "1412532",
+    "codigo_empresa": "1993732",
+    "es_emt": 1,
+    "descripcion": "[descripción del proveedor omitida]",
+    "fecha_vigencia": "2026-10-29T22:21:39Z",
+    "fecha_creacion": "2026-09-29T22:25:46.263Z",
+    "valor_neto": 783045,
+    "total_impuesto": 148779,
+    "monto_despacho": 0,
+    "monto_total": 931824,
+    "proveedor_seleccionado": 0,
+    "descripcion_cotizacion": "[descripción del proveedor omitida]",
+    "estado": 3,
+    "justificacion_inadmisibilidad": "Memorándum Nº 1000/A-254/13218/2026 de fecha 28-09-2026, existe una modificación presupuestaria",
+    "estado_por_comprador": null,
+    "activo": null,
+    "id_oc": null,
+    "nombre_impuesto": "IVA",
+    "porcentaje_impuesto": 19
+   }
+  ],
+  "flags": {
+   "considera_requisitos_medioambientales": false,
+   "considera_requisitos_impacto_social_economico": false
+  },
+  "descripcion": "* Revisar Solicitud de Materiales N° 1000/A-15/76/2026 anexada, donde indica cantidades y características de lo requerido\n* Subir cotización detallada al Portal Mercado Público en formato Word o Excell\n* NO se considerarán los oferentes que no coticen la totalidad de los productos\n* El oferente NO podrá sobrepasar presupuesto disponible\n* De preferencia se seleccionará al oferente que cumpla con el detalle de los productos solicitados o en su defecto que se aproxime\n* Se permite re adjudicar \n",
+  "id_orden_compra": null
+ }
+}

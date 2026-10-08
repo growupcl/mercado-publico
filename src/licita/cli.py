@@ -47,10 +47,15 @@ def cmd_sync(args, config: Config, Sesion) -> int:
     fecha = date.fromisoformat(args.fecha) if args.fecha else hoy_en_chile()
     with Sesion() as s:
         r = sincronizar_licitaciones(s, cliente, fecha, max_detalles=args.max_detalles)
-        print(f"Licitaciones {fecha}: {r.nuevas} nuevas, {r.actualizadas} actualizadas, {r.sin_cambios} sin cambios, {r.errores} errores")
+        print(f"Licitaciones {fecha}: {r.nuevas} nuevas, {r.actualizadas} actualizadas, {r.sin_cambios} sin cambios, "
+              f"{r.omitidas} omitidas, {r.pendientes} pendientes, {r.errores} errores")
         if args.ordenes:
-            r = sincronizar_ordenes_de_compra(s, cliente, fecha, max_detalles=args.max_detalles)
-            print(f"Órdenes de compra {fecha}: {r.nuevas} nuevas, {r.sin_cambios} ya guardadas, {r.errores} errores")
+            from .calce import interes_de_clientes
+
+            r = sincronizar_ordenes_de_compra(s, cliente, fecha, max_detalles=args.max_detalles,
+                                              interes=None if args.todas_las_ordenes else interes_de_clientes(s))
+            print(f"Órdenes de compra {fecha}: {r.nuevas} nuevas, {r.sin_cambios} ya guardadas, "
+                  f"{r.omitidas} sin relación con clientes, {r.pendientes} pendientes, {r.errores} errores")
     return 0
 
 
@@ -246,7 +251,8 @@ def construir_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("sync", help="Sincroniza licitaciones (y opcionalmente órdenes de compra) de un día")
     s.add_argument("--fecha", help="AAAA-MM-DD (por defecto hoy)")
-    s.add_argument("--ordenes", action="store_true", help="También sincroniza órdenes de compra")
+    s.add_argument("--ordenes", action="store_true", help="También sincroniza órdenes de compra (las relacionadas con los clientes)")
+    s.add_argument("--todas-las-ordenes", action="store_true", help="Con --ordenes: no filtrar por los rubros de los clientes")
     s.add_argument("--max-detalles", type=int, help="Máximo de detalles a pedir (cuida el límite diario del ticket)")
     s.set_defaults(fn=cmd_sync)
 
@@ -312,6 +318,8 @@ def construir_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    # httpx registra cada URL, y la de Mercado Público lleva el ticket: no debe quedar en los registros.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     args = construir_parser().parse_args(argv)
     config = Config.desde_entorno()
     Sesion = crear_sesiones(config.database_url)

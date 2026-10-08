@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from datetime import datetime
+from typing import Callable
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -53,11 +54,26 @@ def _texto_licitacion(lic: Licitacion) -> str:
     return " ".join(partes)
 
 
+def _compacto(texto: str) -> str:
+    """Solo letras y números: 'Región del Libertador ... O´Higgins' contiene 'ohiggins'."""
+    return re.sub(r"[^a-z0-9]", "", normalizar(texto))
+
+
 def region_compatible(empresa: Empresa, lic: Licitacion) -> bool:
     if not empresa.regiones or not lic.region:
         return True
-    region = normalizar(lic.region)
-    return any(normalizar(r) in region for r in empresa.regiones)
+    region = _compacto(lic.region)
+    return any(_compacto(r) in region for r in empresa.regiones)
+
+
+def interes_de_clientes(session: Session) -> Callable[[str], bool]:
+    """Filtro para órdenes de compra: True si el texto comparte alguna palabra clave con un cliente activo."""
+    claves = {
+        _raiz(t)
+        for e in session.scalars(select(Empresa).where(Empresa.plan != "gratis"))
+        for kw in e.palabras_clave for t in tokens(kw)
+    }
+    return lambda texto: bool(claves & {_raiz(t) for t in tokens(texto)})
 
 
 def monto_compatible(empresa: Empresa, lic: Licitacion) -> bool:
@@ -71,14 +87,21 @@ def monto_compatible(empresa: Empresa, lic: Licitacion) -> bool:
 
 
 def puntaje_prefiltro(empresa: Empresa, lic: Licitacion) -> float:
-    """Fracción (0 a 1) de las palabras clave de la empresa que aparecen en la licitación."""
+    """Puntaje de 0 a 1 según cuántas palabras clave de la empresa aparecen completas en la licitación.
+
+    Una palabra clave de varias palabras ("soporte técnico") solo cuenta si aparecen todas, así
+    términos genéricos sueltos ("técnico", "equipo") no inflan el puntaje. Las coincidencias
+    parciales suman poco y solo sirven para desempatar.
+    """
     if not region_compatible(empresa, lic) or not monto_compatible(empresa, lic):
         return 0.0
-    claves = {_raiz(t) for kw in empresa.palabras_clave for t in tokens(kw)}
-    if not claves:
+    frases = [r for r in ({_raiz(t) for t in tokens(kw)} for kw in empresa.palabras_clave) if r]
+    if not frases:
         return 0.0
     texto = {_raiz(t) for t in tokens(_texto_licitacion(lic))}
-    return len(claves & texto) / len(claves)
+    completas = sum(1 for f in frases if f <= texto)
+    parciales = sum(len(f & texto) / len(f) for f in frases if not f <= texto)
+    return (completas + 0.25 * parciales) / len(frases)
 
 
 def candidatas(

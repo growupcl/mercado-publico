@@ -129,7 +129,7 @@ así que no necesitan ticket ni clave. Para correrlas contra Postgres:
 
 ## Próximas fases
 
-- Probar con datos reales: validar formato de respuesta, volumen diario y límites del ticket.
+- Probar el puntaje con IA y el análisis de bases con datos reales (el formato de la API, el volumen diario y el enlace a la ficha ya están validados).
 - Descarga automática de las bases desde Mercado Público (hoy el usuario reenvía el PDF), si los términos de uso lo permiten.
 - Carga del histórico de órdenes de compra desde datos-abiertos.chilecompra.cl, para tener precios de referencia desde el primer día.
 - Factura electrónica automática al confirmar cada pago (hoy queda marcada como pendiente de emitir).

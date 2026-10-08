@@ -1,0 +1,10 @@
+{
+  "Cantidad": 3,
+  "FechaCreacion": "2026-10-06T08:00:00.000",
+  "Version": "v1",
+  "Listado": [
+    {"CodigoExterno": "1234-56-LE26", "Nombre": "Adquisición de insumos de aseo para CESFAM", "CodigoEstado": 5, "FechaCierre": "2026-10-20T15:00:00"},
+    {"CodigoExterno": "2345-12-L126", "Nombre": "Mantención de áreas verdes plaza central", "CodigoEstado": 5, "FechaCierre": "2026-10-15T15:00:00"},
+    {"CodigoExterno": "3456-7-LP26", "Nombre": "Construcción de sede social", "CodigoEstado": 8, "FechaCierre": "2026-09-30T15:00:00"}
+  ]
+}

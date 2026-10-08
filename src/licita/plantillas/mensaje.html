@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block titulo %}{{ titulo }} · Calza{% endblock %}
+{% block contenido %}
+<div style="max-width:640px" class="pila">
+  {% if chip %}<span class="chip {{ chip_clase }}">{{ chip }}</span>{% endif %}
+  <h1>{{ titulo }}</h1>
+  <p class="lead">{{ texto }}</p>
+  {% if wa_link %}<div><a class="boton" href="{{ wa_link }}" target="_blank" rel="noopener">Volver a WhatsApp</a></div>{% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,52 @@
+{
+ "Cantidad": 1,
+ "FechaCreacion": "2026-10-06T08:00:00",
+ "Version": "v1",
+ "Listado": [
+  {
+   "CodigoExterno": "3456-7-LP26",
+   "Nombre": "Construcción de sede social",
+   "CodigoEstado": 8,
+   "Descripcion": "Obra de construcción de sede social vecinal.",
+   "FechaCierre": "2026-09-30T15:00:00",
+   "Estado": "Adjudicada",
+   "Comprador": {
+    "CodigoOrganismo": "7248",
+    "NombreOrganismo": "Ilustre Municipalidad de Chillán",
+    "NombreUnidad": "Unidad de Compras",
+    "ComunaUnidad": "Chillán",
+    "RegionUnidad": "Región de Ñuble"
+   },
+   "Tipo": "LP",
+   "Moneda": "CLP",
+   "MontoEstimado": 150000000,
+   "Fechas": {
+    "FechaCreacion": "2026-10-01T10:00:00",
+    "FechaCierre": "2026-09-30T15:00:00",
+    "FechaPublicacion": "2026-10-06T09:00:00",
+    "FechaAdjudicacion": "2026-10-02T12:00:00"
+   },
+   "Items": {
+    "Cantidad": 1,
+    "Listado": [
+     {
+      "Correlativo": 1,
+      "CodigoProducto": 72111000,
+      "Categoria": "Construcción",
+      "NombreProducto": "Construcción de edificios",
+      "Descripcion": "Sede social 120 m2",
+      "UnidadMedida": "Unidad",
+      "Cantidad": 1,
+      "Adjudicacion": {
+       "TipoDocumento": "RUT",
+       "NumeroDocumento": "77.777.777-7",
+       "NombreProveedor": "Constructora Ñuble SpA",
+       "Cantidad": 1,
+       "MontoUnitario": 142000000
+      }
+     }
+    ]
+   }
+  }
+ ]
+}

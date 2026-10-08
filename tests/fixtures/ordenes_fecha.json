@@ -1,0 +1,13 @@
+{
+ "Cantidad": 1,
+ "FechaCreacion": "2026-10-06T08:00:00",
+ "Version": "v1",
+ "Listado": [
+  {
+   "Codigo": "1234-567-SE26",
+   "Nombre": "OC insumos de aseo",
+   "CodigoEstado": 6,
+   "Estado": "Aceptada"
+  }
+ ]
+}

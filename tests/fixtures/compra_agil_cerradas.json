@@ -1,0 +1,145 @@
+{
+ "_nota": "Listado de Compras Ágiles cerradas (ficticio, forma de la guía oficial).",
+ "success": "OK",
+ "trace": null,
+ "errors": null,
+ "payload": {
+  "items": [
+   {
+    "codigo": "5555-1-COT26",
+    "nombre": "Guantes de nitrilo para posta",
+    "estado": {
+     "id_estado": 0,
+     "codigo": "desierta",
+     "glosa": "Desierta"
+    },
+    "convocatoria": {
+     "estado_convocatoria": 1,
+     "descripcion": "Primer llamado"
+    },
+    "documentos": [],
+    "fechas": {
+     "fecha_publicacion": "2026-10-05 09:00",
+     "fecha_cierre": "2026-10-06 15:00",
+     "fecha_ultimo_cambio": "2026-10-07 08:00",
+     "fecha_cancelacion": null
+    },
+    "montos": {
+     "moneda": "CLP",
+     "monto_disponible": 1200000,
+     "monto_disponible_clp": 1200000
+    },
+    "institucion": {
+     "organismo_comprador": "I MUNICIPALIDAD DE CONCEPCION",
+     "rut": "69.150.100-0",
+     "unidad_compra": "Adquisiciones",
+     "region": 8,
+     "nombre_region": "Región del Biobío"
+    },
+    "resumen": {
+     "total_ofertas_recibidas": 0
+    },
+    "motivos": {
+     "motivo_cancelacion": null,
+     "motivo_desierta": null,
+     "motivo_seleccion": null
+    },
+    "links": {
+     "detalle": "/v2/compra-agil/5555-1-COT26"
+    }
+   },
+   {
+    "codigo": "6666-2-COT26",
+    "nombre": "Guantes y bolsas de basura para liceo",
+    "estado": {
+     "id_estado": 0,
+     "codigo": "proveedor_seleccionado",
+     "glosa": "Proveedor seleccionado"
+    },
+    "convocatoria": {
+     "estado_convocatoria": 1,
+     "descripcion": "Primer llamado"
+    },
+    "documentos": [],
+    "fechas": {
+     "fecha_publicacion": "2026-10-05 09:00",
+     "fecha_cierre": "2026-10-06 18:00",
+     "fecha_ultimo_cambio": "2026-10-07 08:00",
+     "fecha_cancelacion": null
+    },
+    "montos": {
+     "moneda": "CLP",
+     "monto_disponible": 1200000,
+     "monto_disponible_clp": 1200000
+    },
+    "institucion": {
+     "organismo_comprador": "I MUNICIPALIDAD DE CONCEPCION",
+     "rut": "69.150.100-0",
+     "unidad_compra": "Adquisiciones",
+     "region": 8,
+     "nombre_region": "Región del Biobío"
+    },
+    "resumen": {
+     "total_ofertas_recibidas": 0
+    },
+    "motivos": {
+     "motivo_cancelacion": null,
+     "motivo_desierta": null,
+     "motivo_seleccion": null
+    },
+    "links": {
+     "detalle": "/v2/compra-agil/6666-2-COT26"
+    }
+   },
+   {
+    "codigo": "7777-3-COT26",
+    "nombre": "Servicio de fumigación",
+    "estado": {
+     "id_estado": 0,
+     "codigo": "cerrada",
+     "glosa": "Cerrada"
+    },
+    "convocatoria": {
+     "estado_convocatoria": 1,
+     "descripcion": "Primer llamado"
+    },
+    "documentos": [],
+    "fechas": {
+     "fecha_publicacion": "2026-10-05 09:00",
+     "fecha_cierre": "2026-10-06 12:00",
+     "fecha_ultimo_cambio": "2026-10-07 08:00",
+     "fecha_cancelacion": null
+    },
+    "montos": {
+     "moneda": "CLP",
+     "monto_disponible": 1200000,
+     "monto_disponible_clp": 1200000
+    },
+    "institucion": {
+     "organismo_comprador": "I MUNICIPALIDAD DE CONCEPCION",
+     "rut": "69.150.100-0",
+     "unidad_compra": "Adquisiciones",
+     "region": 8,
+     "nombre_region": "Región del Biobío"
+    },
+    "resumen": {
+     "total_ofertas_recibidas": 0
+    },
+    "motivos": {
+     "motivo_cancelacion": null,
+     "motivo_desierta": null,
+     "motivo_seleccion": null
+    },
+    "links": {
+     "detalle": "/v2/compra-agil/7777-3-COT26"
+    }
+   }
+  ],
+  "paginacion": {
+   "total_paginas": 1,
+   "numero_pagina": 1,
+   "tamano_pagina": 50,
+   "total_resultados": 3
+  }
+ }
+}

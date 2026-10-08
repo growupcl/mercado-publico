@@ -1,0 +1,58 @@
+# Calza en producción: aplicación + Postgres + Caddy (HTTPS automático).
+# Uso: docker compose up -d --build   (lee las variables de .env)
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://calza:${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD en .env}@db:5432/calza
+    volumes:
+      - documentos:/datos/documentos
+    depends_on:
+      db:
+        condition: service_healthy
+    logging: &logs
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: calza
+      POSTGRES_USER: calza
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD en .env}
+      TZ: America/Santiago
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U calza -d calza"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    logging: *logs
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMINIO: ${DOMINIO:-calza.cl}
+      DOMINIOS_REDIRIGIDOS: ${DOMINIOS_REDIRIGIDOS:-licitainteligente.cl, www.licitainteligente.cl}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    logging: *logs
+
+volumes:
+  documentos:
+  postgres:
+  caddy_data:
+  caddy_config:

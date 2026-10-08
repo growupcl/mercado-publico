@@ -1,0 +1,44 @@
+{
+ "Cantidad": 1,
+ "FechaCreacion": "2026-10-06T08:00:00",
+ "Version": "v1",
+ "Listado": [
+  {
+   "Codigo": "1234-567-SE26",
+   "Nombre": "OC insumos de aseo",
+   "CodigoEstado": 6,
+   "Estado": "Aceptada",
+   "CodigoLicitacion": "1234-12-LE26",
+   "TipoMoneda": "CLP",
+   "Total": 1190000,
+   "TotalNeto": 1000000,
+   "Fechas": {
+    "FechaCreacion": "2026-10-02T10:00:00",
+    "FechaEnvio": "2026-10-03T10:00:00"
+   },
+   "Comprador": {
+    "NombreOrganismo": "Servicio de Salud Concepción",
+    "RegionUnidad": "Región del Biobío "
+   },
+   "Proveedor": {
+    "Codigo": "1",
+    "Nombre": "Aseo Sur SpA",
+    "RutSucursal": "76.123.456-7"
+   },
+   "Items": {
+    "Cantidad": 1,
+    "Listado": [
+     {
+      "CodigoProducto": 47131604,
+      "Categoria": "Artículos de limpieza",
+      "Producto": "Detergente",
+      "EspecificacionComprador": "Detergente 5 L",
+      "Cantidad": 100,
+      "PrecioNeto": 10000,
+      "Total": 1000000
+     }
+    ]
+   }
+  }
+ ]
+}

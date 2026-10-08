@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block titulo %}Calza · Licitaciones que te calzan{% endblock %}
+{% block contenido %}
+<section class="pila" style="max-width:720px;margin-bottom:56px">
+  <span class="chip oro">Para pymes que le venden al Estado</span>
+  <h1>Las licitaciones que te calzan, cada mañana en tu WhatsApp.</h1>
+  <p class="lead">Calza revisa Mercado Público por ti, te avisa solo lo que encaja con tu negocio y te explica las bases en palabras simples: qué piden, cuándo cierra y a qué precio se ha comprado antes.</p>
+  <div><a class="boton" href="/registro">Probar {{ dias_prueba }} días gratis</a></div>
+  <p class="ayuda">Sin tarjeta. Durante la prueba tienes todo lo del plan Pro.</p>
+</section>
+
+<section style="margin-bottom:56px">
+  <h2>Cómo funciona</h2>
+  <div class="rejilla">
+    <div class="tarjeta pila"><span class="chip">1</span><h3>Cuéntanos qué vendes</h3><p class="muted">En tus palabras. Nuestra IA entiende tu rubro, tus regiones y el tamaño de contratos que te interesa.</p></div>
+    <div class="tarjeta pila"><span class="chip">2</span><h3>Recibe tu resumen diario</h3><p class="muted">Cada mañana, las licitaciones nuevas con su porcentaje de calce, monto y fecha de cierre.</p></div>
+    <div class="tarjeta pila"><span class="chip">3</span><h3>Postula con ventaja</h3><p class="muted">Envíanos el PDF de las bases y te decimos requisitos, garantías, plazos y cómo se evalúa.</p></div>
+  </div>
+</section>
+
+<section id="planes">
+  <h2>Planes</h2>
+  <div class="rejilla dos">
+    {% for p in planes %}
+    <div class="tarjeta pila plan">
+      <h3>{{ p.nombre }}</h3>
+      {% if p.codigo == "pro" and fundador %}
+        <div><span class="chip oro">Precio fundador para los primeros clientes Pro</span></div>
+        <div class="precio">{{ fmt(precio_fundador) }} <small>/ mes, de por vida</small></div>
+        <p class="muted">Precio normal {{ fmt(p.mensual) }} al mes.</p>
+      {% else %}
+        <div class="precio">{{ fmt(p.mensual) }} <small>/ mes</small></div>
+      {% endif %}
+      <p class="muted">O {{ fmt(anual[p.codigo]) }} al año (10% de descuento). Precios con IVA.</p>
+      <ul class="check">{% for b in p.beneficios %}<li>{{ b }}</li>{% endfor %}</ul>
+      <div><a class="boton" href="/registro?plan={{ p.codigo }}">Empezar con {{ p.nombre }}</a></div>
+    </div>
+    {% endfor %}
+  </div>
+  <p class="muted" style="margin-top:16px">¿Gestionas licitaciones de varias empresas? Escríbenos a hola@calza.cl para el plan Consultoras.</p>
+</section>
+{% endblock %}

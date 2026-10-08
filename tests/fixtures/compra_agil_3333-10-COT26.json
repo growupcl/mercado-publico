@@ -1,0 +1,73 @@
+{
+ "success": "OK",
+ "trace": null,
+ "errors": null,
+ "payload": {
+  "codigo": "3333-10-COT26",
+  "nombre": "Bolsas de basura para liceo",
+  "estado": {
+   "id_estado": 2,
+   "codigo": "publicada",
+   "glosa": "Publicada"
+  },
+  "convocatoria": {
+   "estado_convocatoria": 1,
+   "descripcion": "Primer llamado",
+   "fecha_cierre_primer_llamado": "2026-10-07 10:30",
+   "fecha_cierre_segundo_llamado": null
+  },
+  "documentos": [],
+  "fechas": {
+   "fecha_publicacion": "2026-10-07 08:05",
+   "fecha_cierre": "2026-10-07 10:30",
+   "fecha_ultimo_cambio": "2026-10-07 08:05",
+   "fecha_cancelacion": null
+  },
+  "institucion": {
+   "organismo_comprador": "SERVICIO LOCAL DE EDUCACION ANDALIEN SUR",
+   "rut": "69.150.100-0",
+   "unidad_compra": "Adquisiciones",
+   "region": 8,
+   "nombre_region": null
+  },
+  "resumen": {
+   "multa_sancion": 0,
+   "total_ofertas_recibidas": 0,
+   "total_demandas": 0
+  },
+  "motivos": {
+   "motivo_cancelacion": null,
+   "motivo_desierta": null,
+   "motivo_seleccion": null
+  },
+  "descripcion": "Bolsas de basura negras para el liceo.",
+  "entrega": {
+   "direccion_entrega": "Av. Los Carrera 1200, Concepción",
+   "plazo_entrega_dias": 1
+  },
+  "presupuesto": {
+   "moneda": "CLP",
+   "tipo_presupuesto": "Disponible",
+   "presupuesto_estimado": 150000,
+   "monto_disponible": 150000,
+   "monto_disponible_clp": 150000,
+   "valor_cambio_moneda": null,
+   "fecha_cambio_moneda": null
+  },
+  "productos_solicitados": [
+   {
+    "nombre": "Bolsas de basura",
+    "codigo_producto": 47121701,
+    "descripcion": null,
+    "cantidad": 50,
+    "unidad_medida": "Paquete"
+   }
+  ],
+  "proveedores_cotizando": [],
+  "id_orden_compra": null,
+  "flags": {
+   "considera_requisitos_medioambientales": false,
+   "considera_requisitos_impacto_social_economico": false
+  }
+ }
+}

@@ -1,0 +1,141 @@
+{
+ "success": "OK",
+ "trace": null,
+ "errors": null,
+ "payload": {
+  "codigo": "6666-2-COT26",
+  "nombre": "Guantes y bolsas de basura para liceo",
+  "estado": {
+   "id_estado": 0,
+   "codigo": "proveedor_seleccionado",
+   "glosa": "Proveedor seleccionado"
+  },
+  "convocatoria": {
+   "estado_convocatoria": 1,
+   "descripcion": "Primer llamado",
+   "fecha_cierre_primer_llamado": "2026-10-08 15:00",
+   "fecha_cierre_segundo_llamado": null
+  },
+  "documentos": [],
+  "fechas": {
+   "fecha_publicacion": "2026-10-05 09:00",
+   "fecha_cierre": "2026-10-06 18:00",
+   "fecha_ultimo_cambio": "2026-10-07 08:00",
+   "fecha_cancelacion": null
+  },
+  "institucion": {
+   "organismo_comprador": "I MUNICIPALIDAD DE CONCEPCION",
+   "rut": "69.150.100-0",
+   "unidad_compra": "Adquisiciones",
+   "region": 8,
+   "nombre_region": "Región del Biobío"
+  },
+  "resumen": {
+   "multa_sancion": 0,
+   "total_ofertas_recibidas": 2,
+   "total_demandas": 0
+  },
+  "motivos": {
+   "motivo_cancelacion": null,
+   "motivo_desierta": null,
+   "motivo_seleccion": null
+  },
+  "descripcion": "Se requieren guantes de nitrilo talla M y bolsas de basura 80x110 para el CESFAM Tucapel.",
+  "entrega": {
+   "direccion_entrega": "Av. Los Carrera 1200, Concepción",
+   "plazo_entrega_dias": 2
+  },
+  "presupuesto": {
+   "moneda": "CLP",
+   "tipo_presupuesto": "Disponible",
+   "presupuesto_estimado": 1200000,
+   "monto_disponible": 1200000,
+   "monto_disponible_clp": 1200000,
+   "valor_cambio_moneda": null,
+   "fecha_cambio_moneda": null
+  },
+  "productos_solicitados": [
+   {
+    "nombre": "Guantes de nitrilo",
+    "codigo_producto": 42132203,
+    "descripcion": "Talla M, caja de 100",
+    "cantidad": 10,
+    "unidad_medida": "Caja"
+   },
+   {
+    "nombre": "Bolsas de basura",
+    "codigo_producto": 47121701,
+    "descripcion": "80x110",
+    "cantidad": 20,
+    "unidad_medida": "Paquete"
+   }
+  ],
+  "proveedores_cotizando": [
+   {
+    "rut_proveedor": "76.111.111-1",
+    "razon_social": "ASEO SUR SPA",
+    "es_emt": 1,
+    "id_cotizacion": 1,
+    "activo": true,
+    "estado": 3,
+    "valor_neto": 78000,
+    "monto_total": null,
+    "justificacion_inadmisibilidad": null,
+    "proveedor_seleccionado": 0,
+    "productos_cotizados": [
+     {
+      "codigo_producto": 42132203,
+      "nombre_producto": "Guantes de nitrilo",
+      "descripcion": "Talla M, caja de 100",
+      "cantidad": 10,
+      "precio_unitario": 4800,
+      "monto_total_producto": 48000
+     },
+     {
+      "codigo_producto": 47121701,
+      "nombre_producto": "Bolsas de basura",
+      "descripcion": "80x110",
+      "cantidad": 20,
+      "precio_unitario": 1500,
+      "monto_total_producto": 30000
+     }
+    ]
+   },
+   {
+    "rut_proveedor": "76.444.444-4",
+    "razon_social": "DISTRIBUIDORA SUR",
+    "es_emt": 1,
+    "id_cotizacion": 1,
+    "activo": true,
+    "estado": 3,
+    "valor_neto": 86000,
+    "monto_total": null,
+    "justificacion_inadmisibilidad": null,
+    "proveedor_seleccionado": 0,
+    "productos_cotizados": [
+     {
+      "codigo_producto": 42132203,
+      "nombre_producto": "Guantes de nitrilo",
+      "descripcion": "Talla M, caja de 100",
+      "cantidad": 10,
+      "precio_unitario": 5200,
+      "monto_total_producto": 52000
+     },
+     {
+      "codigo_producto": 47121701,
+      "nombre_producto": "Bolsas de basura",
+      "descripcion": "80x110",
+      "cantidad": 20,
+      "precio_unitario": 1700,
+      "monto_total_producto": 34000
+     }
+    ]
+   }
+  ],
+  "id_orden_compra": null,
+  "flags": {
+   "considera_requisitos_medioambientales": false,
+   "considera_requisitos_impacto_social_economico": false
+  }
+ }
+}

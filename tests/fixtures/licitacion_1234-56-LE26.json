@@ -1,0 +1,62 @@
+{
+ "Cantidad": 1,
+ "FechaCreacion": "2026-10-06T08:00:00",
+ "Version": "v1",
+ "Listado": [
+  {
+   "CodigoExterno": "1234-56-LE26",
+   "Nombre": "Adquisición de insumos de aseo para CESFAM",
+   "CodigoEstado": 5,
+   "Descripcion": "Compra de artículos de aseo y limpieza para centros de salud familiar de la comuna.",
+   "FechaCierre": "2026-10-20T15:00:00",
+   "Estado": "Publicada",
+   "Comprador": {
+    "CodigoOrganismo": "7248",
+    "NombreOrganismo": "Ilustre Municipalidad de Concepción",
+    "NombreUnidad": "Unidad de Compras",
+    "ComunaUnidad": "Concepción",
+    "RegionUnidad": "Región del Biobío"
+   },
+   "Tipo": "LE",
+   "Moneda": "CLP",
+   "MontoEstimado": 8500000,
+   "Fechas": {
+    "FechaCreacion": "2026-10-01T10:00:00",
+    "FechaCierre": "2026-10-20T15:00:00",
+    "FechaPublicacion": "2026-10-06T09:00:00"
+   },
+   "Items": {
+    "Cantidad": 3,
+    "Listado": [
+     {
+      "Correlativo": 1,
+      "CodigoProducto": 47131604,
+      "Categoria": "Artículos de limpieza",
+      "NombreProducto": "Detergente",
+      "Descripcion": "Detergente líquido 5 litros",
+      "UnidadMedida": "Unidad",
+      "Cantidad": 200
+     },
+     {
+      "Correlativo": 2,
+      "CodigoProducto": 53102104,
+      "Categoria": "Guantes",
+      "NombreProducto": "Guantes de látex",
+      "Descripcion": "Guantes desechables talla M, caja 100",
+      "UnidadMedida": "Unidad",
+      "Cantidad": 500
+     },
+     {
+      "Correlativo": 3,
+      "CodigoProducto": 47121701,
+      "Categoria": "Bolsas de basura",
+      "NombreProducto": "Bolsas de basura",
+      "Descripcion": "Bolsas de basura 80x110",
+      "UnidadMedida": "Unidad",
+      "Cantidad": 1000
+     }
+    ]
+   }
+  }
+ ]
+}

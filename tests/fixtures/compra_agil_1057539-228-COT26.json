@@ -16,7 +16,16 @@
    "fecha_cierre_primer_llamado": "2026-10-08 15:00",
    "fecha_cierre_segundo_llamado": null
   },
-  "documentos": [],
+  "documentos": [
+   {
+    "id": 1925965,
+    "nombre": "Especificaciones técnicas CESFAM.pdf"
+   },
+   {
+    "id": 1925966,
+    "nombre": "Anexo cotización.docx"
+   }
+  ],
   "fechas": {
    "fecha_publicacion": "2026-10-07 09:40",
    "fecha_cierre": "2026-10-08 15:00",

@@ -127,8 +127,6 @@ def texto_detalle(calce: Calce, lic: Licitacion) -> str:
     if requisitos:
         lineas += ["", "⚠️ Ojo con:"] + [f"• {r}" for r in requisitos[:4]]
     lineas += ["", f"✅ Por qué te sirve: {calce.razon}"]
-    if es_compra_agil(lic):
-        lineas += ["", "💲 Escribe *PRECIOS* para ver a cuánto cotiza la competencia."]
     lineas += ["", f"Ficha completa: {url_ficha(lic)}"]
     return "\n".join(lineas)
 

@@ -163,6 +163,7 @@ así que no necesitan ticket ni clave. Para correrlas contra Postgres:
 ## Próximas fases
 
 - Probar el puntaje con IA y el análisis de bases con datos reales (el formato de la API, el volumen diario y el enlace a la ficha ya están validados).
-- Descarga automática de las bases desde Mercado Público (hoy el usuario reenvía el PDF), si los términos de uso lo permiten.
+- Descarga automática de las bases: no hay vía oficial y los términos apuntan en contra; se consultó a ChileCompra
+  (ver [docs/descarga-de-bases.md](docs/descarga-de-bases.md)). Hoy el usuario reenvía el PDF.
 - Factura electrónica automática al confirmar cada pago (hoy se emite a mano en el portal del SII, ver docs/facturacion.md).
 - Aviso por correo (además de WhatsApp) cuando un cobro automático es rechazado.

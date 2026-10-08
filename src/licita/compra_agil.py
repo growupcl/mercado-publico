@@ -170,6 +170,8 @@ def normalizar_compra_agil(raw: dict[str, Any]) -> dict[str, Any]:
             "llamado": convocatoria.get("estado_convocatoria"),
             "ofertas": (raw.get("resumen") or {}).get("total_ofertas_recibidas"),
             "documentos": len(raw.get("documentos") or []),
+            # Solo los nombres: la API no permite descargarlos, el cliente los baja de la ficha y nos los reenvía.
+            "adjuntos": [(d.get("nombre") or "").strip() for d in (raw.get("documentos") or [])[:10] if d.get("nombre")],
         },
     }
     if "productos_solicitados" in raw:  # solo viene en el detalle

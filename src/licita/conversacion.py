@@ -83,7 +83,22 @@ INVITACION_BASES = (
 def _detalle(empresa: Empresa, calce: Calce, lic: Licitacion, momento: datetime) -> str:
     empresa.licitacion_activa = lic.codigo
     empresa.contexto_actualizado_en = momento
-    return texto_detalle(calce, lic) + INVITACION_BASES
+    return texto_detalle(calce, lic) + (invitacion_compra_agil(lic) if lic.tipo == "COT" else INVITACION_BASES)
+
+
+def invitacion_compra_agil(lic: Licitacion) -> str:
+    """Los adjuntos de Compra Ágil no se pueden descargar por la API: se le dice al cliente cuáles son para que los reenvíe."""
+    texto = "\n\n💲 Escribe *PRECIOS* para ver a cuánto cotiza la competencia."
+    adjuntos = (lic.raw or {}).get("adjuntos") or []
+    if adjuntos:
+        lista = "\n".join(f"• {nombre}" for nombre in adjuntos[:5])
+        mas = f"\n• … y {len(adjuntos) - 5} más" if len(adjuntos) > 5 else ""
+        texto += (f"\n📎 Tiene {len(adjuntos)} adjunto{'s' if len(adjuntos) > 1 else ''}:\n{lista}{mas}\n"
+                  "Muchas veces el detalle de lo que piden está ahí. Descarga los PDF desde la ficha y envíamelos aquí: "
+                  "te digo qué piden y qué revisar antes de cotizar.")
+    else:
+        texto += "\n📄 Si tienes documentos de esta compra, envíamelos aquí y te digo qué piden."
+    return texto
 
 
 def _contexto_vigente(empresa: Empresa, momento: datetime) -> bool:

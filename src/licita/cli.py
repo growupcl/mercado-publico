@@ -288,6 +288,31 @@ def cmd_suscripciones(args, config: Config, Sesion) -> int:
     return 0
 
 
+def cmd_facturas(args, config: Config, Sesion) -> int:
+    from . import facturas
+
+    with Sesion() as s:
+        if args.emitida is not None:
+            if not args.folio:
+                raise ValueError("Indica el folio con --folio.")
+            pago = facturas.marcar_emitida(s, args.emitida, args.folio)
+            s.commit()
+            print(f"Pago #{pago.id}: factura folio {pago.factura_folio} registrada.")
+            return 0
+        lista = facturas.pendientes(s)
+        if args.csv:
+            sys.stdout.write(facturas.csv_facturas(lista))
+            return 0
+        if not lista:
+            print("No hay facturas pendientes.")
+            return 0
+        print(f"Facturas por emitir en el SII ({config.prestador}): {len(lista)}\n")
+        for f in lista:
+            print(facturas.texto(f) + "\n")
+        print("Cuando emitas una: licita facturas --emitida PAGO_ID --folio NUMERO")
+    return 0
+
+
 def construir_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="licita", description="Copiloto de licitaciones de Mercado Público")
     sub = p.add_subparsers(dest="comando", required=True)
@@ -347,6 +372,12 @@ def construir_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("suscripciones", help="Vence suscripciones impagas, lista las por vencer y avisa cobros rechazados")
     s.add_argument("--dias", type=int, default=3, help="Días de anticipación para listar las por vencer")
     s.set_defaults(fn=cmd_suscripciones)
+
+    s = sub.add_parser("facturas", help="Lista los pagos por facturar en el portal del SII o registra el folio emitido")
+    s.add_argument("--csv", action="store_true", help="Exporta las pendientes en CSV (separado por punto y coma)")
+    s.add_argument("--emitida", type=int, metavar="PAGO_ID", help="Marca la factura de este pago como emitida")
+    s.add_argument("--folio", help="Con --emitida: folio que entregó el SII")
+    s.set_defaults(fn=cmd_facturas)
 
     s = sub.add_parser("migrar", help="Aplica las migraciones pendientes de la base de datos")
     s.add_argument("--nueva", metavar="MENSAJE", help="Genera una migración nueva a partir de los cambios en los modelos")

@@ -191,6 +191,7 @@ Ajústalos cuando veamos el volumen real.
 | Ver las tareas programadas | `tail -f logs/tareas.log` |
 | Correr una tarea a mano | `deploy/tareas.sh ciclo` (o `whatsapp-enviar`, `suscripciones`…) |
 | Usar cualquier comando de Calza | `docker compose exec app licita --help` |
+| Ver y registrar facturas ([facturacion.md](facturacion.md)) | `docker compose exec app licita facturas` |
 | Respaldar ahora | `deploy/respaldo.sh` |
 | Restaurar un respaldo | `gunzip -c /var/backups/calza/calza-AAAA-MM-DD.sql.gz \| docker compose exec -T db psql -U calza -d calza` |
 

@@ -17,8 +17,14 @@
         <input id="razon_social" name="razon_social" type="text" value="{{ datos.razon_social }}" required>{{ err("razon_social") }}</div>
     </div>
     <div><label for="giro">Giro</label>
-      <input id="giro" name="giro" type="text" value="{{ datos.giro }}" placeholder="Venta al por mayor de artículos de aseo">
-      <p class="ayuda">Lo usamos para emitir tu factura.</p></div>
+      <input id="giro" name="giro" type="text" value="{{ datos.giro }}" placeholder="Venta al por mayor de artículos de aseo" required>{{ err("giro") }}</div>
+    <div class="rejilla" style="gap:16px">
+      <div><label for="direccion">Dirección comercial</label>
+        <input id="direccion" name="direccion" type="text" value="{{ datos.direccion }}" autocomplete="street-address" required>{{ err("direccion") }}</div>
+      <div><label for="comuna">Comuna</label>
+        <input id="comuna" name="comuna" type="text" value="{{ datos.comuna }}" required>{{ err("comuna") }}</div>
+    </div>
+    <p class="ayuda">Giro, dirección y comuna son los datos que pide la factura electrónica.</p>
 
     <h3>Qué vendes</h3>
     <div><label for="descripcion">Describe tu negocio con tus palabras</label>

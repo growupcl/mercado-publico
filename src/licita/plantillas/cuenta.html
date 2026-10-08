@@ -54,12 +54,12 @@
   {% if pagos %}
   <h2>Pagos</h2>
   <div class="tabla"><table>
-    <thead><tr><th>Fecha</th><th>Plan</th><th>Monto</th><th>Estado</th></tr></thead>
+    <thead><tr><th>Fecha</th><th>Plan</th><th>Monto</th><th>Estado</th><th>Factura</th></tr></thead>
     <tbody>{% for p in pagos %}
-      <tr><td>{{ (p.pagado_en or p.creado_en).strftime("%d-%m-%Y") }}</td><td>{{ p.plan|capitalize }} {{ p.periodicidad }}</td><td>{{ fmt(p.monto) }}</td><td>{{ p.estado|capitalize }}</td></tr>
+      <tr><td>{{ (p.pagado_en or p.creado_en).strftime("%d-%m-%Y") }}</td><td>{{ p.plan|capitalize }} {{ p.periodicidad }}</td><td>{{ fmt(p.monto) }}</td><td>{{ p.estado|capitalize }}</td><td>{% if p.factura_emitida %}N° {{ p.factura_folio }}{% elif p.estado == "pagado" %}En emisión{% else %}—{% endif %}</td></tr>
     {% endfor %}</tbody>
   </table></div>
   {% endif %}
-  <p class="ayuda">{{ prestador }} emite la factura a nombre de {{ empresa.razon_social }} (RUT {{ rut }}). ¿Datos incorrectos? Escríbenos a hola@calza.cl.</p>
+  <p class="ayuda">{{ prestador }} emite la factura a nombre de {{ empresa.razon_social }} (RUT {{ rut }}), giro {{ empresa.giro }}, {{ empresa.direccion }}, {{ empresa.comuna }}, y la envía a {{ empresa.email }}. ¿Datos incorrectos? Escríbenos a hola@calza.cl.</p>
 </div>
 {% endblock %}

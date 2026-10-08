@@ -91,6 +91,8 @@ class Empresa(Base):
     rut: Mapped[str] = mapped_column(String(12), default="", index=True)
     razon_social: Mapped[str] = mapped_column(String(200), default="")
     giro: Mapped[str] = mapped_column(String(200), default="")
+    direccion: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    comuna: Mapped[str] = mapped_column(String(100), default="", server_default="")
     email: Mapped[str] = mapped_column(String(200), default="")
     token_cuenta_hash: Mapped[str] = mapped_column(String(64), default="", index=True)
     consentimiento_whatsapp_en: Mapped[datetime | None] = mapped_column(DateTime)
@@ -253,6 +255,8 @@ class Pago(Base):
     # Cuándo se avisó al cliente que este cobro fue rechazado (None = aún no).
     aviso_enviado_en: Mapped[datetime | None] = mapped_column(DateTime)
     factura_emitida: Mapped[bool] = mapped_column(Boolean, default=False)
+    factura_folio: Mapped[str] = mapped_column(String(20), default="", server_default="")
+    factura_emitida_en: Mapped[datetime | None] = mapped_column(DateTime)
     creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
 
 

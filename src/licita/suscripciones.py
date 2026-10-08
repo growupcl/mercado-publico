@@ -51,6 +51,8 @@ class DatosRegistro:
     email: str
     whatsapp: str
     descripcion: str
+    direccion: str = ""
+    comuna: str = ""
     regiones: list[str] = field(default_factory=list)
     monto_max: float | None = None
     plan: str = "pyme"
@@ -92,6 +94,12 @@ def validar(datos: DatosRegistro) -> dict[str, str]:
         errores["rut"] = "El RUT no es válido. Revisa el dígito verificador."
     if len(datos.razon_social.strip()) < 2:
         errores["razon_social"] = "Escribe la razón social (la necesitamos para la factura)."
+    if len(datos.giro.strip()) < 3:
+        errores["giro"] = "Escribe el giro de la empresa (lo exige la factura)."
+    if len(datos.direccion.strip()) < 5:
+        errores["direccion"] = "Escribe la dirección comercial (la exige la factura)."
+    if len(datos.comuna.strip()) < 3:
+        errores["comuna"] = "Escribe la comuna."
     if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", datos.email.strip()):
         errores["email"] = "Escribe un correo válido."
     telefono = normalizar_telefono(datos.whatsapp)
@@ -142,6 +150,7 @@ def registrar_empresa(
         monto_max=datos.monto_max, palabras_clave=palabras_clave, whatsapp=telefono,
         plan="pro",  # durante la prueba tiene todo
         rut=rut, razon_social=datos.razon_social.strip(), giro=datos.giro.strip(), email=datos.email.strip().lower(),
+        direccion=datos.direccion.strip(), comuna=datos.comuna.strip(),
         consentimiento_whatsapp_en=momento,
     )
     session.add(empresa)

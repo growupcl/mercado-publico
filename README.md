@@ -80,6 +80,10 @@ Credenciales de prueba) en `MERCADOPAGO_ACCESS_TOKEN`, configura un webhook haci
 `https://<tu-dominio>/pagos/mercadopago/webhook` con los eventos *Planes y suscripciones*, copia su clave secreta en
 `MERCADOPAGO_WEBHOOK_SECRET` y paga con un usuario y tarjetas de prueba. Ver [docs/mercadopago.md](docs/mercadopago.md).
 
+**Facturas:** cada pago aprobado queda pendiente de factura. `licita facturas` muestra los datos listos para emitirla
+en el portal gratuito del SII y `licita facturas --emitida PAGO_ID --folio N` registra el folio. Ver
+[docs/facturacion.md](docs/facturacion.md).
+
 ## Publicar en el servidor
 
 Calza corre en un VPS (Vultr, Santiago) con Docker: aplicación, Postgres y Caddy (HTTPS automático), más tareas

@@ -90,6 +90,7 @@ def crear_router_web(
     def registrar(
         request: Request,
         nombre: str = Form(""), rut: str = Form(""), razon_social: str = Form(""), giro: str = Form(""),
+        direccion: str = Form(""), comuna: str = Form(""),
         email: str = Form(""), whatsapp: str = Form(""), descripcion: str = Form(""),
         regiones: list[str] = Form([]), monto_max: str = Form(""), plan: str = Form("pyme"),
         periodicidad: str = Form("mensual"), acepta_whatsapp: str = Form(""), acepta_terminos: str = Form(""),
@@ -99,7 +100,8 @@ def crear_router_web(
         except ValueError:
             tope = None
         datos = DatosRegistro(
-            nombre=nombre, rut=rut, razon_social=razon_social, giro=giro, email=email, whatsapp=whatsapp,
+            nombre=nombre, rut=rut, razon_social=razon_social, giro=giro, direccion=direccion, comuna=comuna,
+            email=email, whatsapp=whatsapp,
             descripcion=descripcion, regiones=regiones, monto_max=tope, plan=plan, periodicidad=periodicidad,
             acepta_whatsapp=bool(acepta_whatsapp), acepta_terminos=bool(acepta_terminos),
         )

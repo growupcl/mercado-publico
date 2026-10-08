@@ -8,6 +8,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+from licita import facturas
 from licita import rut as rutlib
 from licita.conversacion import procesar_webhook
 from licita.db import Empresa, MandatoPago, Pago, Suscripcion, ahora
@@ -24,6 +25,7 @@ from licita.web import crear_router_web
 RUT = "76.123.456-0"
 FORM = {
     "nombre": "Aseo Sur", "rut": RUT, "razon_social": "Aseo Sur SpA", "giro": "Venta de artículos de aseo",
+    "direccion": "Av. Colón 1234", "comuna": "Concepción",
     "email": "contacto@aseosur.cl", "whatsapp": "+56 9 8929 9524",
     "descripcion": "Vendemos insumos de aseo, guantes y bolsas de basura a municipios y centros de salud.",
     "regiones": ["Biobío", "Ñuble"], "monto_max": "30000000", "plan": "pro", "periodicidad": "mensual",
@@ -174,10 +176,11 @@ def test_registro_valido_crea_prueba_pro(web):
 
 def test_registro_con_errores_muestra_mensajes(web):
     cliente, Sesion, _ = web
-    malo = {**FORM, "rut": "76.123.456-7", "whatsapp": "123", "acepta_whatsapp": ""}
+    malo = {**FORM, "rut": "76.123.456-7", "whatsapp": "123", "acepta_whatsapp": "", "direccion": ""}
     r = cliente.post("/registro", data=malo)
     assert r.status_code == 422
     assert "El RUT no es válido" in r.text and "celular chileno" in r.text and "autorización" in r.text
+    assert "la dirección comercial" in r.text
     assert 'value="Aseo Sur"' in r.text  # conserva lo escrito
     with Sesion() as s:
         assert s.query(Empresa).count() == 0
@@ -239,6 +242,21 @@ def test_suscripcion_completa_durante_la_prueba(web):
     _aviso(cliente, "subscription_authorized_payment", "9001")  # aviso repetido
     with Sesion() as s:
         assert s.query(Pago).count() == 1 and s.query(Suscripcion).one().vigente_hasta == sumar_meses(fin_prueba, 1)
+
+    # Factura: queda pendiente con los datos para el portal del SII y, con el folio, se ve en la cuenta.
+    assert "En emisión" in cliente.get(f"/cuenta/{token}").text
+    with Sesion() as s:
+        [f] = facturas.pendientes(s)
+        assert (f.rut, f.razon_social, f.direccion, f.comuna) == ("76.123.456-0", "Aseo Sur SpA", "Av. Colón 1234", "Concepción")
+        assert (f.neto, f.iva, f.total) == (33605, 6385, 39990) and f.glosa == "Suscripción Calza plan Pro mensual (1 mes)"
+        assert not f.datos_incompletos
+        assert "76.123.456-0;Aseo Sur SpA" in facturas.csv_facturas([f])
+        facturas.marcar_emitida(s, f.pago_id, "125")
+        s.commit()
+        assert facturas.pendientes(s) == []
+        with pytest.raises(ValueError):
+            facturas.marcar_emitida(s, f.pago_id, "126")
+    assert "N° 125" in cliente.get(f"/cuenta/{token}").text
 
 
 def test_aviso_con_firma_invalida_se_rechaza(web):
@@ -351,3 +369,15 @@ def test_cuenta_por_whatsapp_genera_enlace_nuevo(web):
     token_nuevo = wa.enviados[0].split("https://calza.cl/cuenta/")[1].split()[0]
     assert cliente.get(f"/cuenta/{token_nuevo}").status_code == 200
     assert cliente.get(f"/cuenta/{token_viejo}").status_code == 404
+
+
+def test_desglose_de_iva_como_el_sii():
+    from licita.planes import monto
+
+    for plan, periodicidad, fundador in (("pyme", "mensual", False), ("pro", "mensual", False), ("pro", "mensual", True),
+                                         ("pro", "anual", False), ("pro", "anual", True)):
+        total = monto(plan, periodicidad, fundador=fundador)
+        neto, iva = facturas.desglose_iva(total)
+        assert neto + iva == total and iva == facturas.iva_de(neto)
+    # $215.900 no tiene un neto exacto: se usa el más cercano sin pasarse.
+    assert facturas.desglose_iva(215_900) == (181_428, 34_471)

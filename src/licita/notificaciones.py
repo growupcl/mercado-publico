@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .db import Empresa, MensajeWhatsApp, ahora
+from .plantillas_whatsapp import PAYLOADS_RESUMEN, PLANTILLAS, RESUMEN_DIARIO
 from .resumen import Fila, formato_cierre, marcar_enviados, seleccionar_calces, texto_resumen
 from .whatsapp import ClienteWhatsApp, ErrorWhatsApp, normalizar_telefono
 
@@ -36,11 +37,16 @@ def ventana_abierta(empresa: Empresa, momento: datetime) -> bool:
     return empresa.ultimo_mensaje_entrante is not None and momento - empresa.ultimo_mensaje_entrante < VENTANA
 
 
-def parametros_plantilla(empresa: Empresa, filas: list[Fila]) -> list[str]:
-    """Variables de la plantilla 'resumen_diario_licitaciones' (ver docs/whatsapp.md)."""
+def parametros_plantilla(empresa: Empresa, filas: list[Fila], plantilla: str = RESUMEN_DIARIO.nombre) -> list[str]:
+    """Variables del resumen diario. La plantilla de respaldo usa solo las primeras."""
     calce, lic = filas[0]
     cantidad = "1 licitación nueva" if len(filas) == 1 else f"{len(filas)} licitaciones nuevas"
-    return [empresa.nombre, cantidad, lic.nombre, str(calce.puntaje), formato_cierre(lic)]
+    todas = [empresa.nombre, cantidad, lic.nombre, str(calce.puntaje), formato_cierre(lic)]
+    return todas[: PLANTILLAS[plantilla].variables] if plantilla in PLANTILLAS else todas
+
+
+def payloads_resumen(plantilla: str, codigo: str) -> list[str]:
+    return [p.format(codigo=codigo) for p in PAYLOADS_RESUMEN.get(plantilla, PAYLOADS_RESUMEN[RESUMEN_DIARIO.nombre])]
 
 
 def registrar(session: Session, empresa: Empresa | None, telefono: str, direccion: str, tipo: str, contenido: str, wamid: str = "") -> None:
@@ -78,10 +84,10 @@ def enviar_resumenes(
                 registrar(session, empresa, empresa.whatsapp, "saliente", "texto", texto, wamid)
                 resultado.textos += 1
             else:
-                parametros = parametros_plantilla(empresa, filas)
+                parametros = parametros_plantilla(empresa, filas, plantilla)
                 wamid = wa.enviar_plantilla(
                     empresa.whatsapp, plantilla, idioma=idioma, parametros=parametros,
-                    payloads_botones=["VER_TODAS", f"DETALLE:{filas[0][1].codigo}"],
+                    payloads_botones=payloads_resumen(plantilla, filas[0][1].codigo),
                 )
                 registrar(session, empresa, empresa.whatsapp, "saliente", "plantilla", " | ".join(parametros), wamid)
                 resultado.plantillas += 1

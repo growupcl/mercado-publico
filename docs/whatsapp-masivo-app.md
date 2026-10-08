@@ -79,35 +79,14 @@ Como cliente de un Tech Provider, Calza le paga **directo a Meta**:
 1. En **WhatsApp Manager** del portafolio de Calza → Configuración de pagos, agrega la tarjeta de Calza SpA.
 2. Los cargos (unos US$0,02 por plantilla utility en Chile) quedan a nombre de Calza, sin pasar por Masivo App.
 
-## Paso 4. Crear la plantilla del resumen diario
+## Paso 4. Enviar las plantillas a revisión
 
-Las plantillas son de la cuenta de Calza. Créala desde WhatsApp Manager (Plantillas de mensajes → Crear) o por la API:
+Meta demora cerca de 24 a 36 horas en aprobarlas, así que envíalas **hoy mismo**, todas juntas. El detalle de cada
+plantilla está en [plantillas-whatsapp.md](plantillas-whatsapp.md). Con `WHATSAPP_TOKEN` y `WHATSAPP_WABA_ID` en el `.env`:
 
 ```bash
-curl -X POST "https://graph.facebook.com/v23.0/$WABA_ID/message_templates" \
-  -H "Authorization: Bearer $WHATSAPP_TOKEN" -H "Content-Type: application/json" \
-  -d '{
-    "name": "resumen_diario_licitaciones",
-    "language": "es",
-    "category": "UTILITY",
-    "components": [
-      {
-        "type": "BODY",
-        "text": "Hola {{1}}, hoy encontramos {{2}} que calzan con tu negocio. La mejor: {{3}} ({{4}}% de calce), cierra el {{5}}. Toca un botón para ver el detalle.",
-        "example": {"body_text": [["Aseo Sur", "3 licitaciones nuevas", "Adquisición de insumos de aseo para CESFAM", "92", "20-10-2026 15:00"]]}
-      },
-      {
-        "type": "BUTTONS",
-        "buttons": [
-          {"type": "QUICK_REPLY", "text": "Ver todas"},
-          {"type": "QUICK_REPLY", "text": "Ver la mejor"}
-        ]
-      }
-    ]
-  }'
+docker compose exec app licita whatsapp-plantillas --crear
 ```
-
-Mantén la plantilla **informativa**, sin promociones ni invitaciones a pagar. Si Meta la reclasifica como *marketing*, cuesta unas 4 veces más.
 
 ## Paso 5. Webhook: que los mensajes de Calza lleguen a Calza
 
@@ -162,6 +141,7 @@ Con cualquiera de las dos, Calza **ignora los mensajes dirigidos a otros número
 |---|---|
 | `WHATSAPP_TOKEN` | Token de integración del negocio de Calza (paso 2) |
 | `WHATSAPP_PHONE_NUMBER_ID` | ID del número de Calza (paso 2) |
+| `WHATSAPP_WABA_ID` | ID de la cuenta de WhatsApp Business de Calza (paso 2) |
 | `WHATSAPP_APP_SECRET` | App secret de la app de Masivo App (webhook propio) o el secreto compartido (reenvío) |
 | `WHATSAPP_VERIFY_TOKEN` | Un texto secreto que tú inventas, el mismo que usaste en el paso 5 |
 | `WHATSAPP_PLANTILLA_RESUMEN` | `resumen_diario_licitaciones` |

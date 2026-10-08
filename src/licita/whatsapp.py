@@ -84,6 +84,21 @@ class ClienteWhatsApp:
             raise ErrorWhatsApp(f"No se pudo descargar el archivo (HTTP {archivo.status_code})")
         return archivo.content, datos.get("mime_type", "")
 
+    def crear_plantilla(self, waba_id: str, definicion: dict[str, Any]) -> dict[str, Any]:
+        """Envía una plantilla a revisión de Meta. Devuelve {"id", "status", "category"}."""
+        try:
+            r = self._http.post(f"{self._url_base}/{waba_id}/message_templates", json=definicion, headers=self._headers)
+        except httpx.TransportError as e:
+            raise ErrorWhatsApp(f"Error de red al crear la plantilla: {e}") from e
+        if r.status_code >= 400:
+            try:
+                error = r.json().get("error", {})
+                detalle = error.get("error_user_msg") or error.get("message")
+            except ValueError:
+                detalle = r.text[:200]
+            raise ErrorWhatsApp(f"Meta rechazó la plantilla {definicion.get('name')}: {detalle}")
+        return r.json()
+
     def enviar_texto(self, telefono: str, texto: str) -> str:
         """Texto libre. Solo funciona dentro de la ventana de 24 h (y ahí es gratis)."""
         return self._enviar({

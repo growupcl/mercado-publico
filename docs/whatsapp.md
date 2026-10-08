@@ -43,20 +43,10 @@ Resultado: como máximo **una plantilla pagada al día por usuario**. Todo lo de
    - Suscribirse al campo **messages**.
 7. Crear y enviar a aprobación la plantilla de abajo.
 
-## Plantilla del resumen diario
+## Plantillas
 
-- **Nombre:** `resumen_diario_licitaciones`
-- **Categoría:** Utility
-- **Idioma:** Español (`es`)
-- **Cuerpo:**
-
-  > Hola {{1}}, hoy encontramos {{2}} que calzan con tu negocio. La mejor: {{3}} ({{4}}% de calce), cierra el {{5}}. Toca un botón para ver el detalle.
-
-  Ejemplos para la revisión de Meta: `Aseo Sur` · `3 licitaciones nuevas` · `Adquisición de insumos de aseo para CESFAM` · `92` · `20-10-2026 15:00`
-
-- **Botones (respuesta rápida):** `Ver todas` · `Ver la mejor`
-
-Importante: la plantilla tiene que ser **informativa** (avisos que el usuario pidió). Si incluye promociones o invitaciones a pagar un plan, Meta la reclasifica como *marketing*, que cuesta unas 4 veces más. Esos mensajes van por correo.
+Calza usa cuatro plantillas fijas que se envían a revisión todas juntas, una sola vez:
+ver [plantillas-whatsapp.md](plantillas-whatsapp.md) (`licita whatsapp-plantillas --crear`).
 
 ## Envío diario
 

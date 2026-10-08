@@ -9,6 +9,7 @@ class Config:
     modelo_clasificacion: str
     whatsapp_token: str = ""
     whatsapp_phone_number_id: str = ""
+    whatsapp_waba_id: str = ""
     whatsapp_verify_token: str = ""
     whatsapp_app_secret: str = ""
     whatsapp_api_version: str = "v23.0"
@@ -32,6 +33,7 @@ class Config:
             modelo_clasificacion=os.environ.get("LICITA_MODELO_CLASIFICACION", "claude-haiku-4-5"),
             whatsapp_token=os.environ.get("WHATSAPP_TOKEN", ""),
             whatsapp_phone_number_id=os.environ.get("WHATSAPP_PHONE_NUMBER_ID", ""),
+            whatsapp_waba_id=os.environ.get("WHATSAPP_WABA_ID", ""),
             whatsapp_verify_token=os.environ.get("WHATSAPP_VERIFY_TOKEN", ""),
             whatsapp_app_secret=os.environ.get("WHATSAPP_APP_SECRET", ""),
             whatsapp_api_version=os.environ.get("WHATSAPP_API_VERSION", "v23.0"),

@@ -201,6 +201,31 @@ def cmd_reconstruir_precios(args, config: Config, Sesion) -> int:
     return 0
 
 
+def cmd_whatsapp_plantillas(args, config: Config, Sesion) -> int:
+    import json
+
+    from .plantillas_whatsapp import PLANTILLAS
+
+    seleccion = [PLANTILLAS[n] for n in args.nombres] if args.nombres else list(PLANTILLAS.values())
+    if not args.crear:
+        for p in seleccion:
+            print(f"# {p.nombre}: {p.uso}")
+            print(json.dumps(p.definicion_meta(config.whatsapp_idioma), ensure_ascii=False, indent=2), end="\n\n")
+        print("Para enviarlas a revisión de Meta: licita whatsapp-plantillas --crear")
+        return 0
+    if not config.whatsapp_waba_id:
+        raise SystemExit("Falta WHATSAPP_WABA_ID (ID de la cuenta de WhatsApp Business de Calza).")
+    wa, errores = _whatsapp(config), 0
+    for p in seleccion:
+        try:
+            r = wa.crear_plantilla(config.whatsapp_waba_id, p.definicion_meta(config.whatsapp_idioma))
+            print(f"✓ {p.nombre}: {r.get('status', 'enviada')} (categoría {r.get('category', 'UTILITY')})")
+        except ErrorWhatsApp as e:
+            errores += 1
+            print(f"✗ {e}")
+    return 1 if errores else 0
+
+
 def cmd_servidor(args, config: Config, Sesion) -> int:
     import uvicorn
 
@@ -304,6 +329,11 @@ def construir_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("suscripciones", help="Vence las suscripciones impagas y lista las que están por vencer")
     s.add_argument("--dias", type=int, default=3, help="Días de anticipación para listar las por vencer")
     s.set_defaults(fn=cmd_suscripciones)
+
+    s = sub.add_parser("whatsapp-plantillas", help="Muestra las plantillas de WhatsApp o las envía a revisión de Meta")
+    s.add_argument("--crear", action="store_true", help="Enviarlas a revisión (requiere WHATSAPP_WABA_ID)")
+    s.add_argument("nombres", nargs="*", help="Solo estas plantillas (por defecto, todas)")
+    s.set_defaults(fn=cmd_whatsapp_plantillas)
 
     s = sub.add_parser("whatsapp-enviar", help="Envía el resumen diario por WhatsApp a todas las empresas")
     s.add_argument("--umbral", type=int, default=60, help="Puntaje mínimo de calce")

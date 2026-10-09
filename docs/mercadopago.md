@@ -48,6 +48,8 @@ facturas (`LICITA_PRESTADOR=Virtus SpA`). Cuando exista Calza SpA, basta cambiar
 
 ## Puntos a confirmar en la prueba
 
-- Mercado Pago puede pedirle al cliente **iniciar sesión o crear una cuenta** para suscribirse, y exigir que el correo
-  de esa cuenta coincida con el informado. Si eso genera fricción, se puede agregar un pago único (Checkout Pro) como alternativa.
+- Mercado Pago exige que el cliente **inicie sesión** y que el correo de esa cuenta **coincida** con el de la suscripción
+  ("Tu e-mail no coincide con el de la suscripción"). Por eso "Mi cuenta" pide el correo de la cuenta de Mercado Pago
+  (por defecto, el de la empresa), y `licita mp-prueba` acepta `--email`. Si aun así genera fricción, se puede agregar un
+  pago único (Checkout Pro) como alternativa.
 - La comisión de la cuenta: actualizarla en el modelo financiero (hoy supone 3,5%).

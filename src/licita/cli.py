@@ -320,7 +320,8 @@ def cmd_mp_prueba(args, config: Config, Sesion) -> int:
         if empresa is None:
             raise ValueError(f"No existe la empresa #{args.empresa}.")
         url = iniciar_suscripcion(s, empresa, ClienteMercadoPago(config.mercadopago_access_token), plan="pyme",
-                                  periodicidad="mensual", url_publica=config.url_publica, monto_prueba=args.monto)
+                                  periodicidad="mensual", url_publica=config.url_publica, monto_prueba=args.monto,
+                                  email_pagador=args.email)
     print(f"Suscripción de prueba de ${args.monto:,} mensual para #{empresa.id} {empresa.nombre} (cobra hoy).".replace(",", "."))
     print(f"Abre este enlace para pagar con tu tarjeta:\n{url}")
     print("Después: cancela la renovación desde \"Mi cuenta\", devuelve el pago desde la actividad de Mercado Pago y "
@@ -559,6 +560,7 @@ def construir_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("mp-prueba", help="Crea una suscripción de prueba de bajo monto que cobra hoy (para probar Mercado Pago)")
     s.add_argument("--empresa", type=int, required=True, help="ID de la empresa de prueba")
     s.add_argument("--monto", type=int, default=1000, help="Monto en pesos (entre 500 y 5.000)")
+    s.add_argument("--email", help="Correo de tu cuenta de Mercado Pago (por defecto, el de la empresa)")
     s.set_defaults(fn=cmd_mp_prueba)
 
     s = sub.add_parser("indexnow", help="Avisa a Bing y otros buscadores (IndexNow) las licitaciones recién publicadas")

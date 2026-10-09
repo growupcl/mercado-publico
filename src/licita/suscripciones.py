@@ -185,9 +185,12 @@ def cotizar(session: Session, suscripcion: Suscripcion, plan: str, periodicidad:
 
 def iniciar_suscripcion(
     session: Session, empresa: Empresa, mp: ClienteMercadoPago, *, plan: str, periodicidad: str, url_publica: str,
-    momento: datetime | None = None, monto_prueba: int | None = None,
+    momento: datetime | None = None, monto_prueba: int | None = None, email_pagador: str | None = None,
 ) -> str:
     """Crea la suscripción en Mercado Pago y devuelve la URL donde el cliente ingresa su tarjeta.
+
+    email_pagador: correo de la cuenta de Mercado Pago con que pagará (Mercado Pago rechaza el pago si no coincide);
+    por defecto, el correo de la empresa.
 
     monto_prueba (solo desde la línea de comandos, `licita mp-prueba`): cobra ese monto de inmediato, sin esperar el
     fin de la prueba, para probar un cobro real de punta a punta sin pagar el precio del plan.
@@ -212,7 +215,7 @@ def iniciar_suscripcion(
         inicio, motivo = None, "Calza prueba de cobro"
     creada = mp.crear_suscripcion(
         referencia=mandato.referencia, motivo=motivo,
-        email=empresa.email, monto=valor, meses=PERIODICIDADES[periodicidad],
+        email=email_pagador or empresa.email, monto=valor, meses=PERIODICIDADES[periodicidad],
         url_retorno=f"{url_publica}/pagos/mercadopago/retorno", inicio=inicio,
     )
     mandato.mp_id = creada.id

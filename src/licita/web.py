@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
@@ -36,6 +37,7 @@ plantillas.env.globals["regiones_publicas"] = REGIONES_PUBLICAS
 plantillas.env.globals["rubros_publicos"] = RUBROS
 
 
+EMAIL_VALIDO = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
 MESES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre",
          "noviembre", "diciembre")
 
@@ -157,7 +159,13 @@ def crear_router_web(
             })
 
     @router.post("/cuenta/{token}/suscribir")
-    def suscribir(request: Request, token: str, plan: str = Form(...), periodicidad: str = Form(...)):
+    def suscribir(request: Request, token: str, opcion: str = Form(""), plan: str = Form(""), periodicidad: str = Form(""),
+                  email_mp: str = Form("")):
+        if opcion:
+            plan, _, periodicidad = opcion.partition(":")
+        email_mp = email_mp.strip().lower()
+        if email_mp and not EMAIL_VALIDO.fullmatch(email_mp):
+            return mensaje(request, "Correo no válido", "Vuelve a tu cuenta y revisa el correo de Mercado Pago.", estado=400)
         if mp is None:
             return mensaje(request, "Pagos no disponibles", "Todavía no podemos recibir pagos en línea. Escríbenos a hola@calza.cl.", estado=503)
         with Sesion() as s:
@@ -165,7 +173,8 @@ def crear_router_web(
             if empresa is None:
                 return mensaje(request, "Enlace no válido", "Escribe CUENTA a Calza por WhatsApp para recibir un enlace nuevo.", estado=404)
             try:
-                url = iniciar_suscripcion(s, empresa, mp, plan=plan, periodicidad=periodicidad, url_publica=url_publica)
+                url = iniciar_suscripcion(s, empresa, mp, plan=plan, periodicidad=periodicidad, url_publica=url_publica,
+                                          email_pagador=email_mp or None)
             except ValueError:
                 return mensaje(request, "Plan no válido", "Vuelve a tu cuenta y elige uno de los planes.", estado=400)
             except ErrorMercadoPago as e:

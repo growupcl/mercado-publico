@@ -37,20 +37,25 @@
   <p class="muted">Suscripción con cobro automático mensual o anual, con tarjeta de crédito o débito a través de Mercado Pago. Puedes cancelar cuando quieras.
   {% if suscripcion.estado != "vencida" %}No te cobramos nada hasta el {{ vigente_hasta }}.{% endif %} Precios con IVA.</p>
   {% if not pagos_activos %}<p class="aviso">Los pagos en línea todavía no están habilitados. Escríbenos a hola@calza.cl.</p>{% endif %}
+  <form method="post" action="/cuenta/{{ token }}/suscribir" class="pila">
+  <div style="max-width:520px">
+    <label for="email_mp">Correo de tu cuenta de Mercado Pago</label>
+    <input type="email" id="email_mp" name="email_mp" value="{{ empresa.email }}" required maxlength="254">
+    <p class="ayuda">Mercado Pago solo acepta el pago si inicias sesión con una cuenta que tenga este mismo correo. Si tu cuenta de Mercado Pago usa otro, cámbialo aquí.</p>
+  </div>
   <div class="rejilla dos">
     {% for o in opciones %}
-    <form method="post" action="/cuenta/{{ token }}/suscribir" class="tarjeta pila plan">
-      <input type="hidden" name="plan" value="{{ o.plan }}">
-      <input type="hidden" name="periodicidad" value="{{ o.periodicidad }}">
+    <div class="tarjeta pila plan">
       <h3>{{ o.nombre }} · {{ o.periodicidad }}</h3>
       <div class="precio">{{ fmt(o.monto) }} <small>/ {% if o.periodicidad == "anual" %}año{% else %}mes{% endif %}</small></div>
       {% if o.fundador %}<p class="ayuda">Precio fundador: se mantiene mientras sigas con Calza.</p>{% endif %}
       {% if o.periodicidad == "anual" %}<p class="ayuda">Equivale a {{ fmt(o.monto / 12) }} al mes.</p>{% endif %}
       {% if o.actual %}<div><span class="chip ok">Tu plan actual</span></div>
-      {% else %}<div><button class="boton" type="submit" {% if not pagos_activos %}disabled{% endif %}>{% if mandato %}Cambiar a este plan{% else %}Suscribirme{% endif %}</button></div>{% endif %}
-    </form>
+      {% else %}<div><button class="boton" type="submit" name="opcion" value="{{ o.plan }}:{{ o.periodicidad }}" {% if not pagos_activos %}disabled{% endif %}>{% if mandato %}Cambiar a este plan{% else %}Suscribirme{% endif %}</button></div>{% endif %}
+    </div>
     {% endfor %}
   </div>
+  </form>
 
   {% if pagos %}
   <h2>Pagos</h2>

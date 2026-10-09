@@ -185,14 +185,20 @@ def cotizar(session: Session, suscripcion: Suscripcion, plan: str, periodicidad:
 
 def iniciar_suscripcion(
     session: Session, empresa: Empresa, mp: ClienteMercadoPago, *, plan: str, periodicidad: str, url_publica: str,
-    momento: datetime | None = None,
+    momento: datetime | None = None, monto_prueba: int | None = None,
 ) -> str:
-    """Crea la suscripción en Mercado Pago y devuelve la URL donde el cliente ingresa su tarjeta."""
+    """Crea la suscripción en Mercado Pago y devuelve la URL donde el cliente ingresa su tarjeta.
+
+    monto_prueba (solo desde la línea de comandos, `licita mp-prueba`): cobra ese monto de inmediato, sin esperar el
+    fin de la prueba, para probar un cobro real de punta a punta sin pagar el precio del plan.
+    """
     momento = momento or ahora()
     if plan not in PLANES or periodicidad not in PERIODICIDADES:
         raise ValueError("Plan o periodicidad no válidos.")
     suscripcion = suscripcion_de(session, empresa)
     valor, fundador = cotizar(session, suscripcion, plan, periodicidad)
+    if monto_prueba is not None:
+        valor, fundador = monto_prueba, False
     mandato = MandatoPago(
         empresa_id=empresa.id, plan=plan, periodicidad=periodicidad, monto=valor, precio_fundador=fundador,
         referencia=f"CALZA-{empresa.id}-{secrets.token_hex(4).upper()}",
@@ -201,8 +207,11 @@ def iniciar_suscripcion(
     session.flush()
     # Si aún le quedan días (prueba o período pagado), el primer cobro es cuando terminen.
     inicio = suscripcion.vigente_hasta if suscripcion.vigente_hasta > momento + timedelta(hours=1) else None
+    motivo = f"Calza plan {PLANES[plan].nombre} {periodicidad}"
+    if monto_prueba is not None:
+        inicio, motivo = None, "Calza prueba de cobro"
     creada = mp.crear_suscripcion(
-        referencia=mandato.referencia, motivo=f"Calza plan {PLANES[plan].nombre} {periodicidad}",
+        referencia=mandato.referencia, motivo=motivo,
         email=empresa.email, monto=valor, meses=PERIODICIDADES[periodicidad],
         url_retorno=f"{url_publica}/pagos/mercadopago/retorno", inicio=inicio,
     )

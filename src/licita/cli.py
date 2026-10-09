@@ -306,6 +306,28 @@ def cmd_suscripciones(args, config: Config, Sesion) -> int:
     return 0
 
 
+def cmd_mp_prueba(args, config: Config, Sesion) -> int:
+    from .db import Empresa
+    from .mercadopago import ClienteMercadoPago
+    from .suscripciones import iniciar_suscripcion
+
+    if not config.mercadopago_access_token:
+        raise ValueError("Configura MERCADOPAGO_ACCESS_TOKEN en .env (ver docs/mercadopago.md).")
+    if not 500 <= args.monto <= 5000:
+        raise ValueError("El monto de prueba debe estar entre $500 y $5.000.")
+    with Sesion() as s:
+        empresa = s.get(Empresa, args.empresa)
+        if empresa is None:
+            raise ValueError(f"No existe la empresa #{args.empresa}.")
+        url = iniciar_suscripcion(s, empresa, ClienteMercadoPago(config.mercadopago_access_token), plan="pyme",
+                                  periodicidad="mensual", url_publica=config.url_publica, monto_prueba=args.monto)
+    print(f"Suscripción de prueba de ${args.monto:,} mensual para #{empresa.id} {empresa.nombre} (cobra hoy).".replace(",", "."))
+    print(f"Abre este enlace para pagar con tu tarjeta:\n{url}")
+    print("Después: cancela la renovación desde \"Mi cuenta\", devuelve el pago desde la actividad de Mercado Pago y "
+          "saca el cobro de las facturas pendientes con `licita facturas --emitida PAGO_ID --folio PRUEBA`.")
+    return 0
+
+
 def cmd_facturas(args, config: Config, Sesion) -> int:
     from . import facturas
 
@@ -533,6 +555,11 @@ def construir_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("limpiar", help="Borra Compras Ágiles cerradas hace tiempo que no le sirvieron a ningún cliente")
     s.add_argument("--dias", type=int, default=60, help="Antigüedad mínima desde el cierre")
     s.set_defaults(fn=cmd_limpiar)
+
+    s = sub.add_parser("mp-prueba", help="Crea una suscripción de prueba de bajo monto que cobra hoy (para probar Mercado Pago)")
+    s.add_argument("--empresa", type=int, required=True, help="ID de la empresa de prueba")
+    s.add_argument("--monto", type=int, default=1000, help="Monto en pesos (entre 500 y 5.000)")
+    s.set_defaults(fn=cmd_mp_prueba)
 
     s = sub.add_parser("indexnow", help="Avisa a Bing y otros buscadores (IndexNow) las licitaciones recién publicadas")
     s.add_argument("--horas", type=float, default=3, help="Publicadas en las últimas N horas")

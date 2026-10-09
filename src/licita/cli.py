@@ -28,6 +28,7 @@ from .db import Empresa, crear_sesiones
 from .analisis import DocumentoInvalido, LimiteAlcanzado
 from .correo import ErrorCorreo
 from .mercadopago import ErrorMercadoPago
+from .planes import formato_pesos
 from .ia import ErrorIA
 from .mercadopublico import MercadoPublicoError
 from .whatsapp import ErrorWhatsApp, normalizar_telefono
@@ -322,7 +323,7 @@ def cmd_mp_prueba(args, config: Config, Sesion) -> int:
         url = iniciar_suscripcion(s, empresa, ClienteMercadoPago(config.mercadopago_access_token), plan="pyme",
                                   periodicidad="mensual", url_publica=config.url_publica, monto_prueba=args.monto,
                                   email_pagador=args.email)
-    print(f"Suscripción de prueba de ${args.monto:,} mensual para #{empresa.id} {empresa.nombre} (cobra hoy).".replace(",", "."))
+    print(f"Suscripción de prueba de {formato_pesos(args.monto)} mensual para #{empresa.id} {empresa.nombre} (cobra hoy).")
     print(f"Abre este enlace para pagar con tu tarjeta:\n{url}")
     print("Después: cancela la renovación desde \"Mi cuenta\", devuelve el pago desde la actividad de Mercado Pago y "
           "saca el cobro de las facturas pendientes con `licita facturas --sin-factura PAGO_ID`.")
@@ -336,7 +337,7 @@ def cmd_facturas(args, config: Config, Sesion) -> int:
         if args.sin_factura is not None:
             pago = facturas.marcar_sin_factura(s, args.sin_factura)
             s.commit()
-            print(f"Pago #{pago.id} (${pago.monto:,}) fuera de las facturas pendientes, sin folio.".replace(",", "."))
+            print(f"Pago #{pago.id} ({formato_pesos(pago.monto)}) fuera de las facturas pendientes, sin folio.")
             return 0
         if args.emitida is not None:
             if not args.folio:

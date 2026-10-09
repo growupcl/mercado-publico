@@ -433,3 +433,17 @@ def test_registro_listo_sin_whatsapp_no_pide_saludar(Sesion):
     assert "salúdanos por WhatsApp" not in r.text and "hola@calza.cl" in r.text
     assert "Pro mensual" in r.text  # FORM elige Pro: precio fundador
     assert "$39.990" in r.text
+
+
+def test_suscribir_con_correo_de_mercado_pago_distinto(web):
+    """Mercado Pago rechaza el pago si el correo de la cuenta con que se paga no coincide con el de la suscripción."""
+    cliente, _, mp = web
+    _, token = _registrar(cliente)
+    pagina = cliente.get(f"/cuenta/{token}").text
+    assert 'name="email_mp" value="contacto@aseosur.cl"' in pagina and 'value="pyme:mensual"' in pagina
+    r = cliente.post(f"/cuenta/{token}/suscribir", data={"opcion": "pyme:mensual", "email_mp": " Marco@Gmail.com "},
+                     follow_redirects=False)
+    assert r.status_code == 303
+    assert mp.creadas[-1]["email"] == "marco@gmail.com"
+    r = cliente.post(f"/cuenta/{token}/suscribir", data={"opcion": "pyme:mensual", "email_mp": "no-es-correo"})
+    assert r.status_code == 400

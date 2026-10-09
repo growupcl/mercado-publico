@@ -6,6 +6,7 @@ from urllib.parse import parse_qs
 
 import httpx
 import pytest
+from sqlalchemy import select
 from fastapi.testclient import TestClient
 
 from licita import facturas
@@ -399,3 +400,20 @@ def test_webhook_de_recurso_inexistente_responde_ok(web):
 
     mp.obtener_suscripcion = caida
     assert _aviso(cliente, "subscription_preapproval", "123456").status_code == 502  # Mercado Pago reintentará
+
+
+def test_suscripcion_de_prueba_cobra_hoy_un_monto_bajo(web):
+    cliente, Sesion, mp = web
+    cliente.post("/registro", data=FORM)
+    with Sesion() as s:
+        from licita.db import Empresa
+        from licita.suscripciones import iniciar_suscripcion
+
+        empresa = s.scalars(select(Empresa)).one()
+        url = iniciar_suscripcion(s, empresa, mp, plan="pyme", periodicidad="mensual", url_publica="https://calza.cl",
+                                  monto_prueba=1000)
+        mandato = s.scalars(select(MandatoPago)).one()
+    assert url.startswith("https://www.mercadopago.cl/")
+    assert mp.creadas[-1]["monto"] == 1000 and mp.creadas[-1]["inicio"] is None  # cobra hoy, aunque esté en prueba
+    assert mp.creadas[-1]["motivo"] == "Calza prueba de cobro"
+    assert (mandato.monto, mandato.precio_fundador) == (1000, False)

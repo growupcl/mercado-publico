@@ -25,7 +25,13 @@ URL_API = "https://api.mercadopago.com"
 
 
 class ErrorMercadoPago(Exception):
-    pass
+    def __init__(self, mensaje: str, *, estado_http: int | None = None) -> None:
+        super().__init__(mensaje)
+        self.estado_http = estado_http
+
+    @property
+    def no_existe(self) -> bool:
+        return self.estado_http == 404
 
 
 @dataclass
@@ -84,9 +90,10 @@ class ClienteMercadoPago:
         try:
             datos = r.json()
         except ValueError:
-            raise ErrorMercadoPago(f"Mercado Pago respondió HTTP {r.status_code} sin JSON")
+            raise ErrorMercadoPago(f"Mercado Pago respondió HTTP {r.status_code} sin JSON", estado_http=r.status_code)
         if r.status_code >= 400:
-            raise ErrorMercadoPago(f"Mercado Pago respondió HTTP {r.status_code}: {datos.get('message') or datos}")
+            raise ErrorMercadoPago(f"Mercado Pago respondió HTTP {r.status_code}: {datos.get('message') or datos}",
+                                   estado_http=r.status_code)
         return datos
 
     @staticmethod

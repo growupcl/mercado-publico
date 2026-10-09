@@ -12,7 +12,7 @@ from licita import facturas
 from licita import rut as rutlib
 from licita.conversacion import procesar_webhook
 from licita.db import Empresa, MandatoPago, Pago, Suscripcion, ahora
-from licita.mercadopago import ClienteMercadoPago, CobroMP, SuscripcionMP, verificar_firma
+from licita.mercadopago import ClienteMercadoPago, CobroMP, ErrorMercadoPago, SuscripcionMP, verificar_firma
 from licita.ia import ErrorIA, PerfilExtraido
 from licita.notificaciones import enviar_resumenes
 from licita.planes import monto
@@ -381,3 +381,21 @@ def test_desglose_de_iva_como_el_sii():
         assert neto + iva == total and iva == facturas.iva_de(neto)
     # Un monto sin neto exacto (como el antiguo $215.900): se usa el más cercano sin pasarse.
     assert facturas.desglose_iva(215_900) == (181_428, 34_471)
+
+
+def test_webhook_de_recurso_inexistente_responde_ok(web):
+    """La notificación de prueba del panel de Mercado Pago trae un ID inventado: no hay que pedir reintentos."""
+    cliente, _, mp = web
+
+    def no_existe(mp_id):
+        raise ErrorMercadoPago("Mercado Pago respondió HTTP 404: not found", estado_http=404)
+
+    mp.obtener_suscripcion = no_existe
+    r = _aviso(cliente, "subscription_preapproval", "123456")
+    assert r.status_code == 200
+
+    def caida(mp_id):
+        raise ErrorMercadoPago("Mercado Pago respondió HTTP 500", estado_http=500)
+
+    mp.obtener_suscripcion = caida
+    assert _aviso(cliente, "subscription_preapproval", "123456").status_code == 502  # Mercado Pago reintentará

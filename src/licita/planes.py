@@ -21,13 +21,13 @@ PLANES = {
     "pyme": Plan("pyme", "Pyme", 19_990, (
         "Resumen diario por WhatsApp con las licitaciones que te calzan",
         "Detalle de cada licitación y puntaje de calce",
-        "Análisis de bases en PDF (hasta 15 al mes)",
+        "Análisis de bases en PDF o Word (hasta 15 al mes)",
     )),
     "pro": Plan("pro", "Pro", 59_990, (
         "Todo lo del plan Pyme",
         "Precios de referencia y quién suele ganar",
         "Alertas urgentes de Compra Ágil",
-        "Análisis de bases en PDF (hasta 50 al mes)",
+        "Análisis de bases en PDF o Word (hasta 50 al mes)",
     )),
 }
 PRECIO_FUNDADOR_PRO = 39_990

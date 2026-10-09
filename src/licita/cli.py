@@ -427,6 +427,22 @@ def cmd_limpiar(args, config: Config, Sesion) -> int:
     return 0
 
 
+def cmd_indexnow(args, config: Config, Sesion) -> int:
+    from .publico import cargar_abiertas, recientes
+    from .sitio import avisar_indexnow
+
+    if not config.url_publica.startswith("https://"):
+        print("IndexNow necesita LICITA_URL_PUBLICA con https; no se avisó nada.")
+        return 0
+    with Sesion() as s:
+        nuevas = recientes(cargar_abiertas(s), dias=args.horas / 24)
+    base = config.url_publica
+    urls = [f"{base}/", f"{base}/licitaciones"] + [f"{base}/licitacion/{f.codigo}" for f in nuevas]
+    n = avisar_indexnow(base, urls)
+    print(f"IndexNow: {n} URL avisadas ({len(nuevas)} licitaciones nuevas).")
+    return 0
+
+
 def construir_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="licita", description="Copiloto de licitaciones de Mercado Público")
     sub = p.add_subparsers(dest="comando", required=True)
@@ -517,6 +533,10 @@ def construir_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("limpiar", help="Borra Compras Ágiles cerradas hace tiempo que no le sirvieron a ningún cliente")
     s.add_argument("--dias", type=int, default=60, help="Antigüedad mínima desde el cierre")
     s.set_defaults(fn=cmd_limpiar)
+
+    s = sub.add_parser("indexnow", help="Avisa a Bing y otros buscadores (IndexNow) las licitaciones recién publicadas")
+    s.add_argument("--horas", type=float, default=3, help="Publicadas en las últimas N horas")
+    s.set_defaults(fn=cmd_indexnow)
 
     s = sub.add_parser("migrar", help="Aplica las migraciones pendientes de la base de datos")
     s.add_argument("--nueva", metavar="MENSAJE", help="Genera una migración nueva a partir de los cambios en los modelos")

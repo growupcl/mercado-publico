@@ -1,6 +1,12 @@
 # Caddy obtiene y renueva solo los certificados HTTPS (Let's Encrypt).
 {$DOMINIO} {
-	encode gzip
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
 	reverse_proxy app:8000
 }
 

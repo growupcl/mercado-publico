@@ -1,0 +1,38 @@
+{% macro cierre(f) -%}
+{%- set d = f.dias_para_cierre() -%}
+{%- if d is none %}sin fecha de cierre{% elif d <= 0 %}cierra hoy, {{ f.fecha_cierre.strftime("%H:%M") }}{% elif d == 1 %}cierra mañana, {{ f.fecha_cierre.strftime("%H:%M") }}{% else %}cierra el {{ f.fecha_cierre.strftime("%d-%m-%Y") }} ({{ d }} días){% endif -%}
+{%- endmacro %}
+
+{% macro tarjeta_lic(f) -%}
+<li class="tarjeta lic pila" style="gap:8px;padding:18px 20px">
+  <div class="chips">
+    {% if f.es_compra_agil %}<span class="chip oro">Compra Ágil</span>{% else %}<span class="chip">Licitación</span>{% endif %}
+    {% set d = f.dias_para_cierre() %}{% if d is not none and d <= 1 %}<span class="chip error">{{ "Cierra hoy" if d <= 0 else "Cierra mañana" }}</span>{% endif %}
+  </div>
+  <h3><a href="/licitacion/{{ f.codigo }}">{{ f.nombre }}</a></h3>
+  <div class="meta">
+    {% if f.organismo %}<span>{{ f.organismo }}</span>{% endif %}
+    {% if f.region %}<span>{{ f.region }}</span>{% endif %}
+    {% if f.monto_estimado %}<span>Monto estimado: {{ fmt(f.monto_estimado) }}{% if f.moneda and f.moneda != "CLP" %} {{ f.moneda }}{% endif %}</span>{% endif %}
+    <span>{{ cierre(f) }}</span>
+  </div>
+</li>
+{%- endmacro %}
+
+{% macro migas(items) -%}
+<nav class="migas" aria-label="Ruta"><a href="/">Inicio</a>{% for nombre, url in items %} <span aria-hidden="true">›</span> {% if loop.last %}<span aria-current="page">{{ nombre }}</span>{% else %}<a href="{{ url }}">{{ nombre }}</a>{% endif %}{% endfor %}</nav>
+<script type="application/ld+json">{{ migas_ld(items) | tojson }}</script>
+{%- endmacro %}
+
+{% macro buscador(q="", region_actual=none, regiones=[], autofocus=false) -%}
+<form class="buscador" action="/buscar" method="get" role="search">
+  <label class="sr" for="q">¿Qué vende tu empresa?</label>
+  <input type="text" id="q" name="q" value="{{ q }}" maxlength="300" placeholder="Ej.: artículos de aseo, guantes, bolsas de basura" {% if autofocus %}autofocus{% endif %} required>
+  <label class="sr" for="region">Región</label>
+  <select id="region" name="region" style="width:auto">
+    <option value="">Todo Chile</option>
+    {% for r in regiones %}<option value="{{ r.slug }}" {% if region_actual and region_actual.slug == r.slug %}selected{% endif %}>{{ r.nombre }}</option>{% endfor %}
+  </select>
+  <button class="boton" type="submit">Ver qué me calza</button>
+</form>
+{%- endmacro %}

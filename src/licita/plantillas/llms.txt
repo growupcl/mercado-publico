@@ -1,0 +1,40 @@
+{% autoescape false %}
+# Calza
+
+> Calza (calza.cl) es un servicio chileno que avisa por WhatsApp, cada mañana, las licitaciones y Compras Ágiles de Mercado Público (el sistema de compras del Estado de Chile, administrado por ChileCompra) que calzan con el negocio de cada pyme. También analiza con IA las bases de licitación (PDF o Word) y muestra precios de referencia de compras anteriores.
+
+Calza es independiente: no está afiliado a ChileCompra ni a Mercado Público. Los datos de licitaciones vienen de la API pública de Mercado Público y se actualizan varias veces al día. En este momento hay {{ stats.abiertas }} licitaciones y Compras Ágiles abiertas ({{ stats.compras_agiles }} Compras Ágiles).
+
+## Cómo funciona
+
+- La pyme describe en sus palabras qué vende, en qué regiones y qué montos le interesan.
+- Cada día hábil a las 8:00 recibe por WhatsApp las licitaciones nuevas que calzan, con su porcentaje de calce, monto estimado, fecha de cierre y por qué le sirve.
+- Responde con un número para ver el detalle, o envía las bases para recibir un resumen de requisitos, garantías, plazos y criterios de evaluación.
+- En el plan Pro recibe además alertas urgentes de Compra Ágil (compras de menor monto con plazos muy cortos) y precios de referencia.
+
+## Planes y precios (pesos chilenos, IVA incluido)
+
+{% for p in planes %}- {{ p.nombre }}: ${{ "{:,}".format(p.mensual).replace(",", ".") }} al mes o ${{ "{:,}".format(anual[p.codigo]).replace(",", ".") }} al año. Incluye: {{ p.beneficios | join("; ") }}.
+{% endfor %}- Precio fundador Pro: ${{ "{:,}".format(precio_fundador).replace(",", ".") }} al mes de por vida para los primeros clientes Pro.
+- Consultoras (varias empresas): precio a convenir, escribir a hola@calza.cl.
+- Prueba gratuita: {{ dias_prueba }} días con todo lo del plan Pro, sin tarjeta.
+
+## Páginas principales
+
+- [Inicio y planes]({{ sitio }}/): qué hace Calza, ejemplo de resumen, preguntas frecuentes.
+- [Licitaciones abiertas hoy]({{ sitio }}/licitaciones): listado actualizado de licitaciones y Compras Ágiles abiertas.
+- [Crear cuenta]({{ sitio }}/registro): registro con prueba gratuita.
+- [Términos del servicio]({{ sitio }}/terminos) y [Política de privacidad]({{ sitio }}/privacidad).
+
+## Licitaciones abiertas por región
+
+{% for r in regiones %}- [{{ r.titulo }}]({{ sitio }}/licitaciones/region/{{ r.slug }})
+{% endfor %}
+## Licitaciones abiertas por rubro
+
+{% for r in rubros %}- [{{ r.nombre }}]({{ sitio }}/licitaciones/rubro/{{ r.slug }})
+{% endfor %}
+## Contacto
+
+hola@calza.cl
+{% endautoescape %}

@@ -114,9 +114,12 @@ def crear_router_web(
                 empresa, token = registrar_empresa(s, datos, ia=ia)
             except ErrorRegistro as e:
                 return _form(request, datos, e.errores, estado=422)
-            vigente = suscripcion_de(s, empresa).vigente_hasta
+            suscripcion = suscripcion_de(s, empresa)
+            valor, _ = cotizar(s, suscripcion, suscripcion.plan, suscripcion.periodicidad)
             return plantillas.TemplateResponse(request, "registro_listo.html", {
-                "empresa": empresa, "vigente_hasta": _fecha(vigente),
+                "empresa": empresa, "vigente_hasta": _fecha(suscripcion.vigente_hasta),
+                "plan_elegido": PLANES[suscripcion.plan].nombre, "periodicidad": suscripcion.periodicidad,
+                "precio_plan": valor,
                 "enlace_cuenta": f"{url_publica}/cuenta/{token}", "wa_link": wa_link,
             })
 

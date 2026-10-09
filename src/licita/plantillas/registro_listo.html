@@ -5,17 +5,21 @@
 <div style="max-width:640px" class="pila">
   <span class="chip ok">Cuenta creada</span>
   <h1>¡Listo, {{ empresa.nombre }}!</h1>
-  <p class="lead">Tu prueba del plan Pro dura hasta el {{ vigente_hasta }}. Desde mañana recibirás tu resumen de licitaciones por WhatsApp.</p>
+  <p class="lead">Tu prueba gratis dura hasta el {{ vigente_hasta }} y, mientras tanto, tienes todo lo del plan Pro.
+    Después sigues con el plan que elegiste: <strong>{{ plan_elegido }} {{ periodicidad }}, {{ fmt(precio_plan) }}</strong>.
+    No cobramos nada hasta que lo actives desde tu cuenta.</p>
+  {% if wa_link %}
   <div class="tarjeta pila">
     <h3>Último paso: salúdanos por WhatsApp</h3>
-    <p>Escríbenos "Hola" para confirmar tu número. Así podemos responderte al instante cuando nos envíes bases o preguntas.</p>
-    {% if wa_link %}<div><a class="boton" href="{{ wa_link }}" target="_blank" rel="noopener">Abrir WhatsApp</a></div>{% endif %}
+    <p>Escríbenos "Hola" para confirmar tu número. Así podemos responderte al instante cuando nos envíes bases o preguntas. Desde mañana recibirás ahí tu resumen de licitaciones.</p>
+    <div><a class="boton" href="{{ wa_link }}" target="_blank" rel="noopener">Abrir WhatsApp</a></div>
   </div>
+  {% endif %}
   <div class="tarjeta pila">
     <h3>Tu enlace de acceso</h3>
     <p>Con este enlace ves tu plan y pagas tu suscripción. Guárdalo: funciona como una contraseña.</p>
     <p style="overflow-wrap:anywhere"><a href="{{ enlace_cuenta }}">{{ enlace_cuenta }}</a></p>
-    <p class="ayuda">Si lo pierdes, escribe CUENTA a Calza por WhatsApp y te enviamos uno nuevo.</p>
+    <p class="ayuda">Si lo pierdes, {% if wa_link %}escribe CUENTA a Calza por WhatsApp{% else %}escríbenos a hola@calza.cl{% endif %} y te enviamos uno nuevo.</p>
   </div>
 </div>
 {% endblock %}

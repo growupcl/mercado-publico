@@ -417,3 +417,19 @@ def test_suscripcion_de_prueba_cobra_hoy_un_monto_bajo(web):
     assert mp.creadas[-1]["monto"] == 1000 and mp.creadas[-1]["inicio"] is None  # cobra hoy, aunque esté en prueba
     assert mp.creadas[-1]["motivo"] == "Calza prueba de cobro"
     assert (mandato.monto, mandato.precio_fundador) == (1000, False)
+
+
+def test_registro_listo_dice_el_plan_que_sigue_despues_de_la_prueba(web):
+    cliente, _, _ = web
+    r = cliente.post("/registro", data={**FORM, "plan": "pyme"})
+    assert r.status_code == 200
+    assert "todo lo del plan Pro" in r.text and "Pyme mensual, $19.990" in r.text
+    assert "Abrir WhatsApp" in r.text  # el fixture tiene número público
+
+
+def test_registro_listo_sin_whatsapp_no_pide_saludar(Sesion):
+    cliente = TestClient(crear_app(Sesion, router_web=crear_router_web(Sesion, mp=None, ia=IAFalsa(), url_publica="https://calza.cl")))
+    r = cliente.post("/registro", data=FORM)
+    assert "salúdanos por WhatsApp" not in r.text and "hola@calza.cl" in r.text
+    assert "Pro mensual" in r.text  # FORM elige Pro: precio fundador
+    assert "$39.990" in r.text

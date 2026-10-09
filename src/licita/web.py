@@ -222,6 +222,9 @@ def crear_router_web(
                     if pago is not None and pago.estado == "rechazado" and (wa is not None or correo is not None):
                         tareas.add_task(avisar_rechazos)  # después de responder a Mercado Pago
             except ErrorMercadoPago as e:
+                if e.no_existe:  # p. ej. la notificación de prueba del panel: reintentarla no sirve
+                    log.warning("Aviso de Mercado Pago de un recurso que no existe (%s %s): se ignora", tipo, data_id)
+                    return PlainTextResponse("ok")
                 log.error("No se pudo procesar el aviso de Mercado Pago (%s %s): %s", tipo, data_id, e)
                 return PlainTextResponse("error", status_code=502)  # Mercado Pago reintentará
         return PlainTextResponse("ok")

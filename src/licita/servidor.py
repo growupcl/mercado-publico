@@ -20,6 +20,27 @@ from .whatsapp import ClienteWhatsApp, verificar_firma
 log = logging.getLogger(__name__)
 
 
+class HeadComoGet:
+    """Responde HEAD como GET sin cuerpo: FastAPI solo acepta HEAD si la ruta lo declara.
+
+    Algunos buscadores y verificadores de enlaces consultan con HEAD antes de leer el sitemap o una página.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or scope["method"] != "HEAD":
+            return await self.app(scope, receive, send)
+
+        async def sin_cuerpo(mensaje):
+            if mensaje["type"] == "http.response.body":
+                mensaje = {**mensaje, "body": b""}
+            await send(mensaje)
+
+        await self.app({**scope, "method": "GET"}, receive, sin_cuerpo)
+
+
 def crear_app(
     Sesion: sessionmaker,
     wa: ClienteWhatsApp | None = None,
@@ -34,6 +55,7 @@ def crear_app(
     router_web: APIRouter | None = None,
 ) -> FastAPI:
     app = FastAPI(title="Calza")
+    app.add_middleware(HeadComoGet)
     if router_web is not None:
         app.include_router(router_web)
 

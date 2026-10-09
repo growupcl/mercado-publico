@@ -199,3 +199,9 @@ def test_avisar_indexnow():
     assert avisar_indexnow("https://calza.cl", ["https://calza.cl/licitacion/1"], http=http) == 1
     assert enviados[0]["host"] == "calza.cl" and enviados[0]["keyLocation"].endswith(".txt")
     assert avisar_indexnow("https://calza.cl", [], http=http) == 0
+
+
+def test_head_responde_como_get(sitio):
+    for ruta in ("/", "/sitemap.xml", "/robots.txt", "/licitaciones"):
+        r = sitio.head(ruta)
+        assert r.status_code == 200, ruta

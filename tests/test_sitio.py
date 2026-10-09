@@ -205,3 +205,12 @@ def test_head_responde_como_get(sitio):
     for ruta in ("/", "/sitemap.xml", "/robots.txt", "/licitaciones"):
         r = sitio.head(ruta)
         assert r.status_code == 200, ruta
+
+
+def test_pie_muestra_la_empresa_que_presta_el_servicio(sitio):
+    """Meta aprueba el nombre visible "Calza" si el sitio muestra su relación con la empresa del portafolio."""
+    html = sitio.get("/").text
+    assert "Calza es un servicio de Virtus SpA" in html
+    org = next(b for b in _jsonld(html) if "@graph" in b)["@graph"][0]
+    assert org["parentOrganization"]["name"] == "Virtus SpA"
+    assert "Calza es un servicio de Virtus SpA" in sitio.get("/llms.txt").text

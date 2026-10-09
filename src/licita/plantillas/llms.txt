@@ -3,7 +3,7 @@
 
 > Calza (calza.cl) es un servicio chileno que avisa por WhatsApp, cada mañana, las licitaciones y Compras Ágiles de Mercado Público (el sistema de compras del Estado de Chile, administrado por ChileCompra) que calzan con el negocio de cada pyme. También analiza con IA las bases de licitación (PDF o Word) y muestra precios de referencia de compras anteriores.
 
-Calza es independiente: no está afiliado a ChileCompra ni a Mercado Público. Los datos de licitaciones vienen de la API pública de Mercado Público y se actualizan varias veces al día. En este momento hay {{ stats.abiertas }} licitaciones y Compras Ágiles abiertas ({{ stats.compras_agiles }} Compras Ágiles).
+Calza es un servicio de {{ prestador }}. Es independiente: no está afiliado a ChileCompra ni a Mercado Público. Los datos de licitaciones vienen de la API pública de Mercado Público y se actualizan varias veces al día. En este momento hay {{ stats.abiertas }} licitaciones y Compras Ágiles abiertas ({{ stats.compras_agiles }} Compras Ágiles).
 
 ## Cómo funciona
 

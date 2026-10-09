@@ -447,3 +447,24 @@ def test_suscribir_con_correo_de_mercado_pago_distinto(web):
     assert mp.creadas[-1]["email"] == "marco@gmail.com"
     r = cliente.post(f"/cuenta/{token}/suscribir", data={"opcion": "pyme:mensual", "email_mp": "no-es-correo"})
     assert r.status_code == 400
+
+
+def test_pago_sin_factura_sale_de_pendientes(web):
+    """La prueba de cobro (devuelta) no lleva factura: se saca de las pendientes sin inventar un folio."""
+    cliente, Sesion, mp = web
+    _, token = _registrar(cliente)
+    _suscribir(cliente, token)
+    mp.estados["PRE1"] = "authorized"
+    _aviso(cliente, "subscription_preapproval", "PRE1")
+    mp.cobros["9001"] = CobroMP(id="9001", suscripcion_id="PRE1", estado_pago="approved", monto=39990)
+    _aviso(cliente, "subscription_authorized_payment", "9001")
+    with Sesion() as s:
+        [f] = facturas.pendientes(s)
+        facturas.marcar_sin_factura(s, f.pago_id)
+        s.commit()
+        assert facturas.pendientes(s) == []
+        facturas.marcar_emitida(s, f.pago_id, "130")  # si después sí se factura, se puede registrar el folio
+        s.commit()
+        with pytest.raises(ValueError):
+            facturas.marcar_sin_factura(s, f.pago_id)
+    assert "N° 130" in cliente.get(f"/cuenta/{token}").text

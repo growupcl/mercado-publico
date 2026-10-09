@@ -325,7 +325,7 @@ def cmd_mp_prueba(args, config: Config, Sesion) -> int:
     print(f"Suscripción de prueba de ${args.monto:,} mensual para #{empresa.id} {empresa.nombre} (cobra hoy).".replace(",", "."))
     print(f"Abre este enlace para pagar con tu tarjeta:\n{url}")
     print("Después: cancela la renovación desde \"Mi cuenta\", devuelve el pago desde la actividad de Mercado Pago y "
-          "saca el cobro de las facturas pendientes con `licita facturas --emitida PAGO_ID --folio PRUEBA`.")
+          "saca el cobro de las facturas pendientes con `licita facturas --sin-factura PAGO_ID`.")
     return 0
 
 
@@ -333,6 +333,11 @@ def cmd_facturas(args, config: Config, Sesion) -> int:
     from . import facturas
 
     with Sesion() as s:
+        if args.sin_factura is not None:
+            pago = facturas.marcar_sin_factura(s, args.sin_factura)
+            s.commit()
+            print(f"Pago #{pago.id} (${pago.monto:,}) fuera de las facturas pendientes, sin folio.".replace(",", "."))
+            return 0
         if args.emitida is not None:
             if not args.folio:
                 raise ValueError("Indica el folio con --folio.")
@@ -547,6 +552,8 @@ def construir_parser() -> argparse.ArgumentParser:
     s.add_argument("--csv", action="store_true", help="Exporta las pendientes en CSV (separado por punto y coma)")
     s.add_argument("--emitida", type=int, metavar="PAGO_ID", help="Marca la factura de este pago como emitida")
     s.add_argument("--folio", help="Con --emitida: folio que entregó el SII")
+    s.add_argument("--sin-factura", type=int, metavar="PAGO_ID",
+                   help="Saca un pago de las pendientes sin factura (p. ej. una prueba de cobro devuelta)")
     s.set_defaults(fn=cmd_facturas)
 
     s = sub.add_parser("correo-prueba", help="Envía un correo de prueba para revisar la configuración SMTP")

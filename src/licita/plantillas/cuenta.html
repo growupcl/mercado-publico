@@ -62,7 +62,7 @@
   <div class="tabla"><table>
     <thead><tr><th>Fecha</th><th>Plan</th><th>Monto</th><th>Estado</th><th>Factura</th></tr></thead>
     <tbody>{% for p in pagos %}
-      <tr><td>{{ (p.pagado_en or p.creado_en).strftime("%d-%m-%Y") }}</td><td>{{ p.plan|capitalize }} {{ p.periodicidad }}</td><td>{{ fmt(p.monto) }}</td><td>{{ p.estado|capitalize }}</td><td>{% if p.factura_emitida %}N° {{ p.factura_folio }}{% elif p.estado == "pagado" %}En emisión{% else %}—{% endif %}</td></tr>
+      <tr><td>{{ (p.pagado_en or p.creado_en).strftime("%d-%m-%Y") }}</td><td>{{ p.plan|capitalize }} {{ p.periodicidad }}</td><td>{{ fmt(p.monto) }}</td><td>{{ p.estado|capitalize }}</td><td>{% if p.factura_emitida and p.factura_folio %}N° {{ p.factura_folio }}{% elif p.factura_emitida %}No aplica{% elif p.estado == "pagado" %}En emisión{% else %}—{% endif %}</td></tr>
     {% endfor %}</tbody>
   </table></div>
   {% endif %}

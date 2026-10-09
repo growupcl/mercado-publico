@@ -3,7 +3,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 destino=/var/backups/calza
+umask 077  # los respaldos tienen datos de clientes: solo los lee el usuario calza
 mkdir -p "$destino"
+chmod 700 "$destino"
 archivo="$destino/calza-$(date +%F).sql.gz"
 docker compose exec -T db pg_dump -U calza -d calza | gzip > "$archivo.tmp"
 mv "$archivo.tmp" "$archivo"

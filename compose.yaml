@@ -7,6 +7,8 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql+psycopg://calza:${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD en .env}@db:5432/calza
+      # Dentro del contenedor los documentos van al volumen persistente, aunque .env diga otra cosa.
+      LICITA_DIR_DOCUMENTOS: /datos/documentos
     volumes:
       - documentos:/datos/documentos
     depends_on:

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from "_macros.html" import tarjeta_lic, buscador %}
+{% block titulo %}{% if q %}Licitaciones para «{{ q | truncate(50) }}»{% else %}Busca licitaciones que te calcen{% endif %} · Calza{% endblock %}
+{% block robots %}noindex, follow{% endblock %}
+{% block canonical %}{{ sitio }}/buscar{% endblock %}
+{% block contenido %}
+<section class="pila" style="max-width:820px;margin-bottom:32px">
+  <h1 style="font-size:clamp(28px,4vw,40px)">¿Qué licitaciones te calzan hoy?</h1>
+  <p class="lead">Escribe lo que vende tu empresa, separado por comas. Buscamos entre las {{ total_abiertas | miles }} licitaciones y Compras Ágiles abiertas en Mercado Público.</p>
+  {{ buscador(q=q, region_actual=region_actual, regiones=regiones, autofocus=not q) }}
+</section>
+{% if q %}
+<section class="pila" style="max-width:820px">
+  {% if resultados %}
+  <h2 style="font-size:22px">{{ resultados | length }} {{ "licitación abierta calza" if resultados | length == 1 else "licitaciones abiertas calzan" }} con «{{ q | truncate(60) }}»{% if region_actual %} en la {{ region_actual.titulo }}{% endif %}</h2>
+  <ul class="lista-lic">{% for f, puntaje in resultados %}{{ tarjeta_lic(f) }}{% endfor %}</ul>
+  {% else %}
+  <div class="tarjeta pila"><p>Hoy no encontramos licitaciones abiertas con esas palabras{% if region_actual %} en la {{ region_actual.titulo }}{% endif %}. Prueba con otros productos o sin filtro de región. Cada día se publican cientos: Calza te avisa cuando aparezca la tuya.</p></div>
+  {% endif %}
+  <div class="tarjeta pila" style="background:var(--brand-soft);border-color:transparent">
+    <h2 style="margin:0;font-size:22px">Esto es solo una búsqueda por palabras</h2>
+    <p>Con tu cuenta, nuestra IA entiende tu negocio, descarta lo que no te sirve, te avisa cada mañana por WhatsApp con el porcentaje de calce y te explica las bases.</p>
+    <div><a class="boton" href="/registro">Probar {{ dias_prueba }} días gratis</a></div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

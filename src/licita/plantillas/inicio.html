@@ -1,24 +1,96 @@
 {% extends "base.html" %}
-{% block titulo %}Calza · Licitaciones que te calzan{% endblock %}
+{% from "_macros.html" import tarjeta_lic, buscador, cierre %}
+{% block titulo %}Calza · Licitaciones de Mercado Público en tu WhatsApp{% endblock %}
+{% block descripcion %}Recibe cada mañana en WhatsApp las licitaciones y Compras Ágiles de Mercado Público que calzan con tu pyme. Hoy hay {{ stats.abiertas | miles }} abiertas. Prueba {{ dias_prueba }} días gratis, sin tarjeta.{% endblock %}
+{% block canonical %}{{ sitio }}/{% endblock %}
+{% block jsonld %}
+<script type="application/ld+json">{{ {
+  "@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Calza", "url": sitio ~ "/",
+  "applicationCategory": "BusinessApplication", "operatingSystem": "Web, WhatsApp", "inLanguage": "es-CL",
+  "description": "Avisa por WhatsApp las licitaciones y Compras Ágiles de Mercado Público que calzan con cada pyme, analiza las bases con IA y muestra precios de referencia.",
+  "publisher": {"@id": sitio ~ "/#organizacion"},
+  "offers": ofertas_ld
+} | tojson }}</script>
+<script type="application/ld+json">{{ {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": faq_ld} | tojson }}</script>
+{% endblock %}
 {% block contenido %}
-<section class="pila" style="max-width:720px;margin-bottom:56px">
+<section class="pila" style="max-width:760px;margin-bottom:40px">
   <span class="chip oro">Para pymes que le venden al Estado</span>
   <h1>Las licitaciones que te calzan, cada mañana en tu WhatsApp.</h1>
   <p class="lead">Calza revisa Mercado Público por ti, te avisa solo lo que encaja con tu negocio y te explica las bases en palabras simples: qué piden, cuándo cierra y a qué precio se ha comprado antes.</p>
-  <div><a class="boton" href="/registro">Probar {{ dias_prueba }} días gratis</a></div>
+  <div class="chips" style="gap:12px;align-items:center"><a class="boton" href="/registro">Probar {{ dias_prueba }} días gratis</a><a href="#prueba">o pruébalo ahora sin registrarte ↓</a></div>
   <p class="ayuda">Sin tarjeta. Durante la prueba tienes todo lo del plan Pro.</p>
+</section>
+
+<section aria-label="Mercado Público hoy" class="tarjeta" style="margin-bottom:56px">
+  <div class="cifras">
+    <div><div class="cifra">{{ stats.abiertas | miles }}</div><div class="muted">licitaciones y Compras Ágiles abiertas</div></div>
+    <div><div class="cifra">{{ stats.publicadas_hoy | miles }}</div><div class="muted">publicadas hoy</div></div>
+    <div><div class="cifra">{{ stats.cierran_hoy | miles }}</div><div class="muted">cierran hoy</div></div>
+    <div><div class="cifra">{{ stats.compras_agiles | miles }}</div><div class="muted">Compras Ágiles en curso</div></div>
+  </div>
+  <p class="ayuda" style="margin-top:12px">Datos de Mercado Público (ChileCompra), actualizados varias veces al día. <a href="/licitaciones">Ver todas las licitaciones abiertas</a>.</p>
+</section>
+
+<section id="prueba" class="pila" style="margin-bottom:56px">
+  <h2>Pruébalo: ¿qué vende tu empresa?</h2>
+  <p class="muted">Escribe tus productos o servicios separados por comas y te mostramos las licitaciones abiertas que calzan hoy.</p>
+  {{ buscador(regiones=regiones) }}
+  <div class="chips"><span class="muted" style="font-size:14px">Ejemplos:</span>
+    {% for ej in ["artículos de aseo, guantes", "computadores, notebooks", "uniformes, calzado de seguridad", "alimentos, colaciones", "mantención de áreas verdes"] %}
+    <a class="chip" href="/buscar?q={{ ej | urlencode }}" rel="nofollow">{{ ej }}</a>{% endfor %}
+  </div>
+</section>
+
+<section style="margin-bottom:56px">
+  <div class="rejilla dos" style="align-items:center">
+    <div class="pila">
+      <h2>Así llega tu resumen</h2>
+      <p class="muted">Cada día hábil a las 8:00, solo las licitaciones nuevas que calzan con lo que vendes, tus regiones y el monto que te interesa. Responde con un número y te enviamos el detalle: qué piden, requisitos a los que poner ojo, plazos y la ficha oficial.</p>
+      <p class="muted">Envíanos las bases en PDF o Word y nuestra IA te las resume: garantías, documentos, criterios de evaluación y fechas clave.</p>
+      <p class="ayuda">Ejemplo armado con licitaciones reales abiertas hoy. Tu resumen incluye además el porcentaje de calce y por qué te sirve cada una.</p>
+    </div>
+    <div class="wa" role="img" aria-label="Ejemplo de resumen diario de Calza en WhatsApp">
+      <div class="burbuja">
+        <p>Hola Tu Pyme 👋<br>Hoy encontramos {{ ejemplos | length if ejemplos else 3 }} licitaciones para ti:</p>
+        {% if ejemplos %}{% for f in ejemplos %}
+        <p style="margin-top:8px">{{ loop.index }}. <strong>{{ f.nombre | truncate(70) }}</strong><br>{{ f.organismo | truncate(50) }}<br>Monto estimado: {{ fmt(f.monto_estimado) }} · {{ cierre(f) }}</p>
+        {% endfor %}{% else %}
+        <p style="margin-top:8px">1. <strong>Adquisición de artículos de aseo para CESFAM</strong><br>Municipalidad de ejemplo<br>Monto estimado: $4.500.000 · cierra en 9 días</p>
+        <p style="margin-top:8px">2. <strong>Compra de guantes de nitrilo</strong><br>Servicio de Salud de ejemplo<br>Monto estimado: $2.100.000 · cierra en 6 días</p>
+        {% endif %}
+        <p style="margin-top:8px">Responde con el número de una licitación para ver su detalle.</p>
+        <div class="hora">8:00</div>
+      </div>
+    </div>
+  </div>
 </section>
 
 <section style="margin-bottom:56px">
   <h2>Cómo funciona</h2>
   <div class="rejilla">
     <div class="tarjeta pila"><span class="chip">1</span><h3>Cuéntanos qué vendes</h3><p class="muted">En tus palabras. Nuestra IA entiende tu rubro, tus regiones y el tamaño de contratos que te interesa.</p></div>
-    <div class="tarjeta pila"><span class="chip">2</span><h3>Recibe tu resumen diario</h3><p class="muted">Cada mañana, las licitaciones nuevas con su porcentaje de calce, monto y fecha de cierre.</p></div>
-    <div class="tarjeta pila"><span class="chip">3</span><h3>Postula con ventaja</h3><p class="muted">Envíanos el PDF de las bases y te decimos requisitos, garantías, plazos y cómo se evalúa.</p></div>
+    <div class="tarjeta pila"><span class="chip">2</span><h3>Recibe tu resumen diario</h3><p class="muted">Cada mañana, las licitaciones nuevas con su porcentaje de calce, monto y fecha de cierre. En el plan Pro, alertas urgentes de Compra Ágil.</p></div>
+    <div class="tarjeta pila"><span class="chip">3</span><h3>Postula con ventaja</h3><p class="muted">Envíanos las bases y te decimos requisitos, garantías, plazos, cómo se evalúa y a qué precio se ha comprado antes.</p></div>
   </div>
 </section>
 
-<section id="planes">
+{% if ultimas %}
+<section style="margin-bottom:56px" class="pila">
+  <h2>Recién publicadas en Mercado Público</h2>
+  <ul class="lista-lic">{% for f in ultimas %}{{ tarjeta_lic(f) }}{% endfor %}</ul>
+  <div><a class="boton secundario" href="/licitaciones">Ver las {{ stats.abiertas | miles }} abiertas</a></div>
+</section>
+{% endif %}
+
+<section style="margin-bottom:56px" class="pila">
+  <h2>Licitaciones por rubro</h2>
+  <div class="chips">{% for r in rubros %}<a class="chip" href="/licitaciones/rubro/{{ r.slug }}">{{ r.nombre }}</a>{% endfor %}</div>
+  <h2>Licitaciones por región</h2>
+  <div class="chips">{% for r in regiones %}<a class="chip" href="/licitaciones/region/{{ r.slug }}">{{ r.titulo }}</a>{% endfor %}</div>
+</section>
+
+<section id="planes" style="margin-bottom:56px">
   <h2>Planes</h2>
   <div class="rejilla dos">
     {% for p in planes %}
@@ -37,6 +109,13 @@
     </div>
     {% endfor %}
   </div>
-  <p class="muted" style="margin-top:16px">¿Gestionas licitaciones de varias empresas? Escríbenos a hola@calza.cl para el plan Consultoras.</p>
+  <p class="muted" style="margin-top:16px">¿Gestionas licitaciones de varias empresas? Escríbenos a <a href="mailto:hola@calza.cl">hola@calza.cl</a> para el plan Consultoras.</p>
+</section>
+
+<section id="preguntas" style="max-width:760px">
+  <h2>Preguntas frecuentes</h2>
+  {% for pregunta, respuesta in faq %}
+  <details class="faq"{% if loop.first %} open{% endif %}><summary>{{ pregunta }}</summary><p>{{ respuesta }}</p></details>
+  {% endfor %}
 </section>
 {% endblock %}

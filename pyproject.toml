@@ -32,7 +32,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-licita = ["plantillas/*.html", "migraciones/*.py", "migraciones/*.mako", "migraciones/versions/*.py"]
+licita = ["plantillas/*.html", "plantillas/*.txt", "estaticos/*", "migraciones/*.py", "migraciones/*.mako", "migraciones/versions/*.py"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

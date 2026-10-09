@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% from "_macros.html" import tarjeta_lic, migas as migas_nav, buscador %}
+{% block titulo %}{{ titulo }} · Calza{% endblock %}
+{% block descripcion %}{{ intro | truncate(155) }}{% endblock %}
+{% block jsonld %}
+<script type="application/ld+json">{{ {
+  "@context": "https://schema.org", "@type": "CollectionPage", "name": h1, "url": canonical, "inLanguage": "es-CL",
+  "isPartOf": {"@id": sitio ~ "/#sitio"},
+  "mainEntity": {"@type": "ItemList", "numberOfItems": total_fichas, "itemListElement": item_list_ld(fichas, (numero - 1) * por_pagina)}
+} | tojson }}</script>
+{% endblock %}
+{% block contenido %}
+{{ migas_nav(migas) }}
+<section class="pila" style="max-width:820px;margin-bottom:32px">
+  <h1>{{ h1 }}</h1>
+  <p class="lead">{{ intro }}</p>
+  {% if total_fichas %}<p class="muted">{{ stats.compras_agiles | miles }} Compras Ágiles · {{ stats.publicadas_hoy | miles }} publicadas hoy · {{ stats.cierran_hoy | miles }} cierran hoy</p>{% endif %}
+</section>
+
+<section class="tarjeta pila" style="margin-bottom:32px">
+  <h2 style="font-size:20px;margin:0">¿Cuáles te sirven a ti? Escribe lo que vendes</h2>
+  {{ buscador(region_actual=region_actual, regiones=regiones) }}
+</section>
+
+<div class="rejilla" style="grid-template-columns:minmax(0,1fr);gap:32px">
+  <section>
+    {% if fichas %}
+    <ul class="lista-lic">{% for f in fichas %}{{ tarjeta_lic(f) }}{% endfor %}</ul>
+    {% if total_paginas > 1 %}
+    <nav class="paginas" aria-label="Páginas">
+      {% if numero > 1 %}<a rel="prev" href="{{ ruta }}{% if numero > 2 %}?pagina={{ numero - 1 }}{% endif %}">← Anteriores</a>{% endif %}
+      <span class="muted">Página {{ numero }} de {{ total_paginas }}</span>
+      {% if numero < total_paginas %}<a rel="next" href="{{ ruta }}?pagina={{ numero + 1 }}">Siguientes →</a>{% endif %}
+    </nav>
+    {% endif %}
+    {% else %}
+    <div class="tarjeta pila"><p>Ahora no hay licitaciones abiertas en esta categoría. Se publican nuevas todos los días: crea tu cuenta y te avisamos por WhatsApp cuando aparezca una que te calce.</p></div>
+    {% endif %}
+  </section>
+
+  <section class="tarjeta pila" style="background:var(--brand-soft);border-color:transparent">
+    <h2 style="margin:0">No revises esta lista todos los días</h2>
+    <p>Calza te avisa por WhatsApp solo las licitaciones que calzan con tu negocio, cada mañana, y te explica las bases.</p>
+    <div><a class="boton" href="/registro">Probar {{ dias_prueba }} días gratis</a></div>
+  </section>
+
+  <section class="pila">
+    {% if not rubro_actual %}<h2 style="font-size:20px">Por rubro</h2>
+    <div class="chips">{% for r in rubros %}<a class="chip" href="/licitaciones/rubro/{{ r.slug }}">{{ r.nombre }}</a>{% endfor %}</div>{% endif %}
+    <h2 style="font-size:20px">Por región</h2>
+    <div class="chips">{% for r in regiones %}<a class="chip{% if region_actual and region_actual.slug == r.slug %} activo{% endif %}" href="/licitaciones/region/{{ r.slug }}">{{ r.titulo }}</a>{% endfor %}</div>
+  </section>
+</div>
+{% endblock %}

@@ -1,11 +1,42 @@
 <!doctype html>
-<html lang="es">
+<html lang="es-CL">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block titulo %}Calza{% endblock %}</title>
-<meta name="description" content="Calza te avisa por WhatsApp las licitaciones de Mercado Público que calzan con tu negocio.">
+<meta name="description" content="{% block descripcion %}Calza te avisa por WhatsApp las licitaciones y Compras Ágiles de Mercado Público que calzan con tu negocio, y te explica las bases en palabras simples.{% endblock %}">
+<meta name="robots" content="{% block robots %}index, follow, max-image-preview:large, max-snippet:-1{% endblock %}">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<link rel="canonical" href="{% block canonical %}{{ canonical | default(sitio ~ request.url.path) }}{% endblock %}">
+<meta property="og:site_name" content="Calza">
+<meta property="og:locale" content="es_CL">
+<meta property="og:type" content="{% block og_tipo %}website{% endblock %}">
+<meta property="og:title" content="{{ self.titulo() | trim }}">
+<meta property="og:description" content="{{ self.descripcion() | trim }}">
+<meta property="og:url" content="{{ self.canonical() | trim }}">
+<meta property="og:image" content="{{ sitio }}/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Calza: las licitaciones que te calzan, cada mañana en tu WhatsApp">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#1d5a7a">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="alternate" type="text/markdown" href="/llms.txt" title="Calza para asistentes de IA">
+<script type="application/ld+json">{{ {
+  "@context": "https://schema.org",
+  "@graph": [
+    {"@type": "Organization", "@id": sitio ~ "/#organizacion", "name": "Calza", "url": sitio ~ "/",
+     "logo": sitio ~ "/apple-touch-icon.png", "email": "hola@calza.cl", "areaServed": "CL",
+     "description": "Copiloto para pymes chilenas que le venden al Estado a través de Mercado Público."},
+    {"@type": "WebSite", "@id": sitio ~ "/#sitio", "name": "Calza", "url": sitio ~ "/", "inLanguage": "es-CL",
+     "publisher": {"@id": sitio ~ "/#organizacion"}}
+  ]
+} | tojson }}</script>
+{% block jsonld %}{% endblock %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600&display=swap">
 <style>
 :root{
@@ -65,17 +96,58 @@ footer.sitio .contenedor{display:flex;flex-wrap:wrap;gap:8px 24px;justify-conten
 table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line)}
 .tabla{overflow-x:auto}
+.migas{font-size:14px;color:var(--muted);margin-bottom:16px;display:flex;flex-wrap:wrap;gap:4px}
+.migas a{color:var(--muted)}
+nav.principal{display:flex;align-items:center;gap:20px}
+nav.principal a.enlace{color:var(--ink);text-decoration:none;font-weight:500}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+a.chip{text-decoration:none}
+a.chip.activo{background:var(--brand);color:var(--brand-ink)}
+.cifras{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(45%,180px),1fr));gap:16px}
+nav.principal .boton{white-space:nowrap;padding:10px 16px}
+.cifra{font-family:var(--display);font-size:34px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
+.lista-lic{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:12px}
+.lic h3{font-size:18px;line-height:1.3}
+.lic h3 a{color:var(--ink);text-decoration:none}
+.lic h3 a:hover{text-decoration:underline}
+.meta{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:14px;color:var(--muted)}
+.paginas{display:flex;gap:12px;align-items:center;justify-content:center;margin-top:24px}
+.buscador{display:grid;grid-template-columns:1fr auto auto;gap:8px}
+@media (max-width:640px){.buscador{grid-template-columns:1fr}}
+.wa{background:#e7ddd4;border-radius:18px;padding:16px;max-width:420px;font-size:14px;line-height:1.45}
+.wa .burbuja{background:#ffffff;color:#111b21;border-radius:10px;padding:10px 12px;box-shadow:0 1px 1px rgba(0,0,0,.08)}
+.wa .burbuja + .burbuja{margin-top:8px}
+.wa .hora{font-size:11px;color:#667781;text-align:right}
+@media (prefers-color-scheme: dark){.wa{background:#0b141a}.wa .burbuja{background:#202c33;color:#e9edef}.wa .hora{color:#8696a0}}
+details.faq{border-bottom:1px solid var(--line);padding-block:12px}
+details.faq summary{font-weight:600;cursor:pointer}
+details.faq p{margin-top:8px;color:var(--muted)}
+footer.sitio nav{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:24px;width:100%;margin-bottom:16px}
+footer.sitio nav ul{list-style:none;padding:0;margin:6px 0 0;display:flex;flex-direction:column;gap:2px}
+footer.sitio nav a{color:var(--muted)}
+footer.sitio strong{color:var(--ink)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 </style>
 </head>
 <body>
 <header class="sitio"><div class="contenedor">
-  <a class="logo" href="/">calza<span>.</span></a>
-  {% block accion %}<a class="boton secundario" href="/registro">Probar gratis</a>{% endblock %}
+  <a class="logo" href="/" aria-label="Calza, inicio">calza<span>.</span></a>
+  <nav class="principal">{% block accion %}<a class="enlace" href="/licitaciones">Licitaciones</a><a class="boton secundario" href="/registro">Probar gratis</a>{% endblock %}</nav>
 </div></header>
 <main><div class="contenedor">{% block contenido %}{% endblock %}</div></main>
 <footer class="sitio"><div class="contenedor">
-  <span>Calza es un servicio independiente, no afiliado a ChileCompra ni a Mercado Público.</span>
-  <span><a href="/terminos">Términos</a> · <a href="/privacidad">Privacidad</a> · hola@calza.cl</span>
+  {% block pie_nav %}<nav aria-label="Licitaciones por región y rubro">
+    <div><strong>Licitaciones por región</strong><ul>{% for r in regiones_publicas %}<li><a href="/licitaciones/region/{{ r.slug }}">{{ r.titulo }}</a></li>{% endfor %}</ul></div>
+    <div><strong>Licitaciones por rubro</strong><ul>{% for r in rubros_publicos %}<li><a href="/licitaciones/rubro/{{ r.slug }}">{{ r.nombre }}</a></li>{% endfor %}</ul></div>
+    <div><strong>Calza</strong><ul>
+      <li><a href="/licitaciones">Licitaciones abiertas hoy</a></li>
+      <li><a href="/#planes">Planes y precios</a></li>
+      <li><a href="/#preguntas">Preguntas frecuentes</a></li>
+      <li><a href="/registro">Crear cuenta</a></li>
+    </ul></div>
+  </nav>{% endblock %}
+  <span>Calza es un servicio independiente, no afiliado a ChileCompra ni a Mercado Público. Datos de licitaciones: <a href="https://www.mercadopublico.cl" rel="noopener">Mercado Público</a> (ChileCompra).</span>
+  <span><a href="/terminos">Términos</a> · <a href="/privacidad">Privacidad</a> · <a href="mailto:hola@calza.cl">hola@calza.cl</a></span>
 </div></footer>
 </body>
 </html>

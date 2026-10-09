@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block titulo %}{{ titulo }} · Calza{% endblock %}
+{% block robots %}noindex, nofollow{% endblock %}
 {% block contenido %}
 <div style="max-width:640px" class="pila">
   {% if chip %}<span class="chip {{ chip_clase }}">{{ chip }}</span>{% endif %}

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% from "_macros.html" import tarjeta_lic, migas as migas_nav %}
+{% block titulo %}{{ f.nombre | truncate(70) }} · {{ f.codigo }} · Calza{% endblock %}
+{% block descripcion %}{% if f.es_compra_agil %}Compra Ágil{% else %}Licitación{% endif %} {{ f.codigo }} de {{ f.organismo or "un organismo público" }}{% if f.region %} ({{ f.region }}){% endif %}{% if f.monto_estimado %}, monto estimado {{ fmt(f.monto_estimado) }}{% endif %}. {{ f.descripcion_corta(110) }}{% endblock %}
+{% block robots %}{% if abierta %}index, follow, max-image-preview:large, max-snippet:-1{% else %}noindex, follow{% endif %}{% endblock %}
+{% block og_tipo %}article{% endblock %}
+{% block jsonld %}
+<script type="application/ld+json">{{ {
+  "@context": "https://schema.org", "@type": "WebPage", "name": f.nombre, "url": canonical, "inLanguage": "es-CL",
+  "description": f.descripcion_corta(300), "isPartOf": {"@id": sitio ~ "/#sitio"},
+  "dateModified": f.actualizada_en.isoformat() if f.actualizada_en else none,
+  "about": {"@type": "Thing", "name": f.nombre, "identifier": f.codigo, "url": f.url_oficial},
+  "isBasedOn": f.url_oficial,
+  "provider": {"@type": "GovernmentOrganization", "name": f.organismo} if f.organismo else none
+} | tojson }}</script>
+{% endblock %}
+{% block contenido %}
+{{ migas_nav(migas) }}
+<article class="pila" style="max-width:820px">
+  <div class="chips">
+    {% if f.es_compra_agil %}<span class="chip oro">Compra Ágil</span>{% else %}<span class="chip">Licitación pública</span>{% endif %}
+    {% if abierta %}<span class="chip ok">Abierta</span>{% else %}<span class="chip error">Cerrada</span>{% endif %}
+    {% if rubro %}<a class="chip" href="/licitaciones/rubro/{{ rubro.slug }}">{{ rubro.nombre }}</a>{% endif %}
+  </div>
+  <h1 style="font-size:clamp(26px,4vw,38px)">{{ f.nombre }}</h1>
+  {% if f.resumen %}<p class="lead">{{ f.resumen }}</p>{% endif %}
+
+  <div class="tarjeta">
+    <table>
+      <tbody>
+        <tr><th scope="row">Código</th><td>{{ f.codigo }}</td></tr>
+        {% if f.organismo %}<tr><th scope="row">Organismo</th><td>{{ f.organismo }}</td></tr>{% endif %}
+        {% if f.region %}<tr><th scope="row">Región</th><td>{% if region %}<a href="/licitaciones/region/{{ region.slug }}">{{ f.region }}</a>{% else %}{{ f.region }}{% endif %}{% if f.comuna %} · {{ f.comuna }}{% endif %}</td></tr>{% endif %}
+        <tr><th scope="row">Monto estimado</th><td>{% if f.monto_estimado %}{{ fmt(f.monto_estimado) }}{% if f.moneda and f.moneda != "CLP" %} {{ f.moneda }}{% endif %}{% else %}No informado{% endif %}</td></tr>
+        {% if f.fecha_publicacion %}<tr><th scope="row">Publicación</th><td><time datetime="{{ f.fecha_publicacion.isoformat() }}">{{ f.fecha_publicacion.strftime("%d-%m-%Y %H:%M") }}</time></td></tr>{% endif %}
+        <tr><th scope="row">Cierre</th><td>{% if f.fecha_cierre %}<time datetime="{{ f.fecha_cierre.isoformat() }}">{{ f.fecha_cierre.strftime("%d-%m-%Y %H:%M") }}</time>{% if abierta and dias is not none %} · {% if dias <= 0 %}cierra hoy{% elif dias == 1 %}cierra mañana{% else %}quedan {{ dias }} días{% endif %}{% endif %}{% else %}Sin fecha{% endif %}</td></tr>
+      </tbody>
+    </table>
+    <p class="ayuda" style="margin-top:8px">Horas de Chile continental.</p>
+  </div>
+
+  {% if f.descripcion and f.descripcion != f.nombre %}
+  <section class="pila"><h2>Descripción</h2><p style="white-space:pre-line">{{ f.descripcion | truncate(2500) }}</p></section>
+  {% endif %}
+
+  {% if f.items %}
+  <section class="pila">
+    <h2>Qué se compra</h2>
+    <div class="tabla"><table>
+      <thead><tr><th>Producto o servicio</th><th>Cantidad</th></tr></thead>
+      <tbody>{% for it in f.items[:40] %}
+        <tr><td>{{ it.producto or it.categoria }}{% if it.descripcion and it.descripcion != it.producto %}<div class="ayuda">{{ it.descripcion | truncate(200) }}</div>{% endif %}</td>
+            <td>{% if it.cantidad is number %}{{ "%g" | format(it.cantidad) }}{% endif %} {{ it.unidad or "" }}</td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+    {% if f.items | length > 40 %}<p class="muted">… y {{ f.items | length - 40 }} ítems más en la ficha oficial.</p>{% endif %}
+  </section>
+  {% endif %}
+
+  <div class="chips" style="gap:12px;align-items:center">
+    <a class="boton" href="{{ f.url_oficial }}" rel="noopener nofollow" target="_blank">Ver ficha oficial en Mercado Público</a>
+    {% if abierta %}<a class="boton secundario" href="/registro">Recibir licitaciones como esta</a>{% endif %}
+  </div>
+  <p class="ayuda">Fuente: Mercado Público (ChileCompra). Las ofertas se presentan en la ficha oficial; revisa siempre las bases antes de postular.</p>
+
+  <section class="tarjeta pila" style="background:var(--brand-soft);border-color:transparent">
+    <h2 style="margin:0">¿Te sirve? Calza te explica las bases</h2>
+    <p>Con Calza recibes por WhatsApp las licitaciones que calzan con tu negocio y, si nos envías las bases, te resumimos requisitos, garantías, plazos y cómo se evalúa{% if not f.es_compra_agil %}, además de a qué precio se ha comprado antes{% endif %}.</p>
+    <div><a class="boton" href="/registro">Probar {{ dias_prueba }} días gratis</a></div>
+  </section>
+
+  {% if similares %}
+  <section class="pila">
+    <h2>Otras licitaciones abiertas{% if rubro %} de {{ rubro.nombre | lower }}{% elif region %} en la {{ region.titulo }}{% endif %}</h2>
+    <ul class="lista-lic">{% for x in similares %}{{ tarjeta_lic(x) }}{% endfor %}</ul>
+    <div><a href="{% if rubro %}/licitaciones/rubro/{{ rubro.slug }}{% elif region %}/licitaciones/region/{{ region.slug }}{% else %}/licitaciones{% endif %}">Ver todas →</a></div>
+  </section>
+  {% endif %}
+</article>
+{% endblock %}

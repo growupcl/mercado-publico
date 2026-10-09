@@ -1,4 +1,4 @@
-"""Sitio web: página de inicio, registro, cuenta y suscripciones con Mercado Pago."""
+"""Sitio web: registro, cuenta y suscripciones con Mercado Pago. Las páginas públicas están en sitio.py."""
 
 from __future__ import annotations
 
@@ -20,7 +20,9 @@ from .db import MandatoPago, Pago, Suscripcion, ahora
 from .mercadopago import ClienteMercadoPago, ErrorMercadoPago, verificar_firma
 from .whatsapp import ClienteWhatsApp
 from .ia import AsistenteIA
-from .planes import DIAS_PRUEBA, PLANES, PRECIO_FUNDADOR_PRO, formato_pesos, monto
+from .planes import DIAS_PRUEBA, PLANES, PRECIO_FUNDADOR_PRO, formato_pesos
+from .publico import REGIONES_PUBLICAS, RUBROS, Cache
+from .sitio import crear_router_publico
 from .suscripciones import (
     REGIONES, DatosRegistro, ErrorRegistro, actualizar_mandato, cancelar_renovacion, cotizar, empresa_por_token,
     fundador_disponible, iniciar_suscripcion, registrar_cobro, registrar_empresa, suscripcion_de,
@@ -29,6 +31,9 @@ from .suscripciones import (
 log = logging.getLogger(__name__)
 plantillas = Jinja2Templates(directory=str(Path(__file__).parent / "plantillas"))
 plantillas.env.globals["fmt"] = formato_pesos
+plantillas.env.globals["sitio"] = ""
+plantillas.env.globals["regiones_publicas"] = REGIONES_PUBLICAS
+plantillas.env.globals["rubros_publicos"] = RUBROS
 
 
 MESES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre",
@@ -52,26 +57,23 @@ def crear_router_web(
     wa: ClienteWhatsApp | None = None,
     idioma_whatsapp: str = "es",
     correo: ClienteCorreo | None = None,
+    cache_publico: Cache | None = None,
 ) -> APIRouter:
     if mp is not None and not mp_webhook_secreto and not permitir_sin_firma:
         raise ValueError("Falta MERCADOPAGO_WEBHOOK_SECRET: sin él no se puede verificar que los avisos vengan de Mercado Pago.")
     router = APIRouter()
     url_publica = url_publica.rstrip("/")
+    plantillas.env.globals["sitio"] = url_publica  # para URL canónicas y Open Graph
+    router.include_router(crear_router_publico(
+        Sesion, plantillas=plantillas, url_publica=url_publica, fundador_disponible=fundador_disponible,
+        cache=cache_publico,
+    ))
     wa_link = f"https://wa.me/{whatsapp_publico}?text={quote('Hola Calza')}" if whatsapp_publico else ""
 
     def mensaje(request: Request, titulo: str, texto: str, *, chip: str = "", chip_clase: str = "", estado: int = 200):
         return plantillas.TemplateResponse(request, "mensaje.html", {
             "titulo": titulo, "texto": texto, "chip": chip, "chip_clase": chip_clase, "wa_link": wa_link,
         }, status_code=estado)
-
-    @router.get("/", response_class=HTMLResponse)
-    def inicio(request: Request):
-        with Sesion() as s:
-            fundador = fundador_disponible(s)
-        return plantillas.TemplateResponse(request, "inicio.html", {
-            "planes": list(PLANES.values()), "anual": {c: monto(c, "anual") for c in PLANES},
-            "fundador": fundador, "precio_fundador": PRECIO_FUNDADOR_PRO, "dias_prueba": DIAS_PRUEBA,
-        })
 
     def _form(request: Request, datos: DatosRegistro, errores: dict, estado: int = 200):
         with Sesion() as s:

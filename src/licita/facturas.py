@@ -101,9 +101,21 @@ def marcar_emitida(session: Session, pago_id: int, folio: str, *, momento: datet
         raise ValueError(f"No existe el pago #{pago_id}.")
     if pago.estado != "pagado":
         raise ValueError(f"El pago #{pago_id} no está pagado: no corresponde factura.")
-    if pago.factura_emitida and pago.factura_folio != folio:
+    if pago.factura_emitida and pago.factura_folio and pago.factura_folio != folio:
         raise ValueError(f"El pago #{pago_id} ya tiene la factura folio {pago.factura_folio}.")
     pago.factura_emitida, pago.factura_folio = True, folio
+    pago.factura_emitida_en = pago.factura_emitida_en or momento or ahora()
+    return pago
+
+
+def marcar_sin_factura(session: Session, pago_id: int, *, momento: datetime | None = None) -> Pago:
+    """Saca un pago de las pendientes sin emitir factura (p. ej. la prueba de cobro, devuelta). Queda sin folio."""
+    pago = session.get(Pago, pago_id)
+    if pago is None:
+        raise ValueError(f"No existe el pago #{pago_id}.")
+    if pago.factura_emitida and pago.factura_folio:
+        raise ValueError(f"El pago #{pago_id} ya tiene la factura folio {pago.factura_folio}.")
+    pago.factura_emitida, pago.factura_folio = True, ""
     pago.factura_emitida_en = pago.factura_emitida_en or momento or ahora()
     return pago
 

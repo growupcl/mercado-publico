@@ -29,7 +29,8 @@
   "@graph": [
     {"@type": "Organization", "@id": sitio ~ "/#organizacion", "name": "Calza", "url": sitio ~ "/",
      "logo": sitio ~ "/apple-touch-icon.png", "email": "hola@calza.cl", "areaServed": "CL",
-     "description": "Copiloto para pymes chilenas que le venden al Estado a través de Mercado Público."},
+     "description": "Copiloto para pymes chilenas que le venden al Estado a través de Mercado Público.",
+     "parentOrganization": {"@type": "Organization", "name": prestador}},
     {"@type": "WebSite", "@id": sitio ~ "/#sitio", "name": "Calza", "url": sitio ~ "/", "inLanguage": "es-CL",
      "publisher": {"@id": sitio ~ "/#organizacion"}}
   ]
@@ -146,7 +147,7 @@ footer.sitio strong{color:var(--ink)}
       <li><a href="/registro">Crear cuenta</a></li>
     </ul></div>
   </nav>{% endblock %}
-  <span>Calza es un servicio independiente, no afiliado a ChileCompra ni a Mercado Público. Datos de licitaciones: <a href="https://www.mercadopublico.cl" rel="noopener">Mercado Público</a> (ChileCompra).</span>
+  <span>Calza es un servicio de {{ prestador }}, independiente y no afiliado a ChileCompra ni a Mercado Público. Datos de licitaciones: <a href="https://www.mercadopublico.cl" rel="noopener">Mercado Público</a> (ChileCompra).</span>
   <span><a href="/terminos">Términos</a> · <a href="/privacidad">Privacidad</a> · <a href="mailto:hola@calza.cl">hola@calza.cl</a></span>
 </div></footer>
 </body>

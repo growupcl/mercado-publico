@@ -33,6 +33,7 @@ log = logging.getLogger(__name__)
 plantillas = Jinja2Templates(directory=str(Path(__file__).parent / "plantillas"))
 plantillas.env.globals["fmt"] = formato_pesos
 plantillas.env.globals["sitio"] = ""
+plantillas.env.globals["prestador"] = "Virtus SpA"
 plantillas.env.globals["regiones_publicas"] = REGIONES_PUBLICAS
 plantillas.env.globals["rubros_publicos"] = RUBROS
 
@@ -66,6 +67,7 @@ def crear_router_web(
     router = APIRouter()
     url_publica = url_publica.rstrip("/")
     plantillas.env.globals["sitio"] = url_publica  # para URL canónicas y Open Graph
+    plantillas.env.globals["prestador"] = prestador  # Meta exige ver la relación entre la marca Calza y la empresa
     router.include_router(crear_router_publico(
         Sesion, plantillas=plantillas, url_publica=url_publica, fundador_disponible=fundador_disponible,
         cache=cache_publico,

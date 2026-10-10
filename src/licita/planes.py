@@ -19,7 +19,7 @@ class Plan:
 
 PLANES = {
     "pyme": Plan("pyme", "Pyme", 19_990, (
-        "Resumen diario por WhatsApp con las licitaciones que te calzan",
+        "Resumen diario por WhatsApp con las licitaciones que calzan con tu empresa",
         "Detalle de cada licitación y puntaje de calce",
         "Análisis de bases en PDF o Word (hasta 15 al mes)",
     )),

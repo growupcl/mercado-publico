@@ -28,20 +28,60 @@ Resultado: como máximo **una plantilla pagada al día por usuario**. Todo lo de
 - **BAJA** / **ALTA** → deja de recibir o vuelve a recibir resúmenes (Meta exige permitir la baja).
 - Cualquier otro texto → mensaje de ayuda.
 
-## Configuración en Meta (una vez)
+## Configuración en Meta (cómo está hoy)
 
-> Calza se conecta a través de **Masivo App** (Tech Provider), con su propio portafolio de Meta: sigue la guía [whatsapp-masivo-app.md](whatsapp-masivo-app.md). Los pasos de abajo sirven solo si algún día Calza tiene su propia app de Meta.
+| Pieza | Valor |
+|---|---|
+| Portafolio de Meta | **Calza** (ID 28242079118797984), razón social Virtus SpA, dominio `calza.cl` verificado |
+| Cuenta de WhatsApp Business | ID **1089829487170220** (nombre interno "Masivo App", conviene renombrarla "Calza") |
+| Número | **+56 9 5787 5125**, nombre visible "Calza", ID **1302990632906843** |
+| App de Meta | **Calza** (ID 2210923413125483), publicada, del portafolio Calza. Acceso estándar: no requiere revisión |
+| Token | usuario del sistema `calza-servidor` (administrador), token sin vencimiento con `whatsapp_business_messaging` y `whatsapp_business_management` |
+| Webhook | `https://calza.cl/webhook/whatsapp`, campo **messages** suscrito |
+| Pago a Meta | tarjeta de Virtus SpA en la cuenta de WhatsApp (IVA autoliquidado, ver el F29) |
 
-1. Crear una app de tipo **Business** en [developers.facebook.com](https://developers.facebook.com) y agregar el producto **WhatsApp**.
-2. Registrar el número de teléfono de Calza (no puede estar en uso en la app de WhatsApp normal) y verificar la empresa en el Business Manager de Meta.
-3. Crear un **usuario del sistema** con permiso `whatsapp_business_messaging` y generar un **token permanente** → `WHATSAPP_TOKEN`.
-4. Copiar el **Phone number ID** → `WHATSAPP_PHONE_NUMBER_ID` y el **App secret** (Configuración de la app → Básica) → `WHATSAPP_APP_SECRET`.
-5. Inventar un texto secreto → `WHATSAPP_VERIFY_TOKEN`.
-6. Levantar el servidor (`licita servidor`) en una URL pública con HTTPS y configurar el webhook en Meta:
-   - URL: `https://<tu-dominio>/webhook/whatsapp`
-   - Token de verificación: el mismo de `WHATSAPP_VERIFY_TOKEN`
-   - Suscribirse al campo **messages**.
-7. Crear y enviar a aprobación la plantilla de abajo.
+El número se creó con el registro integrado de Masivo App ([whatsapp-masivo-app.md](whatsapp-masivo-app.md)), pero
+Calza usa **su propia app de Meta**: así no comparte el token ni la clave secreta de la app de Masivo. La app de Masivo
+también quedó suscrita a la cuenta y recibe los mismos mensajes. No debe responderlos: su bot tiene que estar apagado
+para el cliente Calza.
+
+### Variables del `.env`
+
+| Variable | De dónde sale |
+|---|---|
+| `WHATSAPP_TOKEN` | business.facebook.com/settings → Usuarios del sistema → `calza-servidor` → Generar token (app Calza, sin vencimiento) |
+| `WHATSAPP_PHONE_NUMBER_ID` | `1302990632906843` |
+| `WHATSAPP_WABA_ID` | `1089829487170220` |
+| `WHATSAPP_APP_SECRET` | developers.facebook.com → app **Calza** → Configuración → Básica → Clave secreta (32 caracteres hexadecimales) |
+| `WHATSAPP_VERIFY_TOKEN` | texto aleatorio (`openssl rand -hex 24`), el mismo que se puso al configurar el webhook en Meta |
+| `LICITA_WHATSAPP_PUBLICO` | `56957875125` (botón "Abrir WhatsApp" del sitio) |
+
+Hay que cargar todas a la vez: con `WHATSAPP_TOKEN` pero sin `WHATSAPP_APP_SECRET` o `WHATSAPP_VERIFY_TOKEN`, la
+app no arranca. Después: `docker compose up -d app` (`restart` no vuelve a leer el `.env`).
+
+### Si algo falla
+
+- **El log muestra `POST /webhook/whatsapp ... 401`**: `WHATSAPP_APP_SECRET` no es la clave secreta de la app
+  Calza (por ejemplo, quedó el token, que mide unos 200 caracteres, o la clave de otra app). Meta reintenta los
+  mensajes rechazados, así que llegan todos juntos al corregirla.
+- **No llega nada al webhook**: revisa que la app esté publicada y suscrita a la cuenta
+  (`GET /1089829487170220/subscribed_apps` con el token debe listar la app Calza).
+- **Llegan dos respuestas distintas**: el bot de Masivo App está respondiendo. Apágalo para el cliente Calza.
+- **Rotar el token** (por ejemplo, si se filtró): genera uno nuevo para `calza-servidor`, cámbialo en el `.env` y
+  aplica con `docker compose up -d app`. Para invalidar el anterior, en el usuario del sistema → Revocar tokens.
+
+### Desde cero (para otra instalación)
+
+1. App de Meta tipo empresa en developers.facebook.com, en el portafolio de la empresa, con el caso de uso
+   "Conectarte con los clientes a través de WhatsApp".
+2. Número registrado en la cuenta de WhatsApp Business (no puede estar en la app de WhatsApp) y método de pago.
+3. Usuario del sistema administrador con la app y la cuenta de WhatsApp asignadas (control total), y token sin
+   vencimiento con `whatsapp_business_messaging` y `whatsapp_business_management`.
+4. Cargar las variables de arriba y levantar el servidor.
+5. Webhook en la app: URL `https://<dominio>/webhook/whatsapp`, el `WHATSAPP_VERIFY_TOKEN` y el campo **messages**.
+6. Suscribir la app a la cuenta: `POST /<WABA_ID>/subscribed_apps` con el token.
+7. Publicar la app (privacidad `/privacidad`, términos `/terminos`, eliminación de datos `/privacidad`, ícono).
+8. Enviar las plantillas a revisión (abajo).
 
 ## Plantillas
 

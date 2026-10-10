@@ -139,7 +139,7 @@ Completa al menos:
 | `MERCADOPUBLICO_TICKET` | Ticket de la API de Mercado Público (cuando llegue) |
 | `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_SECRET` | Ver [mercadopago.md](mercadopago.md) |
 | `LICITA_PRESTADOR` | `Virtus SpA` |
-| `WHATSAPP_*`, `LICITA_WHATSAPP_PUBLICO` | Ver [whatsapp-masivo-app.md](whatsapp-masivo-app.md) |
+| `WHATSAPP_*`, `LICITA_WHATSAPP_PUBLICO` | Ver [whatsapp.md](whatsapp.md) |
 | `SMTP_USUARIO`, `SMTP_CLAVE` | Correo de avisos desde hola@calza.cl. Ver [correo.md](correo.md) |
 
 Lo que aún no tengas (ticket, WhatsApp, Mercado Pago) puede quedar vacío: el sitio funciona igual y esas partes
@@ -190,7 +190,7 @@ deploy/tareas.sh historico-oc --meses 24
 
 ## 8. Conectar WhatsApp y Mercado Pago
 
-- **WhatsApp:** URL del webhook `https://calza.cl/webhook/whatsapp` ([whatsapp-masivo-app.md](whatsapp-masivo-app.md), paso 5).
+- **WhatsApp:** URL del webhook `https://calza.cl/webhook/whatsapp` ([whatsapp.md](whatsapp.md)).
 - **Mercado Pago:** URL del webhook `https://calza.cl/pagos/mercadopago/webhook` ([mercadopago.md](mercadopago.md)).
 
 ## Operación del día a día

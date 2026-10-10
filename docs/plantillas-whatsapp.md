@@ -37,12 +37,13 @@ Ejemplos: `Aseo Sur` · `Pyme mensual` · `23 de octubre de 2026`
 
 Ejemplos: `Aseo Sur` · `Compra de guantes de nitrilo para CESFAM` · `95` · `09-10-2026 18:00`
 
-Se envían como **Utility** e idioma **Español (`es`)**. Al revisarlas (octubre de 2026), Meta dejó
-`resumen_diario_simple` y `cobro_rechazado` como utilidad, pero pasó a **marketing** `resumen_diario_licitaciones`
-y `alerta_compra_agil`: destacar una licitación concreta ("La mejor: …", "hay una Compra Ágil que calza: …") cuenta
-como recomendación aunque el cliente la haya pedido. Por eso en producción el resumen diario usa
-`WHATSAPP_PLANTILLA_RESUMEN=resumen_diario_simple`. La alerta de Compra Ágil (solo plan Pro) se envía como
-marketing, que cuesta más y tiene límites de frecuencia por persona.
+Se envían como **Utility** e idioma **Español (`es`)**. Al revisarlas (octubre de 2026), Meta solo dejó como
+utilidad `cobro_rechazado` y pasó a **marketing** las otras tres, incluida `resumen_diario_simple`: para Meta, un
+resumen de oportunidades que la empresa envía por su cuenta es marketing aunque el cliente lo haya pedido y pague por
+él. No depende de la redacción. Por eso el resumen diario usa la plantilla principal (`resumen_diario_licitaciones`,
+con los dos botones) y se asume el costo de marketing: unos US$0,06 a 0,09 por mensaje, solo los días en que el
+cliente no escribió en las últimas 24 horas. Meta también limita cuántos mensajes de marketing recibe cada persona;
+si aparecen errores de entrega, conviene enviar el resumen además por correo.
 
 ## Enviarlas a revisión (todas juntas)
 
@@ -75,8 +76,8 @@ paralelo con el resto de la configuración.
 ## Para que no las rechacen ni las recategoricen
 
 - Nada de promociones, descuentos ni invitaciones a pagar un plan: eso las convierte en *marketing* (unas 4 veces más caras).
-- Tampoco destacar una oportunidad concreta (nombre de la licitación, porcentaje de calce): avisar que "tu resumen
-  está listo" queda como utilidad, y el detalle va gratis cuando el cliente toca el botón.
+- Los avisos sobre algo que ya pasó en la cuenta del cliente (un cobro, un vencimiento) quedan como utilidad; los
+  resúmenes o alertas de oportunidades nuevas, no.
 - El cuerpo no empieza ni termina con una variable y tiene suficiente texto fijo alrededor de ellas.
 - Ejemplos realistas en todas las variables.
 - No editar una plantilla aprobada: crear una nueva con otro nombre si hay que cambiarla.

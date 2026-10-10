@@ -37,7 +37,12 @@ Ejemplos: `Aseo Sur` · `Pyme mensual` · `23 de octubre de 2026`
 
 Ejemplos: `Aseo Sur` · `Compra de guantes de nitrilo para CESFAM` · `95` · `09-10-2026 18:00`
 
-Todas son de categoría **Utility** e idioma **Español (`es`)**.
+Se envían como **Utility** e idioma **Español (`es`)**. Al revisarlas (octubre de 2026), Meta dejó
+`resumen_diario_simple` y `cobro_rechazado` como utilidad, pero pasó a **marketing** `resumen_diario_licitaciones`
+y `alerta_compra_agil`: destacar una licitación concreta ("La mejor: …", "hay una Compra Ágil que calza: …") cuenta
+como recomendación aunque el cliente la haya pedido. Por eso en producción el resumen diario usa
+`WHATSAPP_PLANTILLA_RESUMEN=resumen_diario_simple`. La alerta de Compra Ágil (solo plan Pro) se envía como
+marketing, que cuesta más y tiene límites de frecuencia por persona.
 
 ## Enviarlas a revisión (todas juntas)
 
@@ -70,6 +75,8 @@ paralelo con el resto de la configuración.
 ## Para que no las rechacen ni las recategoricen
 
 - Nada de promociones, descuentos ni invitaciones a pagar un plan: eso las convierte en *marketing* (unas 4 veces más caras).
+- Tampoco destacar una oportunidad concreta (nombre de la licitación, porcentaje de calce): avisar que "tu resumen
+  está listo" queda como utilidad, y el detalle va gratis cuando el cliente toca el botón.
 - El cuerpo no empieza ni termina con una variable y tiene suficiente texto fijo alrededor de ellas.
 - Ejemplos realistas en todas las variables.
 - No editar una plantilla aprobada: crear una nueva con otro nombre si hay que cambiarla.

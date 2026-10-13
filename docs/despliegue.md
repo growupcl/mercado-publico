@@ -197,7 +197,7 @@ deploy/tareas.sh historico-oc --meses 24
 
 | Necesito… | Comando (como `calza`, en `/opt/calza`) |
 |---|---|
-| Publicar una versión nueva | `deploy/actualizar.sh` |
+| Publicar una versión nueva | `deploy/actualizar.sh` (espera a que terminen las tareas en curso; las que tocan durante la actualización se omiten y quedan en `logs/tareas.log`) |
 | Ver qué pasa en el sitio | `docker compose logs -f app` |
 | Ver las tareas programadas | `tail -f logs/tareas.log` |
 | Correr una tarea a mano | `deploy/tareas.sh ciclo` (o `whatsapp-enviar`, `suscripciones`…) |

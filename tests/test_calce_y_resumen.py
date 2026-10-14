@@ -2,9 +2,9 @@ from datetime import date, datetime
 from types import SimpleNamespace
 
 from licita.calce import buscar_calces, candidatas, puntaje_prefiltro
-from licita.db import Calce, Empresa
+from licita.db import Calce, Empresa, Licitacion
 from licita.ia import AsistenteIA, ClasificacionLicitacion, EvaluacionCalce, EvaluacionesCalce, clasificar_pendientes
-from licita.resumen import formato_pesos, resumen_diario
+from licita.resumen import formato_pesos, razon_corta, resumen_diario, texto_detalle
 from licita.sync import sincronizar_licitaciones
 
 MOMENTO = datetime(2026, 10, 7, 9, 0)
@@ -101,6 +101,31 @@ def test_resumen_diario_formato_whatsapp(Sesion, cliente_mp):
     assert "Mantención" not in texto
     # Ya notificado: el día siguiente no se repite.
     assert resumen_diario(s, e, momento=MOMENTO) is None
+
+
+def test_resumen_acorta_el_motivo_y_el_detalle_lo_muestra_completo(Sesion, cliente_mp):
+    s = _cargar(Sesion, cliente_mp)
+    e = _empresa_aseo(s)
+    razon = ("Piden detergente, guantes y bolsas de basura, que son tu rubro. "
+             "Además el monto calza con tu rango y la región es la tuya.")
+    calce = Calce(empresa_id=e.id, licitacion_codigo="1234-56-LE26", puntaje=92, razon=razon)
+    s.add(calce)
+    s.commit()
+    texto = resumen_diario(s, e, momento=MOMENTO)
+    assert "   Piden detergente, guantes y bolsas de basura, que son tu rubro.\n" in texto
+    assert "Además" not in texto
+    assert f"Por qué te sirve: {razon}" in texto_detalle(calce, s.get(Licitacion, "1234-56-LE26"))
+
+
+def test_razon_corta():
+    assert razon_corta("  Es tu rubro.  ") == "Es tu rubro."
+    assert razon_corta("Piden guantes; también mascarillas.") == "Piden guantes."
+    assert razon_corta("Piden 1.5 kg de cloro.") == "Piden 1.5 kg de cloro."
+    larga = "Piden " + ", ".join(["detergente", "guantes", "bolsas", "cloro", "escobas", "traperos", "jabón", "toallas", "papel higiénico"])
+    corta = razon_corta(larga, largo=60)
+    assert corta.endswith("…") and len(corta) <= 61
+    assert not corta[:-1].endswith(",")
+    assert larga.startswith(corta[:-1])
 
 
 def test_clasificar_pendientes_solo_publicadas(Sesion, cliente_mp):

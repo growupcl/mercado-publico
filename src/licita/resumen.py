@@ -33,6 +33,22 @@ def titulo(lic: Licitacion) -> str:
     return f"⚡ Compra Ágil: {lic.nombre}" if es_compra_agil(lic) else lic.nombre
 
 
+LARGO_RAZON_RESUMEN = 90
+
+
+def razon_corta(razon: str, largo: int = LARGO_RAZON_RESUMEN) -> str:
+    """Motivo del calce para el resumen: solo la primera frase y, si aún es larga, cortada en una palabra.
+    El detalle de la licitación muestra el motivo completo."""
+    razon = " ".join(razon.split())
+    for fin in (". ", "; "):
+        if fin in razon:
+            razon = razon.split(fin, 1)[0] + "."
+            break
+    if len(razon) <= largo:
+        return razon
+    return razon[:largo].rsplit(" ", 1)[0].rstrip(",;:") + "…"
+
+
 def formato_cierre(lic: Licitacion) -> str:
     return lic.fecha_cierre.strftime("%d-%m-%Y %H:%M") if lic.fecha_cierre else "sin fecha"
 
@@ -96,7 +112,7 @@ def texto_resumen(empresa: Empresa, filas: list[Fila]) -> str:
             f"{i}. *{titulo(lic)}* ({calce.puntaje}% de calce)",
             f"   {lugar}",
             f"   Monto estimado: {formato_pesos(lic.monto_estimado)} · Cierra: {formato_cierre(lic)}",
-            f"   {calce.razon}",
+            f"   {razon_corta(calce.razon)}",
             "",
         ]
     lineas.append("Responde con el número de una licitación para ver su detalle.")

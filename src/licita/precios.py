@@ -12,6 +12,7 @@ se usan productos parecidos de la misma familia (mismos 6 primeros dígitos del 
 
 from __future__ import annotations
 
+import math
 import statistics
 from collections import Counter
 from dataclasses import dataclass, field
@@ -20,7 +21,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .calce import tokens
+from .calce import _raiz, tokens
 from .db import Licitacion, OrdenCompra, Precio, ahora
 from .resumen import formato_pesos
 
@@ -30,6 +31,13 @@ MINIMO_OBSERVACIONES = 3
 MAXIMO_SIN_CODIGO = 20_000
 MESES_HISTORIA = 24
 SIMILITUD_MINIMA = 0.5
+# Si el precio alto habitual (p75) es más de 5 veces el bajo (p25), el código mezcla cosas de tamaños muy distintos.
+DISPERSION_MAXIMA = 5.0
+# Servicios (segmentos 70 a 95 del clasificador ONU): se compran como "1 unidad" de cualquier tamaño, así que
+# primero se comparan con las compras del mismo código cuya descripción se parece a la licitación.
+SEGMENTO_SERVICIOS = 70
+MINIMO_PARECIDAS = 5
+PALABRAS_EN_COMUN = 2
 
 
 # --- Carga de precios desde lo sincronizado ---
@@ -142,6 +150,12 @@ class ReferenciaPrecio:
     en_region: int
     proveedores_frecuentes: list[tuple[str, int]]
     por_similitud: bool  # True si se usaron productos parecidos y no el mismo código
+    parecidas_a: list[str] = field(default_factory=list)  # palabras de la licitación con que se filtró (servicios)
+
+    @property
+    def dispersa(self) -> bool:
+        """El rango habitual es tan amplio que la mediana no dice cuánto cobrar en esta licitación."""
+        return self.p25 > 0 and self.p75 / self.p25 > DISPERSION_MAXIMA
 
     @property
     def rango_competitivo(self) -> tuple[float, float]:
@@ -183,7 +197,7 @@ class InformePrecios:
     @property
     def total_mediano(self) -> float | None:
         """Costo de la licitación a precio mediano, si todos los ítems tienen referencia y cantidad."""
-        if not self.referencias or any(r is None or not r.cantidad for _, r in self.referencias):
+        if not self.referencias or any(r is None or not r.cantidad or r.dispersa for _, r in self.referencias):
             return None
         return sum(r.mediana * r.cantidad for _, r in self.referencias)
 
@@ -196,12 +210,15 @@ def _cuartiles(valores: list[float]) -> tuple[float, float, float]:
 
 
 def _sin_atipicos(valores: list[float]) -> list[float]:
-    """Quita precios atípicos (regla de 1,5 × rango intercuartil), por ejemplo cajas contra unidades."""
+    """Quita precios atípicos, por ejemplo cajas contra unidades: regla de 1,5 × rango intercuartil sobre el
+    logaritmo del precio, es decir, en proporción y no en pesos. En pesos, los servicios grandes (un evento de
+    $20 millones entre muchos de $1 millón) quedaban fuera y la referencia bajaba."""
     if len(valores) < 4:
         return valores
-    q1, _, q3 = _cuartiles(valores)
+    logs = [math.log(v) for v in valores]
+    q1, _, q3 = _cuartiles(logs)
     rango = q3 - q1
-    filtrados = [v for v in valores if q1 - 1.5 * rango <= v <= q3 + 1.5 * rango]
+    filtrados = [v for v, lv in zip(valores, logs) if q1 - 1.5 * rango <= lv <= q3 + 1.5 * rango]
     return filtrados or valores
 
 
@@ -227,13 +244,56 @@ def _observaciones(
     return parecidas, True
 
 
+def es_servicio(item: dict) -> bool:
+    codigo = str(item.get("codigo_producto") or "")
+    return len(codigo) >= 2 and codigo[:2].isdigit() and int(codigo[:2]) >= SEGMENTO_SERVICIOS
+
+
+# Palabras frecuentes en nombres de licitaciones que no dicen qué se compra.
+GENERICAS_LICITACION = {"serv", "actividad", "actividades", "comuna", "comunal", "municipal", "municipalidad",
+                        "region", "regional", "ano", "anual", "programa", "proyecto", "realizacion", "ejecucion"}
+
+
+def _raices(texto: str) -> dict[str, str]:
+    """Raíz → palabra tal como aparece (la primera vez), para comparar sin plurales y mostrar la palabra real."""
+    raices: dict[str, str] = {}
+    for t in tokens(texto):
+        if t not in GENERICAS_LICITACION:
+            raices.setdefault(_raiz(t), t)
+    return raices
+
+
+def _parecidas_a_la_licitacion(obs: list[Precio], item: dict, contexto: str) -> tuple[list[Precio], list[str]]:
+    """Compras del mismo código cuya descripción comparte palabras propias de esta licitación (no las del nombre
+    genérico del producto, que tienen todas). Devuelve las compras y las palabras usadas, de la más repetida a la menos."""
+    propias = _raices(f"{item.get('descripcion', '')} {contexto}")
+    for r in _raices(f"{item.get('producto', '')} {item.get('categoria', '')}"):
+        propias.pop(r, None)
+    if len(propias) < PALABRAS_EN_COMUN:
+        return [], []
+    parecidas, usadas = [], Counter()
+    for p in obs:
+        comunes = propias.keys() & _raices(p.producto).keys()
+        if len(comunes) >= PALABRAS_EN_COMUN:
+            parecidas.append(p)
+            usadas.update(comunes)
+    return parecidas, [propias[r] for r, _ in usadas.most_common()]
+
+
 def referencia_item(
-    session: Session, item: dict, *, region: str = "", momento: datetime | None = None, meses: int = MESES_HISTORIA
+    session: Session, item: dict, *, region: str = "", contexto: str = "", momento: datetime | None = None,
+    meses: int = MESES_HISTORIA,
 ) -> ReferenciaPrecio | None:
+    """`contexto`: nombre de la licitación; en servicios sirve para comparar solo con compras parecidas."""
     momento = momento or ahora()
     obs, por_similitud = _observaciones(session, item, momento - timedelta(days=30 * meses))
     if len(obs) < MINIMO_OBSERVACIONES:
         return None
+    parecidas_a: list[str] = []
+    if es_servicio(item) and contexto:
+        parecidas, palabras = _parecidas_a_la_licitacion(obs, item, contexto)
+        if len(parecidas) >= MINIMO_PARECIDAS:
+            obs, parecidas_a = parecidas, palabras
     valores = sorted(_sin_atipicos([p.precio_unitario for p in obs]))
     p25, mediana, p75 = _cuartiles(valores)
     proveedores = Counter(p.proveedor_nombre for p in obs if p.proveedor_nombre and valores[0] <= p.precio_unitario <= valores[-1])
@@ -246,6 +306,7 @@ def referencia_item(
         en_region=sum(1 for p in obs if region and p.region == region),
         proveedores_frecuentes=proveedores.most_common(3),
         por_similitud=por_similitud,
+        parecidas_a=parecidas_a,
     )
 
 
@@ -274,7 +335,7 @@ def referencia_cotizaciones(
 def informe_precios(session: Session, lic: Licitacion, *, momento: datetime | None = None) -> InformePrecios:
     informe = InformePrecios(codigo=lic.codigo, nombre=lic.nombre, monto_estimado=lic.monto_estimado)
     for item in lic.items:
-        informe.referencias.append((item, referencia_item(session, item, region=lic.region, momento=momento)))
+        informe.referencias.append((item, referencia_item(session, item, region=lic.region, contexto=lic.nombre, momento=momento)))
         informe.cotizaciones.append(referencia_cotizaciones(session, item, momento=momento))
     return informe
 
@@ -296,12 +357,20 @@ def texto_precios(informe: InformePrecios, *, maximo_items: int = 8) -> str:
         cantidad = _cantidad(item.get("cantidad"))
         producto = item.get("producto") or item.get("categoria") or ""
         lineas.append(f"{mostrados}. *{producto}*" + (f" × {cantidad:g}" if cantidad else ""))
-        if ref:
+        if ref and ref.dispersa:
+            lineas += [
+                f"   ⚠️ Rango muy amplio: {formato_pesos(ref.p25)} – {formato_pesos(ref.p75)} ({ref.observaciones} compras).",
+                "   Este código agrupa " + ("servicios" if es_servicio(item) else "compras") + " de tamaños muy distintos: "
+                "no es una referencia confiable para esta licitación. Guíate por el presupuesto y lo que piden las bases.",
+            ]
+        elif ref:
             bajo, alto = ref.rango_competitivo
             lineas += [
                 f"   Mediana: {formato_pesos(ref.mediana)} c/u · habitual {formato_pesos(ref.p25)} – {formato_pesos(ref.p75)} ({ref.observaciones} compras)",
                 f"   👉 Precio competitivo: {formato_pesos(bajo)} – {formato_pesos(alto)}",
             ]
+            if ref.parecidas_a:
+                lineas.append(f"   (Comparado con compras parecidas a esta: {', '.join(ref.parecidas_a[:4])})")
             if ref.proveedores_frecuentes:
                 lineas.append("   Suelen ganar: " + ", ".join(f"{n} ({c})" for n, c in ref.proveedores_frecuentes))
         if cot:

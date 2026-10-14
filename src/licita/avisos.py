@@ -1,4 +1,4 @@
-"""Avisos al cliente sobre su cuenta: por ahora, cobros rechazados de la suscripción.
+"""Avisos al cliente sobre su cuenta: cobros rechazados de la suscripción y fin de la prueba gratuita.
 
 Mercado Pago reintenta los cobros rechazados por su cuenta; nosotros le avisamos al cliente para que
 revise su tarjeta antes de que termine el período (más los días de gracia).
@@ -22,8 +22,9 @@ from .correo import ClienteCorreo, ErrorCorreo
 from .db import Empresa, MandatoPago, Pago, Suscripcion, ahora
 from .notificaciones import registrar, ventana_abierta
 from .planes import PLANES
-from .plantillas_whatsapp import COBRO_RECHAZADO
-from .suscripciones import DIAS_GRACIA_RENOVACION, generar_token
+from .plantillas_whatsapp import COBRO_RECHAZADO, FIN_PRUEBA, SUSCRIPCION_TERMINADA
+from .planes import PRECIO_FUNDADOR_PRO, formato_pesos
+from .suscripciones import DIAS_GRACIA_RENOVACION, fundador_disponible, generar_token
 from .whatsapp import ClienteWhatsApp, ErrorWhatsApp
 
 log = logging.getLogger(__name__)
@@ -184,3 +185,174 @@ def _avisar_whatsapp(session, wa, empresa, mandato, limite, enlace, idioma, mome
         log.warning("No se pudo avisar el cobro rechazado por WhatsApp a la empresa #%s: %s", empresa.id, e)
         return False  # se reintenta en la próxima revisión
     return True
+
+
+# --- Fin de la prueba gratuita ---
+
+# Cuántos días antes de que termine la prueba se avisa (día 11 de 14).
+DIAS_AVISO_FIN_PRUEBA = 3
+# Pasado este plazo desde el vencimiento, el aviso de "terminó" ya no se envía (llegaría atrasado).
+VIGENCIA_AVISO_TERMINADA = timedelta(days=3)
+
+
+def _correo_html(empresa: Empresa, parrafos: list[str], enlace: str, boton: str) -> str:
+    e = html.escape
+    cuerpo = "".join(f"<p>{p}</p>" for p in parrafos)  # los párrafos ya vienen escapados
+    return f"""<!doctype html>
+<html lang="es"><body style="margin:0;padding:24px;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#1f2933">
+<div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:8px;padding:28px">
+<p style="font-size:20px;font-weight:bold;margin:0 0 16px">Calza</p>
+<p>Hola {e(empresa.nombre)}:</p>
+{cuerpo}
+<p style="text-align:center;margin:28px 0"><a href="{e(enlace)}" style="background:#0b6e4f;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:6px;font-weight:bold">{e(boton)}</a></p>
+<p style="font-size:13px;color:#52606d">Este enlace es privado: funciona como una contraseña, no lo compartas.</p>
+<p style="font-size:13px;color:#52606d">Equipo Calza · hola@calza.cl</p>
+</div></body></html>"""
+
+
+def _texto_fundador(fundador: bool) -> str:
+    if not fundador:
+        return ""
+    return (f"Si eliges el plan Pro ahora, quedas con el precio fundador de {formato_pesos(PRECIO_FUNDADOR_PRO)} "
+            "al mes de por vida (solo para los primeros clientes).")
+
+
+def mensajes_fin_prueba(empresa: Empresa, termina: str, enlace: str, fundador: bool) -> tuple[str, str, str, str]:
+    """(texto de WhatsApp, asunto, texto y html del correo) del aviso de que la prueba termina pronto."""
+    fundador_txt = _texto_fundador(fundador)
+    whatsapp = (f"Hola {empresa.nombre}, tu prueba gratuita de Calza termina el {termina}. Para seguir recibiendo "
+                "cada mañana las licitaciones que calzan con tu negocio, elige tu plan aquí (enlace privado):\n"
+                f"{enlace}" + (f"\n\n{fundador_txt}" if fundador_txt else "") +
+                "\n\nSi te suscribes ahora no pierdes días de prueba: el primer cobro es al terminarla.")
+    asunto = f"Tu prueba de Calza termina el {termina}"
+    texto = (f"Hola {empresa.nombre}:\n\nTu prueba gratuita de Calza termina el {termina}. Desde ese día dejas de "
+             "recibir el resumen diario de licitaciones por WhatsApp.\n\n"
+             f"Para seguir recibiéndolo, elige tu plan desde tu cuenta:\n\n{enlace}\n\n"
+             + (f"{fundador_txt}\n" if fundador_txt else "") +
+             "Si te suscribes ahora no pierdes días de prueba: el primer cobro es al terminarla.\n\n"
+             "Este enlace es privado: funciona como una contraseña, no lo compartas.\n\n"
+             "Saludos,\nEquipo Calza · hola@calza.cl")
+    e = html.escape
+    parrafos = [f"Tu prueba gratuita de Calza termina el <strong>{e(termina)}</strong>. Desde ese día dejas de "
+                "recibir el resumen diario de licitaciones por WhatsApp.",
+                "Para seguir recibiéndolo, elige tu plan desde tu cuenta. Si te suscribes ahora no pierdes días de "
+                "prueba: el primer cobro es al terminarla."]
+    if fundador_txt:
+        parrafos.append(e(fundador_txt))
+    return whatsapp, asunto, texto, _correo_html(empresa, parrafos, enlace, "Elegir mi plan")
+
+
+def mensajes_terminada(empresa: Empresa, que: str, termino: str, enlace: str, fundador: bool) -> tuple[str, str, str, str]:
+    """Lo mismo para el aviso de que la prueba o el plan terminó. `que`: "prueba gratuita" o "plan Pyme mensual"."""
+    fundador_txt = _texto_fundador(fundador)
+    whatsapp = (f"Hola {empresa.nombre}, tu {que} de Calza terminó el {termino} y dejamos de enviarte el resumen "
+                "diario de licitaciones. Si quieres volver a recibirlas, elige tu plan aquí (enlace privado):\n"
+                f"{enlace}" + (f"\n\n{fundador_txt}" if fundador_txt else ""))
+    asunto = f"Tu {que} de Calza terminó"
+    texto = (f"Hola {empresa.nombre}:\n\nTu {que} de Calza terminó el {termino} y dejamos de enviarte el resumen "
+             "diario de licitaciones por WhatsApp.\n\n"
+             f"Si quieres volver a recibirlas, elige tu plan desde tu cuenta:\n\n{enlace}\n\n"
+             + (f"{fundador_txt}\n\n" if fundador_txt else "") +
+             "Si no te convenció, nos ayudaría mucho saber por qué: responde este correo con una línea.\n\n"
+             "Este enlace es privado: funciona como una contraseña, no lo compartas.\n\n"
+             "Saludos,\nEquipo Calza · hola@calza.cl")
+    e = html.escape
+    parrafos = [f"Tu {e(que)} de Calza terminó el <strong>{e(termino)}</strong> y dejamos de enviarte el resumen "
+                "diario de licitaciones por WhatsApp.",
+                "Si quieres volver a recibirlas, elige tu plan desde tu cuenta."]
+    if fundador_txt:
+        parrafos.append(e(fundador_txt))
+    parrafos.append("Si no te convenció, nos ayudaría mucho saber por qué: responde este correo con una línea.")
+    return whatsapp, asunto, texto, _correo_html(empresa, parrafos, enlace, "Volver a Calza")
+
+
+def _enviar_aviso(session, wa, correo, empresa, *, texto_wa, plantilla, parametros, asunto, texto, cuerpo_html,
+                  idioma, momento) -> tuple[bool, bool]:
+    """Envía por WhatsApp (si lo tiene activo) y por correo. Devuelve (whatsapp_ok, correo_ok)."""
+    ok_wa = ok_correo = False
+    if wa is not None and empresa.whatsapp and empresa.whatsapp_activo:
+        try:
+            if ventana_abierta(empresa, momento):
+                wamid = wa.enviar_texto(empresa.whatsapp, texto_wa)
+                registrar(session, empresa, empresa.whatsapp, "saliente", "texto", texto_wa.split("\n")[0], wamid)
+            else:
+                wamid = wa.enviar_plantilla(empresa.whatsapp, plantilla.nombre, idioma=idioma, parametros=parametros,
+                                            payloads_botones=["CUENTA"])
+                registrar(session, empresa, empresa.whatsapp, "saliente", "plantilla", " | ".join(parametros), wamid)
+            ok_wa = True
+        except ErrorWhatsApp as e:
+            log.warning("No se pudo enviar el aviso %s por WhatsApp a la empresa #%s: %s", plantilla.nombre, empresa.id, e)
+    if correo is not None and empresa.email:
+        try:
+            correo.enviar(empresa.email, asunto, texto, cuerpo_html)
+            ok_correo = True
+        except ErrorCorreo as e:
+            log.warning("No se pudo enviar el aviso %s por correo a la empresa #%s: %s", plantilla.nombre, empresa.id, e)
+    return ok_wa, ok_correo
+
+
+def _plan_terminado(session: Session, empresa: Empresa, suscripcion: Suscripcion) -> str:
+    """"prueba gratuita" si nunca pagó; si no, el plan que tenía."""
+    pago = session.scalar(select(Pago).where(Pago.empresa_id == empresa.id, Pago.estado == "pagado")
+                          .order_by(Pago.creado_en.desc()).limit(1))
+    if pago is None:
+        return "prueba gratuita"
+    return f"plan {PLANES[pago.plan].nombre} {pago.periodicidad}" if pago.plan in PLANES else "plan"
+
+
+def avisar_fin_de_prueba(
+    session: Session,
+    wa: ClienteWhatsApp | None,
+    *,
+    url_publica: str,
+    correo: ClienteCorreo | None = None,
+    idioma: str = "es",
+    momento: datetime | None = None,
+) -> ResultadoAvisos:
+    """Avisa a quienes están por terminar la prueba sin suscribirse y a quienes acaban de pasar al plan gratis.
+
+    Cada aviso se marca como enviado si salió por al menos un canal; si fallan ambos, se reintenta en la próxima
+    revisión. Un aviso de "terminó" que lleva más de 3 días pendiente ya no se envía."""
+    momento = momento or ahora()
+    resultado = ResultadoAvisos()
+    fundador = fundador_disponible(session)
+    por_terminar = session.scalars(select(Suscripcion).where(
+        Suscripcion.estado == "prueba", Suscripcion.mandato_activo_id.is_(None), Suscripcion.aviso_fin_prueba_en.is_(None),
+        Suscripcion.vigente_hasta > momento, Suscripcion.vigente_hasta <= momento + timedelta(days=DIAS_AVISO_FIN_PRUEBA),
+    )).all()
+    for suscripcion in por_terminar:
+        empresa = session.get(Empresa, suscripcion.empresa_id)
+        termina = fecha_larga(suscripcion.vigente_hasta)
+        enlace = f"{url_publica}/cuenta/{generar_token(empresa)}"
+        texto_wa, asunto, texto, cuerpo_html = mensajes_fin_prueba(empresa, termina, enlace, fundador)
+        ok_wa, ok_correo = _enviar_aviso(
+            session, wa, correo, empresa, texto_wa=texto_wa, plantilla=FIN_PRUEBA, parametros=[empresa.nombre, termina],
+            asunto=asunto, texto=texto, cuerpo_html=cuerpo_html, idioma=idioma, momento=momento)
+        if ok_wa or ok_correo:
+            suscripcion.aviso_fin_prueba_en = momento
+        resultado.whatsapp += ok_wa
+        resultado.correos += ok_correo
+        session.commit()
+
+    terminadas = session.scalars(select(Suscripcion).where(
+        Suscripcion.estado == "vencida", Suscripcion.aviso_vencida_en.is_(None),
+    )).all()
+    for suscripcion in terminadas:
+        if momento - suscripcion.vigente_hasta > VIGENCIA_AVISO_TERMINADA:
+            suscripcion.aviso_vencida_en = momento  # atrasado: ya no se envía
+            session.commit()
+            continue
+        empresa = session.get(Empresa, suscripcion.empresa_id)
+        que, termino = _plan_terminado(session, empresa, suscripcion), fecha_larga(suscripcion.vigente_hasta)
+        enlace = f"{url_publica}/cuenta/{generar_token(empresa)}"
+        texto_wa, asunto, texto, cuerpo_html = mensajes_terminada(empresa, que, termino, enlace, fundador)
+        ok_wa, ok_correo = _enviar_aviso(
+            session, wa, correo, empresa, texto_wa=texto_wa, plantilla=SUSCRIPCION_TERMINADA,
+            parametros=[empresa.nombre, que, termino], asunto=asunto, texto=texto, cuerpo_html=cuerpo_html,
+            idioma=idioma, momento=momento)
+        if ok_wa or ok_correo:
+            suscripcion.aviso_vencida_en = momento
+        resultado.whatsapp += ok_wa
+        resultado.correos += ok_correo
+        session.commit()
+    return resultado

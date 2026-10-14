@@ -278,6 +278,7 @@ def registrar_cobro(session: Session, mp: ClienteMercadoPago, cobro_id: str, *, 
         inicio = max(momento, suscripcion.vigente_hasta)
         suscripcion.vigente_hasta = sumar_meses(inicio, PERIODICIDADES[mandato.periodicidad])
         suscripcion.plan, suscripcion.periodicidad, suscripcion.estado = mandato.plan, mandato.periodicidad, "activa"
+        suscripcion.aviso_vencida_en = None  # si vuelve a vencer, se avisa de nuevo
         empresa.plan = mandato.plan
         pago.estado, pago.pagado_en = "pagado", momento
     else:

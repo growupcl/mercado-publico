@@ -307,6 +307,19 @@ def cmd_suscripciones(args, config: Config, Sesion) -> int:
     return 0
 
 
+def cmd_avisos_prueba(args, config: Config, Sesion) -> int:
+    from .avisos import avisar_fin_de_prueba
+
+    wa, correo = (_whatsapp(config) if config.whatsapp_token else None), _correo(config)
+    if wa is None and correo is None:
+        print("Sin WhatsApp ni correo configurados: no se envían avisos.")
+        return 0
+    with Sesion() as s:
+        r = avisar_fin_de_prueba(s, wa, url_publica=config.url_publica, correo=correo, idioma=config.whatsapp_idioma)
+    print(f"Avisos de fin de prueba y de plan terminado: {r.whatsapp} por WhatsApp, {r.correos} por correo")
+    return 0
+
+
 def cmd_mp_prueba(args, config: Config, Sesion) -> int:
     from .db import Empresa
     from .mercadopago import ClienteMercadoPago
@@ -548,6 +561,9 @@ def construir_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("suscripciones", help="Vence suscripciones impagas, lista las por vencer y avisa cobros rechazados")
     s.add_argument("--dias", type=int, default=3, help="Días de anticipación para listar las por vencer")
     s.set_defaults(fn=cmd_suscripciones)
+
+    s = sub.add_parser("avisos-prueba", help="Avisa a quienes terminan la prueba en 3 días y a quienes pasaron al plan gratis")
+    s.set_defaults(fn=cmd_avisos_prueba)
 
     s = sub.add_parser("facturas", help="Lista los pagos por facturar en el portal del SII o registra el folio emitido")
     s.add_argument("--csv", action="store_true", help="Exporta las pendientes en CSV (separado por punto y coma)")

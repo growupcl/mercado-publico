@@ -30,5 +30,8 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # 3:15: vence suscripciones impagas y lista las próximas a vencer.
 15 3 * * *      /opt/calza/deploy/tareas.sh suscripciones
 
+# 10:05: avisos de "tu prueba termina en 3 días" y "tu prueba o plan terminó" (a una hora razonable para WhatsApp).
+5 10 * * *      /opt/calza/deploy/tareas.sh avisos-prueba
+
 # 2:45: respaldo de la base de datos.
 45 2 * * *      /opt/calza/deploy/respaldo.sh >> /opt/calza/logs/respaldos.log 2>&1

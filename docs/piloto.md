@@ -60,14 +60,14 @@ Para [N] usa el número de licitaciones abiertas que muestra la portada de calza
 
 ## Durante la prueba
 
-Calza no avisa solo cuando una prueba está por terminar. Para ver a quién le toca el mensaje 3, ejecuta en el servidor
-(como usuario `calza`, en `/opt/calza`):
+Los mensajes 3 y 4 ya salen solos (`licita avisos-prueba`, todos los días a las 10:05): por WhatsApp y por correo,
+3 días antes de que termine la prueba si la empresa no se ha suscrito, y el día en que pasa al plan gratis. Los de
+abajo sirven para escribir en persona además del aviso automático, por ejemplo para agendar la conversación de cierre.
+Para ver qué pruebas vencen pronto, ejecuta en el servidor (como usuario `calza`, en `/opt/calza`):
 
 ```
 docker compose exec -T app licita suscripciones --dias 3
 ```
-
-Lista las cuentas que vencen en los próximos 3 días.
 
 ### 1. Bienvenida (día 1, después de que se registra)
 

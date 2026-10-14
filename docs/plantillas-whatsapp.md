@@ -16,6 +16,8 @@ a Meta y el que usa el sistema. Las pruebas automáticas revisan las reglas que 
 | `resumen_diario_simple` | Respaldo con menos variables, por si Meta rechaza la principal | Ver licitaciones | Recomendada |
 | `cobro_rechazado` | Mercado Pago no pudo cobrar la suscripción (ya se envía automáticamente) | Ver mi cuenta | Recomendada |
 | `alerta_compra_agil` | Aviso urgente de Compra Ágil (plan Pro) | Ver detalle | **Sí**, si vendes el plan Pro (alertas urgentes) |
+| `fin_prueba` | La prueba termina en 3 días y la empresa no se ha suscrito (se envía automáticamente) | Ver mi cuenta | **Sí** |
+| `suscripcion_terminada` | La prueba o el plan terminó sin pago y la cuenta pasó al plan gratis (automático) | Ver mi cuenta | **Sí** |
 
 ### `resumen_diario_licitaciones`
 > Hola {{1}}, hoy encontramos {{2}} que calzan con tu negocio. La mejor: {{3}} ({{4}}% de calce), cierra el {{5}}. Toca un botón para ver el detalle.
@@ -36,6 +38,22 @@ Ejemplos: `Aseo Sur` · `Pyme mensual` · `23 de octubre de 2026`
 > Hola {{1}}, hay una Compra Ágil que calza con tu negocio: {{2}} ({{3}}% de calce). El plazo para cotizar cierra el {{4}}. Toca el botón para ver el detalle.
 
 Ejemplos: `Aseo Sur` · `Compra de guantes de nitrilo para CESFAM` · `95` · `09-10-2026 18:00`
+
+### `fin_prueba`
+> Hola {{1}}, tu prueba gratuita de Calza termina el {{2}}. Desde ese día dejarás de recibir el resumen diario de licitaciones por WhatsApp. Toca el botón y te enviamos el enlace a tu cuenta.
+
+Ejemplos: `Aseo Sur` · `28 de octubre de 2026`
+
+### `suscripcion_terminada`
+> Hola {{1}}, tu {{2}} de Calza terminó el {{3}} y dejamos de enviarte el resumen diario de licitaciones. Si quieres volver a recibirlas, toca el botón y te enviamos el enlace a tu cuenta.
+
+Ejemplos: `Aseo Sur` · `prueba gratuita` · `28 de octubre de 2026`
+
+Las dos solo informan un cambio en la cuenta, sin precios ni invitación a pagar, para que queden como utilidad. Los
+planes y el precio fundador van en el texto libre (si la ventana de 24 horas está abierta) y en el correo, que no pasan
+por la revisión de Meta. Para enviar solo estas dos a revisión:
+`docker compose exec app licita whatsapp-plantillas --crear fin_prueba suscripcion_terminada`.
+Mientras no estén aprobadas, el aviso por WhatsApp falla (queda en el registro) y llega igual por correo.
 
 Se envían como **Utility** e idioma **Español (`es`)**. Al revisarlas (octubre de 2026), Meta solo dejó como
 utilidad `cobro_rechazado` y pasó a **marketing** las otras tres, incluida `resumen_diario_simple`: para Meta, un

@@ -25,7 +25,7 @@ from .planes import DIAS_PRUEBA, PLANES, PRECIO_FUNDADOR_PRO, formato_pesos
 from .publico import REGIONES_PUBLICAS, RUBROS, Cache
 from .sitio import crear_router_publico
 from .suscripciones import (
-    REGIONES, DatosRegistro, ErrorRegistro, actualizar_mandato, cancelar_renovacion, cotizar, empresa_por_token,
+    REGIONES, DatosRegistro, ErrorRegistro, actualizar_mandato, actualizar_perfil, cancelar_renovacion, cotizar, empresa_por_token,
     fundador_disponible, iniciar_suscripcion, registrar_cobro, registrar_empresa, suscripcion_de,
 )
 
@@ -127,38 +127,63 @@ def crear_router_web(
                 "enlace_cuenta": f"{url_publica}/cuenta/{token}", "wa_link": wa_link,
             })
 
+    def _pagina_cuenta(request: Request, s, empresa, token: str, *, perfil: dict | None = None,
+                       errores_perfil: dict | None = None, perfil_guardado: bool = False, estado: int = 200):
+        suscripcion = suscripcion_de(s, empresa)
+        mandato = s.get(MandatoPago, suscripcion.mandato_activo_id) if suscripcion.mandato_activo_id else None
+        opciones = []
+        for codigo, plan in PLANES.items():
+            for periodicidad in ("mensual", "anual"):
+                valor, fundador = cotizar(s, suscripcion, codigo, periodicidad)
+                actual = mandato is not None and (mandato.plan, mandato.periodicidad) == (codigo, periodicidad)
+                opciones.append({"plan": codigo, "nombre": plan.nombre, "periodicidad": periodicidad, "monto": valor,
+                                 "fundador": fundador, "actual": actual})
+        pagos = list(s.scalars(select(Pago).where(Pago.empresa_id == empresa.id).order_by(Pago.creado_en.desc()).limit(12)))
+        # Último cobro rechazado de la suscripción activa, si no hubo uno aprobado después.
+        rechazo = None
+        if mandato is not None and pagos and pagos[0].mandato_id == mandato.id and pagos[0].estado == "rechazado":
+            rechazo = _fecha(pagos[0].creado_en)
+        restantes = max(0, (suscripcion.vigente_hasta - ahora()).days)
+        nombres = {**{c: p.nombre for c, p in PLANES.items()}, "gratis": "Gratis", "consultora": "Consultoras"}
+        return plantillas.TemplateResponse(request, "cuenta.html", {
+            "empresa": empresa, "suscripcion": suscripcion, "plan_actual": nombres.get(empresa.plan, empresa.plan),
+            "vigente_hasta": _fecha(suscripcion.vigente_hasta), "dias_restantes": restantes, "mandato": mandato,
+            "nombre_mandato": nombres.get(mandato.plan) if mandato else "",
+            "opciones": opciones, "pagos": pagos, "token": token, "prestador": prestador,
+            "rut": rutlib.formatear(empresa.rut) if empresa.rut else "", "pagos_activos": mp is not None,
+            "rechazo": rechazo, "regiones": REGIONES, "errores_perfil": errores_perfil or {},
+            "perfil": perfil or {"descripcion": empresa.descripcion, "regiones": empresa.regiones or [],
+                                 "monto_max": empresa.monto_max},
+            "perfil_guardado": perfil_guardado,
+        }, status_code=estado)
+
     @router.get("/cuenta/{token}", response_class=HTMLResponse)
-    def cuenta(request: Request, token: str):
+    def cuenta(request: Request, token: str, perfil: str = ""):
         with Sesion() as s:
             empresa = empresa_por_token(s, token)
             if empresa is None:
                 return mensaje(request, "Enlace no válido",
                                "Este enlace de acceso no existe o fue reemplazado. Escribe CUENTA a Calza por WhatsApp para recibir uno nuevo.",
                                estado=404)
-            suscripcion = suscripcion_de(s, empresa)
-            mandato = s.get(MandatoPago, suscripcion.mandato_activo_id) if suscripcion.mandato_activo_id else None
-            opciones = []
-            for codigo, plan in PLANES.items():
-                for periodicidad in ("mensual", "anual"):
-                    valor, fundador = cotizar(s, suscripcion, codigo, periodicidad)
-                    actual = mandato is not None and (mandato.plan, mandato.periodicidad) == (codigo, periodicidad)
-                    opciones.append({"plan": codigo, "nombre": plan.nombre, "periodicidad": periodicidad, "monto": valor,
-                                     "fundador": fundador, "actual": actual})
-            pagos = list(s.scalars(select(Pago).where(Pago.empresa_id == empresa.id).order_by(Pago.creado_en.desc()).limit(12)))
-            # Último cobro rechazado de la suscripción activa, si no hubo uno aprobado después.
-            rechazo = None
-            if mandato is not None and pagos and pagos[0].mandato_id == mandato.id and pagos[0].estado == "rechazado":
-                rechazo = _fecha(pagos[0].creado_en)
-            restantes = max(0, (suscripcion.vigente_hasta - ahora()).days)
-            nombres = {**{c: p.nombre for c, p in PLANES.items()}, "gratis": "Gratis", "consultora": "Consultoras"}
-            return plantillas.TemplateResponse(request, "cuenta.html", {
-                "empresa": empresa, "suscripcion": suscripcion, "plan_actual": nombres.get(empresa.plan, empresa.plan),
-                "vigente_hasta": _fecha(suscripcion.vigente_hasta), "dias_restantes": restantes, "mandato": mandato,
-                "nombre_mandato": nombres.get(mandato.plan) if mandato else "",
-                "opciones": opciones, "pagos": pagos, "token": token, "prestador": prestador,
-                "rut": rutlib.formatear(empresa.rut) if empresa.rut else "", "pagos_activos": mp is not None,
-                "rechazo": rechazo,
-            })
+            return _pagina_cuenta(request, s, empresa, token, perfil_guardado=perfil == "guardado")
+
+    @router.post("/cuenta/{token}/perfil", response_class=HTMLResponse)
+    def guardar_perfil(request: Request, token: str, descripcion: str = Form(""), regiones: list[str] = Form([]),
+                       monto_max: str = Form("")):
+        try:
+            tope = float(monto_max) if monto_max.strip() else None
+        except ValueError:
+            tope = -1.0  # lo rechaza la validación
+        with Sesion() as s:
+            empresa = empresa_por_token(s, token)
+            if empresa is None:
+                return mensaje(request, "Enlace no válido", "Escribe CUENTA a Calza por WhatsApp para recibir un enlace nuevo.", estado=404)
+            try:
+                actualizar_perfil(s, empresa, descripcion=descripcion, regiones=regiones, monto_max=tope, ia=ia)
+            except ErrorRegistro as e:
+                datos = {"descripcion": descripcion, "regiones": regiones, "monto_max": monto_max}
+                return _pagina_cuenta(request, s, empresa, token, perfil=datos, errores_perfil=e.errores, estado=422)
+        return RedirectResponse(f"/cuenta/{token}?perfil=guardado#perfil", status_code=303)
 
     @router.post("/cuenta/{token}/suscribir")
     def suscribir(request: Request, token: str, opcion: str = Form(""), plan: str = Form(""), periodicidad: str = Form(""),

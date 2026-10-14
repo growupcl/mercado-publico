@@ -75,7 +75,26 @@ ALERTA_COMPRA_AGIL = Plantilla(
     uso="Aviso urgente de Compra Ágil (plan Pro), apenas se confirma el calce.",
 )
 
-PLANTILLAS = {p.nombre: p for p in (RESUMEN_DIARIO, RESUMEN_DIARIO_SIMPLE, COBRO_RECHAZADO, ALERTA_COMPRA_AGIL)}
+FIN_PRUEBA = Plantilla(
+    nombre="fin_prueba",
+    cuerpo=("Hola {{1}}, tu prueba gratuita de Calza termina el {{2}}. Desde ese día dejarás de recibir el resumen "
+            "diario de licitaciones por WhatsApp. Toca el botón y te enviamos el enlace a tu cuenta."),
+    ejemplos=("Aseo Sur", "28 de octubre de 2026"),
+    botones=("Ver mi cuenta",),
+    uso="Aviso 3 días antes de que termine la prueba, si la empresa todavía no se suscribe.",
+)
+
+SUSCRIPCION_TERMINADA = Plantilla(
+    nombre="suscripcion_terminada",
+    cuerpo=("Hola {{1}}, tu {{2}} de Calza terminó el {{3}} y dejamos de enviarte el resumen diario de "
+            "licitaciones. Si quieres volver a recibirlas, toca el botón y te enviamos el enlace a tu cuenta."),
+    ejemplos=("Aseo Sur", "prueba gratuita", "28 de octubre de 2026"),
+    botones=("Ver mi cuenta",),
+    uso="Aviso cuando termina la prueba o el plan sin pago y la cuenta pasa al plan gratis.",
+)
+
+PLANTILLAS = {p.nombre: p for p in (RESUMEN_DIARIO, RESUMEN_DIARIO_SIMPLE, COBRO_RECHAZADO, ALERTA_COMPRA_AGIL,
+                                    FIN_PRUEBA, SUSCRIPCION_TERMINADA)}
 
 # Qué responde Calza cuando el usuario toca cada botón (el payload se define al enviar).
 PAYLOADS_RESUMEN = {

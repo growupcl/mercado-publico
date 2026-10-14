@@ -229,6 +229,10 @@ class Suscripcion(Base):
     precio_fundador: Mapped[bool] = mapped_column(Boolean, default=False)
     # Suscripción de Mercado Pago que cobra automáticamente (None = sin renovación automática).
     mandato_activo_id: Mapped[int | None] = mapped_column(Integer)
+    # Avisos de cuenta: "tu prueba termina pronto" (una vez por prueba) y "tu prueba o plan terminó" (se limpia
+    # cuando vuelve a pagar, para avisar si vence de nuevo). None = no enviado.
+    aviso_fin_prueba_en: Mapped[datetime | None] = mapped_column(DateTime)
+    aviso_vencida_en: Mapped[datetime | None] = mapped_column(DateTime)
     creada_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
 
 

@@ -263,3 +263,128 @@ def test_error_smtp_se_informa(monkeypatch):
     monkeypatch.setattr(smtplib, "SMTP", caido)
     with pytest.raises(ErrorCorreo, match="cliente@pyme.cl"):
         ClienteCorreo("smtp.gmail.com", 587, "u", "c", "hola@calza.cl").enviar("cliente@pyme.cl", "a", "b")
+
+
+# --- Fin de la prueba ---
+
+from licita.avisos import avisar_fin_de_prueba  # noqa: E402
+from licita.suscripciones import revisar_vencimientos  # noqa: E402
+
+
+@pytest.fixture
+def en_prueba(Sesion):
+    """Empresa recién registrada (prueba de 14 días), sin suscripción en Mercado Pago."""
+    wa, correo = WAFalso(), CorreoFalso()
+    router = crear_router_web(Sesion, mp=MPFalso(), ia=IAFalsa(), url_publica="https://calza.cl", mp_webhook_secreto=SECRETO)
+    cliente = TestClient(crear_app(Sesion, router_web=router))
+    _registrar(cliente)
+    with Sesion() as s:
+        fin = s.query(Suscripcion).one().vigente_hasta
+    return cliente, Sesion, wa, correo, fin
+
+
+def _avisar(Sesion, wa, correo, momento):
+    with Sesion() as s:
+        return avisar_fin_de_prueba(s, wa, url_publica="https://calza.cl", correo=correo, momento=momento)
+
+
+def test_avisa_tres_dias_antes_de_que_termine_la_prueba_una_sola_vez(en_prueba):
+    cliente, Sesion, wa, correo, fin = en_prueba
+    assert _avisar(Sesion, wa, correo, fin - timedelta(days=4)).total == 0  # todavía no
+    r = _avisar(Sesion, wa, correo, fin - timedelta(days=2, hours=23))
+    assert (r.whatsapp, r.correos) == (1, 1)
+    [(tipo, nombre, parametros, botones)] = wa.enviados
+    assert (tipo, nombre, parametros, botones) == ("plantilla", "fin_prueba", ["Aseo Sur", fecha_larga(fin)], ["CUENTA"])
+    [(para, asunto, texto, html)] = correo.enviados
+    assert para == "contacto@aseosur.cl" and asunto == f"Tu prueba de Calza termina el {fecha_larga(fin)}"
+    assert "precio fundador de $39.990" in texto and "precio fundador de $39.990" in html
+    enlace = texto.split("https://calza.cl/cuenta/")[1].split()[0]
+    assert cliente.get(f"/cuenta/{enlace}").status_code == 200 and f'href="https://calza.cl/cuenta/{enlace}"' in html
+    assert _avisar(Sesion, wa, correo, fin - timedelta(days=1)).total == 0  # no se repite
+
+
+def test_con_ventana_abierta_el_aviso_va_como_texto_con_enlace(en_prueba):
+    cliente, Sesion, wa, correo, fin = en_prueba
+    momento = fin - timedelta(days=2)
+    with Sesion() as s:
+        s.query(Empresa).one().ultimo_mensaje_entrante = momento - timedelta(hours=1)
+        s.commit()
+    _avisar(Sesion, wa, None, momento)
+    [(tipo, texto)] = wa.enviados
+    assert tipo == "texto" and "tu prueba gratuita de Calza termina el" in texto
+    assert cliente.get(texto.split("https://calza.cl")[1].split()[0]).status_code == 200
+    with Sesion() as s:
+        assert "/cuenta/" not in s.query(MensajeWhatsApp).filter_by(direccion="saliente").one().contenido
+
+
+def test_no_avisa_fin_de_prueba_si_ya_se_suscribio(en_prueba):
+    _, Sesion, wa, correo, fin = en_prueba
+    with Sesion() as s:
+        s.query(Suscripcion).one().mandato_activo_id = 99
+        s.commit()
+    assert _avisar(Sesion, wa, correo, fin - timedelta(days=2)).total == 0
+
+
+def test_si_fallan_ambos_canales_se_reintenta(en_prueba):
+    _, Sesion, wa, correo, fin = en_prueba
+    wa.falla = correo.falla = True
+    assert _avisar(Sesion, wa, correo, fin - timedelta(days=2)).total == 0
+    wa.falla = correo.falla = False
+    assert _avisar(Sesion, wa, correo, fin - timedelta(days=1)).total == 2
+
+
+def test_con_baja_de_whatsapp_solo_va_el_correo(en_prueba):
+    _, Sesion, wa, correo, fin = en_prueba
+    with Sesion() as s:
+        s.query(Empresa).one().whatsapp_activo = False
+        s.commit()
+    r = _avisar(Sesion, wa, correo, fin - timedelta(days=2))
+    assert (r.whatsapp, r.correos) == (0, 1) and wa.enviados == []
+
+
+def test_avisa_cuando_la_prueba_termino_y_no_si_es_atrasado(en_prueba):
+    _, Sesion, wa, correo, fin = en_prueba
+    with Sesion() as s:
+        s.query(Suscripcion).one().aviso_fin_prueba_en = fin - timedelta(days=3)  # ya se avisó antes
+        s.commit()
+        revisar_vencimientos(s, momento=fin + timedelta(hours=5))
+    r = _avisar(Sesion, wa, correo, fin + timedelta(hours=12))
+    assert (r.whatsapp, r.correos) == (1, 1)
+    [(_, nombre, parametros, _)] = wa.enviados
+    assert nombre == "suscripcion_terminada" and parametros == ["Aseo Sur", "prueba gratuita", fecha_larga(fin)]
+    [(_, asunto, texto, _)] = correo.enviados
+    assert asunto == "Tu prueba gratuita de Calza terminó" and "responde este correo" in texto
+    assert _avisar(Sesion, wa, correo, fin + timedelta(days=1)).total == 0  # no se repite
+
+
+def test_aviso_de_terminada_atrasado_no_se_envia(en_prueba):
+    _, Sesion, wa, correo, fin = en_prueba
+    with Sesion() as s:
+        s.query(Suscripcion).one().aviso_fin_prueba_en = fin
+        revisar_vencimientos(s, momento=fin + timedelta(hours=5))
+    assert _avisar(Sesion, wa, correo, fin + timedelta(days=5)).total == 0
+    with Sesion() as s:
+        assert s.query(Suscripcion).one().aviso_vencida_en is not None
+
+
+def test_plan_pagado_que_vence_dice_el_plan_y_se_rearma_al_volver_a_pagar(entorno):
+    cliente, Sesion, mp, wa, _ = entorno  # Pyme mensual con renovación automática
+    mp.cobros["C1"] = CobroMP(id="C1", suscripcion_id="PRE1", estado_pago="approved", monto=19990)
+    _aviso(cliente, "subscription_authorized_payment", "C1")
+    with Sesion() as s:
+        sus = s.query(Suscripcion).one()
+        sus.mandato_activo_id, sus.aviso_vencida_en = None, ahora()  # canceló; un aviso viejo ya enviado
+        fin = sus.vigente_hasta
+        s.commit()
+    mp.cobros["C2"] = CobroMP(id="C2", suscripcion_id="PRE1", estado_pago="approved", monto=19990)
+    _aviso(cliente, "subscription_authorized_payment", "C2")  # vuelve a pagar: el aviso se rearma
+    with Sesion() as s:
+        sus = s.query(Suscripcion).one()
+        assert sus.aviso_vencida_en is None
+        sus.mandato_activo_id = None
+        fin = sus.vigente_hasta
+        s.commit()
+        revisar_vencimientos(s, momento=fin + timedelta(hours=1))
+    wa.enviados.clear()
+    r = _avisar(Sesion, wa, None, fin + timedelta(hours=6))
+    assert r.whatsapp == 1 and wa.enviados[0][2] == ["Aseo Sur", "plan Pyme mensual", fecha_larga(fin)]

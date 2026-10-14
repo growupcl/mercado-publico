@@ -28,8 +28,28 @@ def _config(conexion=None, url: str | None = None) -> ConfigAlembic:
     return cfg
 
 
+# Columna que agregó cada migración, de la más nueva a la más antigua. Sirve para saber en qué versión está una base
+# creada sin Alembic (con create_all): se marca esa versión y se aplican solo las siguientes.
+MARCAS = (
+    ("0005", "suscripciones", "aviso_fin_prueba_en"),
+    ("0004", "pagos", "aviso_correo_en"),
+    ("0003", "empresas", "direccion"),
+    ("0002", "pagos", "aviso_enviado_en"),
+)
+
+
+def version_del_esquema(conexion) -> str:
+    inspector = inspect(conexion)
+    tablas = set(inspector.get_table_names())
+    for revision, tabla, columna in MARCAS:
+        if tabla in tablas and columna in {c["name"] for c in inspector.get_columns(tabla)}:
+            return revision
+    return "0001"
+
+
 def migrar(database_url: str) -> None:
-    """Deja la base en la última versión. Si fue creada antes de existir las migraciones, la marca como actual."""
+    """Deja la base en la última versión. Si fue creada sin Alembic, la marca con la versión que tiene su esquema y
+    aplica las siguientes."""
     motor = create_engine(database_url)
     try:
         with motor.connect() as conexion:
@@ -40,9 +60,8 @@ def migrar(database_url: str) -> None:
                 tablas = set(inspect(conexion).get_table_names())
                 cfg = _config(conexion)
                 if "empresas" in tablas and "alembic_version" not in tablas:
-                    command.stamp(cfg, "head")
-                else:
-                    command.upgrade(cfg, "head")
+                    command.stamp(cfg, version_del_esquema(conexion))
+                command.upgrade(cfg, "head")
                 conexion.commit()
             finally:
                 if es_postgres:

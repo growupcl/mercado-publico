@@ -279,7 +279,10 @@ def crear_sesiones(database_url: str) -> sessionmaker:
     if database_url in ("sqlite://", "sqlite:///:memory:"):
         # Base en memoria (pruebas): una sola conexión compartida entre hilos.
         engine = create_engine(database_url, poolclass=StaticPool, connect_args={"check_same_thread": False})
+        Base.metadata.create_all(engine)
     else:
+        from .migrar import migrar
+
+        migrar(database_url)  # aplica las migraciones pendientes antes de usar la base
         engine = create_engine(database_url)
-    Base.metadata.create_all(engine)
     return sessionmaker(engine, expire_on_commit=False)

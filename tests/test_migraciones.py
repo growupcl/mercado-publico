@@ -90,3 +90,21 @@ def test_migracion_0004_no_genera_correos_por_cobros_ya_resueltos(tmp_path):
     with motor.connect() as conexion:
         filas = dict(conexion.execute(text("SELECT id, aviso_correo_en FROM pagos")).all())
     assert filas[1] is not None and filas[2] is None  # el ya resuelto no se vuelve a avisar; el pendiente sí
+
+
+def test_base_creada_sin_alembic_con_un_esquema_viejo_recibe_las_columnas_nuevas(tmp_path):
+    """Producción se creó con create_all antes de la migración 0005: debe marcarse 0004 y aplicar 0005."""
+    from alembic import command
+    from sqlalchemy import text
+
+    url = f"sqlite:///{tmp_path}/prod.db"
+    motor = create_engine(url)
+    with motor.connect() as conexion:
+        command.upgrade(_config(conexion), "0004")
+        conexion.execute(text("DROP TABLE alembic_version"))  # como si se hubiera creado con create_all
+        conexion.commit()
+    Sesion = crear_sesiones(url)  # cualquier comando aplica lo pendiente al iniciar
+    with motor.connect() as conexion:
+        assert MigrationContext.configure(conexion).get_current_revision() == _ultima_version()
+        assert "aviso_fin_prueba_en" in {c["name"] for c in inspect(conexion).get_columns("suscripciones")}
+    Sesion.kw["bind"].dispose()

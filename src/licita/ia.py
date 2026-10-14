@@ -62,7 +62,9 @@ SISTEMA_CALCE = """Eres un asesor experto en compras públicas de Chile. Evalúa
 Para cada licitación entrega:
 - codigo: el código exacto recibido.
 - puntaje: entero de 0 a 100. 90-100 = calce evidente con lo que vende; 60-89 = probable, vale la pena revisar; 30-59 = parcial o dudoso; 0-29 = no corresponde.
-- razon: una frase en español, concreta, que explique el puntaje al dueño de la pyme.
+- razon: máximo 12 palabras en español, para leer en el celular. Di qué piden que calza (o no) con lo que vende la empresa.
+  No repitas organismo, región, monto ni fecha de cierre: ya se muestran aparte. Sin "Esta licitación" ni "La empresa".
+  Ejemplos: "Piden detergente, guantes y bolsas: es tu rubro." · "Solo 2 de 10 ítems son de aseo." · "Es mantención de jardines, no venta de insumos."
 Considera rubro, productos o servicios pedidos, región y monto respecto del perfil. No inventes datos que no estén en la información recibida."""
 
 

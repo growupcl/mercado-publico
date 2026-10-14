@@ -16,12 +16,12 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 import anthropic
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from . import rut as rutlib
 from .calce import tokens
-from .db import Empresa, MandatoPago, Pago, Suscripcion, ahora
+from .db import Calce, Empresa, MandatoPago, Pago, Suscripcion, ahora
 from .mercadopago import ClienteMercadoPago
 from .ia import AsistenteIA, ErrorIA
 from .planes import CUPOS_FUNDADOR, DIAS_PRUEBA, PERIODICIDADES, PLANES, monto
@@ -120,6 +120,18 @@ def validar(datos: DatosRegistro) -> dict[str, str]:
     return errores
 
 
+def extraer_palabras_clave(descripcion: str, ia: AsistenteIA | None) -> list[str]:
+    """Rubros y palabras clave con IA; si no se puede, las palabras de la descripción."""
+    if ia is not None:
+        try:
+            perfil = ia.extraer_perfil(descripcion)
+            if perfil.palabras_clave or perfil.rubros:
+                return perfil.palabras_clave + perfil.rubros
+        except (ErrorIA, anthropic.APIError) as e:
+            log.warning("No se pudo extraer el perfil con IA; se usan las palabras de la descripción: %s", e)
+    return sorted(tokens(descripcion))
+
+
 def registrar_empresa(
     session: Session, datos: DatosRegistro, *, ia: AsistenteIA | None = None, momento: datetime | None = None
 ) -> tuple[Empresa, str]:
@@ -135,16 +147,7 @@ def registrar_empresa(
     if errores:
         raise ErrorRegistro(errores)
 
-    palabras_clave: list[str] = []
-    if ia is not None:
-        try:
-            perfil = ia.extraer_perfil(datos.descripcion)
-            palabras_clave = perfil.palabras_clave + perfil.rubros
-        except (ErrorIA, anthropic.APIError) as e:
-            log.warning("No se pudo extraer el perfil con IA; se usan las palabras de la descripción: %s", e)
-    if not palabras_clave:
-        palabras_clave = sorted(tokens(datos.descripcion))
-
+    palabras_clave = extraer_palabras_clave(datos.descripcion, ia)
     empresa = Empresa(
         nombre=datos.nombre.strip(), descripcion=datos.descripcion.strip(), regiones=datos.regiones,
         monto_max=datos.monto_max, palabras_clave=palabras_clave, whatsapp=telefono,
@@ -293,6 +296,33 @@ def cancelar_renovacion(session: Session, empresa: Empresa, mp: ClienteMercadoPa
     suscripcion.mandato_activo_id = None
     session.commit()
     return True
+
+
+# --- Perfil ---
+
+def actualizar_perfil(
+    session: Session, empresa: Empresa, *, descripcion: str, regiones: list[str], monto_max: float | None,
+    ia: AsistenteIA | None = None,
+) -> None:
+    """Cambia qué vende la empresa, sus regiones y su monto máximo. Si cambió la descripción, vuelve a extraer
+    las palabras clave. Los calces aún no enviados se borran para evaluarlos de nuevo con el perfil nuevo."""
+    descripcion = descripcion.strip()
+    errores: dict[str, str] = {}
+    if len(descripcion) < 20:
+        errores["descripcion"] = "Cuéntanos con más detalle qué vende tu empresa (al menos una frase)."
+    if any(r not in REGIONES for r in regiones):
+        errores["regiones"] = "Elige regiones de la lista."
+    if monto_max is not None and monto_max <= 0:
+        errores["monto_max"] = "El monto máximo debe ser mayor que cero, o déjalo vacío."
+    if errores:
+        raise ErrorRegistro(errores)
+    cambio = (descripcion, sorted(regiones), monto_max) != (empresa.descripcion, sorted(empresa.regiones or []), empresa.monto_max)
+    if descripcion != empresa.descripcion or not empresa.palabras_clave:
+        empresa.palabras_clave = extraer_palabras_clave(descripcion, ia)
+    empresa.descripcion, empresa.regiones, empresa.monto_max = descripcion, regiones, monto_max
+    if cambio:
+        session.execute(delete(Calce).where(Calce.empresa_id == empresa.id, Calce.notificado.is_(False)))
+    session.commit()
 
 
 # --- Vencimientos ---

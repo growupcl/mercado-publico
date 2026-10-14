@@ -37,6 +37,7 @@ TEXTO_AYUDA = (
     "• Escribe *TODAS* para volver a ver el último resumen.\n"
     "• Escribe *PRECIOS* después de ver una licitación para saber cuánto ha pagado el Estado por lo mismo.\n"
     "• Envíame el *PDF de las bases* de una licitación y te digo qué piden, plazos, garantías y cómo se evalúa.\n"
+    "• Escribe *PERFIL* para cambiar qué vendes, tus regiones o tu monto máximo.\n"
     "• Escribe *CUENTA* para ver tu plan o pagar.\n"
     "• Escribe *BAJA* si ya no quieres recibir mensajes."
 )
@@ -161,6 +162,14 @@ def responder(
         token = generar_token(empresa)
         return [f"🔐 Este es tu enlace privado para ver tu plan y pagar:\n{url_publica}/cuenta/{token}\n\n"
                 "No lo compartas: funciona como una contraseña. Si pides uno nuevo, el anterior deja de funcionar."]
+
+    if comando in ("perfil", "mi perfil", "rubro", "rubros"):
+        if not url_publica:
+            return ["Escríbenos a hola@calza.cl y te ayudamos a cambiar tu perfil."]
+        token = generar_token(empresa)
+        return [f"✏️ Aquí puedes cambiar qué vende tu empresa, tus regiones y tu monto máximo:\n{url_publica}/cuenta/{token}#perfil\n\n"
+                "Desde el próximo ciclo te buscamos licitaciones con tu perfil nuevo. "
+                "No compartas el enlace: funciona como una contraseña."]
 
     if comando in ("precios", "precio"):
         return [_precios(session, empresa, momento)]

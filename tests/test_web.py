@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from licita import facturas
 from licita import rut as rutlib
 from licita.conversacion import procesar_webhook
-from licita.db import Empresa, MandatoPago, Pago, Suscripcion, ahora
+from licita.db import Calce, Empresa, Licitacion, MandatoPago, Pago, Suscripcion, ahora
 from licita.mercadopago import ClienteMercadoPago, CobroMP, ErrorMercadoPago, SuscripcionMP, verificar_firma
 from licita.ia import ErrorIA, PerfilExtraido
 from licita.notificaciones import enviar_resumenes
@@ -468,3 +468,69 @@ def test_pago_sin_factura_sale_de_pendientes(web):
         with pytest.raises(ValueError):
             facturas.marcar_sin_factura(s, f.pago_id)
     assert "N° 130" in cliente.get(f"/cuenta/{token}").text
+
+
+# --- Perfil ---
+
+def test_cambiar_perfil_reextrae_palabras_y_reevalua_lo_no_enviado(web):
+    cliente, Sesion, _ = web
+    _, token = _registrar(cliente)
+    with Sesion() as s:
+        e = empresa_por_token(s, token)
+        e.palabras_clave = ["viejo"]
+        s.add_all([Licitacion(codigo="A-1", nombre="Aseo"), Licitacion(codigo="B-2", nombre="Guantes")])
+        s.add_all([Calce(empresa_id=e.id, licitacion_codigo="A-1", puntaje=90, razon="x", notificado=True),
+                   Calce(empresa_id=e.id, licitacion_codigo="B-2", puntaje=70, razon="x")])
+        s.commit()
+    pagina = cliente.get(f"/cuenta/{token}")
+    assert "Tu perfil" in pagina.text and '<span class="chip">viejo</span>' in pagina.text
+
+    # Solo cambian las regiones: no se llama a la IA, pero lo no enviado se vuelve a evaluar.
+    r = cliente.post(f"/cuenta/{token}/perfil", data={"descripcion": FORM["descripcion"], "regiones": ["Maule"],
+                                                      "monto_max": ""}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == f"/cuenta/{token}?perfil=guardado#perfil"
+    with Sesion() as s:
+        e = empresa_por_token(s, token)
+        assert (e.regiones, e.monto_max, e.palabras_clave) == (["Maule"], None, ["viejo"])
+        assert [c.licitacion_codigo for c in s.scalars(select(Calce))] == ["A-1"]  # lo ya enviado se conserva
+
+    nueva = "Insumos de aseo, guantes de nitrilo y mantención de áreas verdes para municipios."
+    r = cliente.post(f"/cuenta/{token}/perfil", data={"descripcion": nueva, "regiones": ["Maule"], "monto_max": "5000000"})
+    assert r.status_code == 200 and "guardamos tu perfil" in r.text
+    with Sesion() as s:
+        e = empresa_por_token(s, token)
+        assert (e.descripcion, e.monto_max) == (nueva, 5_000_000)
+        assert e.palabras_clave == ["detergente", "guantes", "artículos de aseo"]
+
+
+def test_perfil_con_errores_no_cambia_nada(web):
+    cliente, Sesion, _ = web
+    _, token = _registrar(cliente)
+    r = cliente.post(f"/cuenta/{token}/perfil", data={"descripcion": "aseo", "regiones": ["Narnia"], "monto_max": "-5"})
+    assert r.status_code == 422
+    assert "al menos una frase" in r.text and "Elige regiones de la lista" in r.text and "mayor que cero" in r.text
+    assert ">aseo</textarea>" in r.text  # conserva lo escrito
+    with Sesion() as s:
+        e = empresa_por_token(s, token)
+        assert (e.descripcion, e.regiones) == (FORM["descripcion"], ["Biobío", "Ñuble"])
+    assert cliente.post("/cuenta/token-que-no-existe-0000000/perfil", data={"descripcion": "x" * 30}).status_code == 404
+
+
+def test_perfil_por_whatsapp_lleva_a_la_seccion(web):
+    cliente, Sesion, _ = web
+    _registrar(cliente)
+
+    class WA:
+        enviados = []
+
+        def enviar_texto(self, tel, texto):
+            self.enviados.append(texto)
+            return "w"
+
+    payload = {"entry": [{"changes": [{"value": {"messages": [
+        {"from": "56989299524", "id": "wamid.p1", "type": "text", "text": {"body": "Perfil"}}]}}]}]}
+    with Sesion() as s:
+        procesar_webhook(s, WA(), payload, url_publica="https://calza.cl")
+    enlace = WA.enviados[0].split("https://calza.cl")[1].split()[0]
+    assert enlace.endswith("#perfil")
+    assert "Tu perfil" in cliente.get(enlace.removesuffix("#perfil")).text

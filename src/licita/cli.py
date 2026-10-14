@@ -616,6 +616,7 @@ def main(argv: list[str] | None = None) -> int:
     # httpx registra cada URL, y la de Mercado Público lleva el ticket: no debe quedar en los registros.
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpx2").setLevel(logging.WARNING)  # copia de httpx que usa el SDK de Anthropic: una línea por llamada a la IA
+    logging.getLogger("alembic").setLevel(logging.WARNING)  # revisa las migraciones al iniciar cada comando: sin ruido si no hay
     args = construir_parser().parse_args(argv)
     config = Config.desde_entorno()
     Sesion = crear_sesiones(config.database_url)

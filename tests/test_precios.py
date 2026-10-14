@@ -150,3 +150,55 @@ def test_precios_en_plan_pyme_muestra_invitacion_al_pro(s):
     procesar_webhook(s, wa, _texto("PRECIOS"), momento=MOMENTO)
     assert "parte del *plan Pro*" in wa.enviados[-1]
     assert "referencias de 1 de 3 ítems" in wa.enviados[-1]
+
+
+EVENTOS = "90151802"  # Producción de eventos (servicio)
+
+
+def test_atipicos_en_proporcion_no_descarta_servicios_grandes(s):
+    for i, valor in enumerate([200_000, 500_000, 1_000_000, 2_000_000, 3_000_000, 20_000_000]):
+        _precio(s, f"OC-{i}", valor, codigo="47131700", producto="Insumos")
+    _precio(s, "OC-error", 1, codigo="47131700", producto="Insumos")  # error de digitación
+    s.commit()
+    ref = referencia_item(s, {"codigo_producto": "47131700", "producto": "Insumos"}, momento=MOMENTO)
+    assert ref.maximo == 20_000_000 and ref.minimo == 200_000
+
+
+def _licitacion_evento(s, nombre="SERV. PRODUCCIÓN PARA ACTIVIDAD ENCUENTRO JUVENTUD"):
+    lic = Licitacion(codigo="2686-134-LE26", nombre=nombre, region="Región Metropolitana de Santiago",
+                     items=[{"codigo_producto": EVENTOS, "producto": "Producción de eventos", "cantidad": 1}])
+    s.add(lic)
+    return lic
+
+
+def test_servicio_de_codigo_disperso_avisa_que_no_es_comparable(s):
+    lic = _licitacion_evento(s, nombre="Servicio de producción integral")
+    for i, valor in enumerate([90_000, 150_000, 180_000, 400_000, 1_000_000, 2_000_000, 2_900_000, 4_000_000]):
+        _precio(s, f"OC-{i}", valor, codigo=EVENTOS, producto="Producción de eventos coffee break", cantidad=1)
+    s.commit()
+    informe = informe_precios(s, lic, momento=MOMENTO)
+    [(_, ref)] = informe.referencias
+    assert ref.dispersa and not ref.parecidas_a
+    assert informe.total_mediano is None
+    texto = texto_precios(informe)
+    assert "⚠️ Rango muy amplio" in texto and "agrupa servicios de tamaños muy distintos" in texto
+    assert "Precio competitivo" not in texto and "Total a precio mediano" not in texto and "Suelen ganar" not in texto
+
+
+def test_servicio_se_compara_con_compras_parecidas_a_la_licitacion(s):
+    lic = _licitacion_evento(s)
+    for i, valor in enumerate([90_000, 150_000, 180_000, 400_000, 1_000_000, 2_000_000, 2_900_000]):
+        _precio(s, f"OC-chico-{i}", valor, codigo=EVENTOS, producto="Producción de eventos coffee break ceremonia", cantidad=1)
+    for i, valor in enumerate([15_000_000, 18_000_000, 20_000_000, 22_000_000, 25_000_000]):
+        _precio(s, f"OC-grande-{i}", valor, codigo=EVENTOS, cantidad=1, proveedor="Eventos Andes SpA",
+                producto="Producción de eventos encuentros de juventud, escenario y sonido")
+    s.commit()
+    informe = informe_precios(s, lic, momento=MOMENTO)
+    [(_, ref)] = informe.referencias
+    assert ref.observaciones == 5 and ref.mediana == 20_000_000 and not ref.dispersa
+    assert set(ref.parecidas_a) == {"encuentro", "juventud"}
+    assert ref.proveedores_frecuentes == [("Eventos Andes SpA", 5)]
+    texto = texto_precios(informe)
+    assert "Mediana: $20.000.000 c/u" in texto
+    assert "(Comparado con compras parecidas a esta: " in texto and "juventud" in texto
+    assert "Total a precio mediano: $20.000.000" in texto

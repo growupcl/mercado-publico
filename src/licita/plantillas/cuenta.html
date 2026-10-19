@@ -58,6 +58,13 @@
     <div><button class="boton" type="submit">Guardar perfil</button></div>
   </form>
 
+  <form method="post" action="/cuenta/{{ token }}/correo" class="tarjeta" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
+    <div><strong>Resumen diario por correo</strong>
+      <p class="ayuda" style="margin:4px 0 0">{% if empresa.resumen_por_correo %}Activado: además de WhatsApp, te enviamos una copia a {{ empresa.email }}.{% else %}Desactivado: solo lo recibes por WhatsApp.{% endif %}</p></div>
+    {% if empresa.resumen_por_correo %}<button class="boton secundario" type="submit" name="activar" value="no">Desactivar</button>
+    {% else %}<button class="boton" type="submit" name="activar" value="si">Activar</button>{% endif %}
+  </form>
+
   <h2>{% if mandato %}Cambiar de plan{% else %}Elige tu plan{% endif %}</h2>
   <p class="muted">Suscripción con cobro automático mensual o anual, con tarjeta de crédito o débito a través de Mercado Pago. Puedes cancelar cuando quieras.
   {% if suscripcion.estado != "vencida" %}No te cobramos nada hasta el {{ vigente_hasta }}.{% endif %} Precios con IVA.</p>

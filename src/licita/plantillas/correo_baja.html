@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block titulo %}Resumen por correo · Calza{% endblock %}
+{% block robots %}noindex, nofollow{% endblock %}
+{% block contenido %}
+<div style="max-width:640px" class="pila">
+  <h1>¿Dejar de recibir el resumen por correo?</h1>
+  <p class="lead">{{ empresa.nombre }} dejará de recibir la copia diaria del resumen en {{ empresa.email }}.
+  Por WhatsApp lo sigues recibiendo igual, y los avisos de tu cuenta (como un cobro rechazado) llegan por correo de todas formas.</p>
+  <form method="post" action="/correo/baja/{{ token }}"><button class="boton" type="submit">Sí, no enviar más por correo</button></form>
+  <p class="ayuda">Puedes volver a activarlo cuando quieras desde tu cuenta (escribe CUENTA a Calza por WhatsApp).</p>
+</div>
+{% endblock %}

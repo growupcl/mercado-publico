@@ -27,7 +27,8 @@ class ClienteCorreo:
     nombre_remitente: str = "Calza"
     timeout: float = 30
 
-    def mensaje(self, destinatario: str, asunto: str, texto: str, html: str | None = None) -> EmailMessage:
+    def mensaje(self, destinatario: str, asunto: str, texto: str, html: str | None = None,
+                encabezados: dict[str, str] | None = None) -> EmailMessage:
         m = EmailMessage()
         m["From"] = formataddr((self.nombre_remitente, self.remitente))
         m["To"] = destinatario
@@ -36,14 +37,17 @@ class ClienteCorreo:
         m["Date"] = formatdate(localtime=False)
         m["Message-ID"] = make_msgid(domain=self.remitente.rsplit("@", 1)[-1])
         m["Auto-Submitted"] = "auto-generated"  # evita respuestas automáticas en bucle
+        for nombre, valor in (encabezados or {}).items():
+            m[nombre] = valor
         m.set_content(texto)
         if html:
             m.add_alternative(html, subtype="html")
         return m
 
-    def enviar(self, destinatario: str, asunto: str, texto: str, html: str | None = None) -> str:
-        """Envía el correo y devuelve su Message-ID."""
-        m = self.mensaje(destinatario, asunto, texto, html)
+    def enviar(self, destinatario: str, asunto: str, texto: str, html: str | None = None,
+               encabezados: dict[str, str] | None = None) -> str:
+        """Envía el correo y devuelve su Message-ID. `encabezados`: extra, p. ej. List-Unsubscribe."""
+        m = self.mensaje(destinatario, asunto, texto, html, encabezados)
         contexto = ssl.create_default_context()
         try:
             if self.puerto == 465:

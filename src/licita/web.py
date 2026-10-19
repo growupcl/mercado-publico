@@ -17,7 +17,7 @@ from sqlalchemy.orm import sessionmaker
 from . import legal
 from . import rut as rutlib
 from .correo import ClienteCorreo
-from .db import MandatoPago, Pago, Suscripcion, ahora
+from .db import Empresa, MandatoPago, Pago, Suscripcion, ahora
 from .mercadopago import ClienteMercadoPago, ErrorMercadoPago, verificar_firma
 from .whatsapp import ClienteWhatsApp
 from .ia import AsistenteIA
@@ -166,6 +166,43 @@ def crear_router_web(
                                "Este enlace de acceso no existe o fue reemplazado. Escribe CUENTA a Calza por WhatsApp para recibir uno nuevo.",
                                estado=404)
             return _pagina_cuenta(request, s, empresa, token, perfil_guardado=perfil == "guardado")
+
+    def _por_token_correo(s, token: str):
+        if not token or len(token) < 20:
+            return None
+        return s.scalar(select(Empresa).where(Empresa.token_correo == token))
+
+    @router.get("/correo/baja/{token}", response_class=HTMLResponse)
+    def correo_baja_confirmar(request: Request, token: str):
+        # Solo muestra la confirmación: los antivirus de correo abren los enlaces y no deben dar de baja a nadie.
+        with Sesion() as s:
+            empresa = _por_token_correo(s, token)
+            if empresa is None:
+                return mensaje(request, "Enlace no válido", "Este enlace no existe. Escribe CUENTA a Calza por WhatsApp "
+                               "y desde tu cuenta puedes desactivar el resumen por correo.", estado=404)
+            return plantillas.TemplateResponse(request, "correo_baja.html", {"empresa": empresa, "token": token})
+
+    @router.post("/correo/baja/{token}", response_class=HTMLResponse)
+    def correo_baja(request: Request, token: str):
+        """Baja del resumen por correo: desde la página de confirmación o en un clic desde Gmail (List-Unsubscribe-Post)."""
+        with Sesion() as s:
+            empresa = _por_token_correo(s, token)
+            if empresa is None:
+                return mensaje(request, "Enlace no válido", "Este enlace no existe.", estado=404)
+            empresa.resumen_por_correo = False
+            s.commit()
+        return mensaje(request, "Listo", "Ya no te enviaremos el resumen por correo. Por WhatsApp lo sigues recibiendo, "
+                       "y puedes volver a activarlo desde tu cuenta.", chip="Resumen por correo desactivado")
+
+    @router.post("/cuenta/{token}/correo")
+    def cuenta_correo(request: Request, token: str, activar: str = Form("")):
+        with Sesion() as s:
+            empresa = empresa_por_token(s, token)
+            if empresa is None:
+                return mensaje(request, "Enlace no válido", "Escribe CUENTA a Calza por WhatsApp para recibir un enlace nuevo.", estado=404)
+            empresa.resumen_por_correo = activar == "si"
+            s.commit()
+        return RedirectResponse(f"/cuenta/{token}#perfil", status_code=303)
 
     @router.post("/cuenta/{token}/perfil", response_class=HTMLResponse)
     def guardar_perfil(request: Request, token: str, descripcion: str = Form(""), regiones: list[str] = Form([]),

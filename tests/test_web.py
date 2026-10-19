@@ -534,3 +534,28 @@ def test_perfil_por_whatsapp_lleva_a_la_seccion(web):
     enlace = WA.enviados[0].split("https://calza.cl")[1].split()[0]
     assert enlace.endswith("#perfil")
     assert "Tu perfil" in cliente.get(enlace.removesuffix("#perfil")).text
+
+
+# --- Resumen por correo ---
+
+def test_baja_del_resumen_por_correo_pide_confirmacion_y_se_reactiva_en_la_cuenta(web):
+    cliente, Sesion, _ = web
+    _, token = _registrar(cliente)
+    with Sesion() as s:
+        e = empresa_por_token(s, token)
+        e.token_correo = "t" * 32
+        s.commit()
+    confirmar = cliente.get(f"/correo/baja/{'t' * 32}")
+    assert confirmar.status_code == 200 and "¿Dejar de recibir el resumen por correo?" in confirmar.text
+    with Sesion() as s:
+        assert empresa_por_token(s, token).resumen_por_correo  # abrir el enlace no da de baja
+    r = cliente.post(f"/correo/baja/{'t' * 32}", data={"List-Unsubscribe": "One-Click"})
+    assert r.status_code == 200 and "Ya no te enviaremos el resumen por correo" in r.text
+    with Sesion() as s:
+        assert not empresa_por_token(s, token).resumen_por_correo
+    assert "Desactivado: solo lo recibes por WhatsApp" in cliente.get(f"/cuenta/{token}").text
+    r = cliente.post(f"/cuenta/{token}/correo", data={"activar": "si"}, follow_redirects=False)
+    assert r.status_code == 303
+    with Sesion() as s:
+        assert empresa_por_token(s, token).resumen_por_correo
+    assert cliente.get("/correo/baja/no-existe-este-token-0000").status_code == 404

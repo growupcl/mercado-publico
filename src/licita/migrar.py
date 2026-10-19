@@ -31,6 +31,7 @@ def _config(conexion=None, url: str | None = None) -> ConfigAlembic:
 # Columna que agregó cada migración, de la más nueva a la más antigua. Sirve para saber en qué versión está una base
 # creada sin Alembic (con create_all): se marca esa versión y se aplican solo las siguientes.
 MARCAS = (
+    ("0006", "empresas", "resumen_por_correo"),
     ("0005", "suscripciones", "aviso_fin_prueba_en"),
     ("0004", "pagos", "aviso_correo_en"),
     ("0003", "empresas", "direccion"),

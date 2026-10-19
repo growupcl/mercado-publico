@@ -149,10 +149,12 @@ def cmd_whatsapp_enviar(args, config: Config, Sesion) -> int:
 
     with Sesion() as s:
         r = enviar_resumenes(
-            s, _whatsapp(config), plantilla=config.whatsapp_plantilla_resumen, idioma=config.whatsapp_idioma,
-            umbral=args.umbral,
+            s, _whatsapp(config) if config.whatsapp_token else None, plantilla=config.whatsapp_plantilla_resumen,
+            idioma=config.whatsapp_idioma, umbral=args.umbral, correo=_correo(config), url_publica=config.url_publica,
+            whatsapp_publico=config.whatsapp_publico,
         )
     print(f"Plantillas: {r.plantillas} · Textos gratis (ventana abierta): {r.textos} · Sin novedades: {r.sin_novedades} · Errores: {r.errores}")
+    print(f"Correos: {r.correos} · Errores de correo: {r.errores_correo}")
     return 0
 
 

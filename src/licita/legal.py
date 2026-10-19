@@ -64,8 +64,11 @@ def privacidad(prestador: str) -> list:
         "Solo te escribimos si lo autorizaste al registrarte. Puedes dejar de recibir mensajes en cualquier momento escribiendo BAJA.",
     ]),
     ("Correo", [
-        "Te escribimos por correo solo por temas de tu cuenta, como un cobro rechazado de tu suscripción. "
-        "Estos avisos llegan aunque hayas pedido la baja de WhatsApp, porque son necesarios para administrar tu cuenta.",
+        "Te enviamos una copia diaria del resumen de licitaciones por correo. Puedes desactivarla con el enlace que trae "
+        "cada correo o desde tu cuenta.",
+        "También te escribimos por temas de tu cuenta, como el término de tu prueba o un cobro rechazado de tu suscripción. "
+        "Estos avisos llegan aunque hayas desactivado el resumen por correo o pedido la baja de WhatsApp, porque son "
+        "necesarios para administrar tu cuenta.",
     ]),
     ("Tus derechos", [
         "Puedes solicitar acceso, rectificación, eliminación u oposición al tratamiento de tus datos escribiendo a hola@calza.cl.",

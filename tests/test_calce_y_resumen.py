@@ -212,3 +212,18 @@ def test_las_valoraciones_de_la_empresa_llegan_a_la_ia(Sesion, cliente_mp):
     assert "<preferencias_empresa>" in contenido and "no es mi rubro" in contenido
     assert "Mantención" in contenido.split("<preferencias_empresa>")[1].split("</preferencias_empresa>")[0]
     assert "preferencias_empresa" in falso.llamadas[0]["system"]
+
+
+def test_el_detalle_muestra_la_descripcion_de_cada_item():
+    from licita.resumen import texto_detalle
+
+    lic = Licitacion(codigo="5240-109-LR26", nombre="Software forense", organismo="Carabineros", region="RM", items=[
+        {"producto": "Software de extracción de datos", "cantidad": 2, "descripcion": "Licencia Forensic Toolkit (FTK) perpetua con soporte por 3 años"},
+        {"producto": "Software de extracción de datos", "cantidad": 1, "descripcion": "Licencia EnCase Forensic " + "x" * 200},
+        {"producto": "Guantes", "cantidad": 10, "descripcion": "guantes"},  # repite el nombre: no se muestra
+    ])
+    texto = texto_detalle(Calce(puntaje=70, razon="x"), lic)
+    assert "• 2 × Software de extracción de datos: Licencia Forensic Toolkit (FTK) perpetua con soporte por 3 años" in texto
+    linea = next(l for l in texto.splitlines() if "EnCase" in l)
+    assert linea.endswith("…") and len(linea) < 140
+    assert "• 10 × Guantes\n" in texto + "\n"

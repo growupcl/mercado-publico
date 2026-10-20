@@ -48,7 +48,7 @@ def test_muestra_empresas_e_indica_a_quien_contactar(Sesion):
         s.commit()
     r = cliente.get("/admin", auth=("admin", CLAVE))
     assert "Aseo Sur" in r.text and "Jardines Norte" in r.text
-    assert "prueba por terminar sin suscripción" in r.text and "sin escribir hace 9 días" in r.text
+    assert "Prueba termina sin suscripción" in r.text and "Sin escribir hace 9 días" in r.text
     assert 'href="https://wa.me/56989299524"' in r.text and "mailto:contacto@aseosur.cl" in r.text
     assert r.text.index("Aseo Sur") < r.text.index("Jardines Norte")  # primero a quien contactar
     with Sesion() as s:
@@ -74,3 +74,26 @@ def test_ingreso_mensual_y_cobrado_del_mes(Sesion):
         ind, [fila] = datos_panel(s)
     assert (ind.activas, ind.con_renovacion, ind.ingreso_mensual, ind.cobrado_mes) == (1, 1, 17_991, 215_890)
     assert fila.pagado == 215_890 and fila.mandato is not None
+
+
+def test_filtros_y_estado_vacio(Sesion):
+    cliente = _cliente(Sesion)
+    r = cliente.get("/admin", auth=("admin", CLAVE))
+    assert "Todo al día" in r.text and "Todavía no hay empresas registradas" in r.text
+    _registrar(cliente)
+    r = cliente.get("/admin?estado=vencida", auth=("admin", CLAVE))
+    assert "No hay empresas en este filtro" in r.text and 'aria-current="page">Vencidas' in r.text
+    r = cliente.get("/admin?estado=prueba", auth=("admin", CLAVE))
+    assert "Aseo Sur" in r.text and "Día 0 de 14" in r.text
+    assert cliente.get("/admin?estado=otra-cosa", auth=("admin", CLAVE)).status_code == 200  # cae en "Todas"
+
+
+def test_tiempo_relativo():
+    from datetime import datetime
+
+    from licita.admin import hace
+
+    ahora_ = datetime(2026, 10, 20, 10)
+    assert [hace(None, ahora_), hace(ahora_, ahora_), hace(datetime(2026, 10, 19, 23), ahora_),
+            hace(datetime(2026, 10, 14), ahora_), hace(datetime(2026, 9, 29), ahora_)] == [
+        "nunca", "hoy", "ayer", "hace 6 días", "hace 3 semanas"]

@@ -271,7 +271,7 @@ def cmd_servidor(args, config: Config, Sesion) -> int:
         Sesion, mp=mp, ia=AsistenteIA(modelo=config.modelo_clasificacion) if hay_ia else None,
         url_publica=config.url_publica, whatsapp_publico=config.whatsapp_publico,
         mp_webhook_secreto=config.mercadopago_webhook_secret, prestador=config.prestador,
-        wa=wa, idioma_whatsapp=config.whatsapp_idioma, correo=_correo(config),
+        wa=wa, idioma_whatsapp=config.whatsapp_idioma, correo=_correo(config), admin_clave=config.admin_clave,
     )
     app = crear_app(
         Sesion, wa, verify_token=config.whatsapp_verify_token,

@@ -20,6 +20,7 @@ from .correo import ClienteCorreo
 from .db import Empresa, MandatoPago, Pago, Suscripcion, ahora
 from .mercadopago import ClienteMercadoPago, ErrorMercadoPago, verificar_firma
 from .whatsapp import ClienteWhatsApp
+from .admin import crear_router_admin
 from .ia import AsistenteIA
 from .planes import DIAS_PRUEBA, PLANES, PRECIO_FUNDADOR_PRO, formato_pesos
 from .publico import REGIONES_PUBLICAS, RUBROS, Cache
@@ -61,6 +62,7 @@ def crear_router_web(
     idioma_whatsapp: str = "es",
     correo: ClienteCorreo | None = None,
     cache_publico: Cache | None = None,
+    admin_clave: str = "",
 ) -> APIRouter:
     if mp is not None and not mp_webhook_secreto and not permitir_sin_firma:
         raise ValueError("Falta MERCADOPAGO_WEBHOOK_SECRET: sin él no se puede verificar que los avisos vengan de Mercado Pago.")
@@ -72,6 +74,7 @@ def crear_router_web(
         Sesion, plantillas=plantillas, url_publica=url_publica, fundador_disponible=fundador_disponible,
         cache=cache_publico,
     ))
+    router.include_router(crear_router_admin(Sesion, plantillas=plantillas, clave=admin_clave))
     wa_link = f"https://wa.me/{whatsapp_publico}?text={quote('Hola Calza')}" if whatsapp_publico else ""
 
     def mensaje(request: Request, titulo: str, texto: str, *, chip: str = "", chip_clase: str = "", estado: int = 200):

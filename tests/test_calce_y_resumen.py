@@ -176,3 +176,24 @@ def test_sin_clave_de_claude_el_error_es_controlado(monkeypatch, tmp_path):
     e = Empresa(nombre="A", descripcion="Vendemos guantes")
     with pytest.raises(ErrorIA, match="ANTHROPIC_API_KEY"):
         AsistenteIA(cliente).extraer_perfil(e.descripcion)
+
+
+def test_clasificar_se_corta_tras_varios_errores_seguidos_con_el_motivo(Sesion):
+    import pytest
+
+    from licita.ia import ERRORES_SEGUIDOS_MAXIMO, ErrorIA
+
+    class IAQueFalla:
+        llamadas = 0
+
+        def clasificar_licitacion(self, lic):
+            IAQueFalla.llamadas += 1
+            raise ErrorIA("Saldo de créditos insuficiente")
+
+    s = Sesion()
+    s.add_all([Licitacion(codigo=f"L-{i}", nombre="x", estado_codigo=5, fecha_publicacion=datetime(2026, 10, 1, 0, i))
+               for i in range(ERRORES_SEGUIDOS_MAXIMO + 5)])
+    s.commit()
+    with pytest.raises(ErrorIA, match="5 errores seguidos.*Saldo de créditos insuficiente"):
+        clasificar_pendientes(s, IAQueFalla())
+    assert IAQueFalla.llamadas == ERRORES_SEGUIDOS_MAXIMO  # no siguió intentando con el resto

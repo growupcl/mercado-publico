@@ -24,7 +24,7 @@ from sqlalchemy.orm import sessionmaker
 from .db import ahora
 from .planes import DIAS_PRUEBA, PLANES, PRECIO_FUNDADOR_PRO, formato_pesos, monto
 from .publico import (
-    POR_PAGINA, REGION_POR_SLUG, REGIONES_PUBLICAS, RUBRO_POR_SLUG, RUBROS, Cache, Ficha, buscar, cargar_abiertas,
+    POR_PAGINA, REGION_POR_SLUG, REGIONES_PUBLICAS, RUBRO_POR_SLUG, RUBROS, Cache, Ficha, adjudicadas_recientes, buscar, cargar_abiertas,
     cargar_ficha, ejemplo_resumen, estadisticas, pagina,
 )
 
@@ -280,9 +280,9 @@ def crear_router_publico(
         return html(request, "licitacion.html", {
             "f": f, "abierta": abierta, "dias": f.dias_para_cierre(), "rubro": rubro, "region": region,
             "similares": similares[:6], "migas": migas, "canonical": f"{url_publica}/licitacion/{f.codigo}",
-            "precios": precios_de(f) if abierta else [],
+            "precios": precios_de(f) if abierta else [], "indexable": f.indexable,
             "dias_prueba": DIAS_PRUEBA,
-        }, encabezados=CACHE_PUBLICO if abierta else {**CACHE_PUBLICO, **NO_INDEXAR})
+        }, encabezados=CACHE_PUBLICO if f.indexable else {**CACHE_PUBLICO, **NO_INDEXAR})
 
     @router.get("/buscar", response_class=HTMLResponse)
     def buscar_demo(request: Request, q: str = "", region: str = ""):
@@ -320,6 +320,9 @@ def crear_router_publico(
             urls += [(f"{url_publica}/licitaciones/region/{r.slug}", hoy, "0.8") for r in REGIONES_PUBLICAS]
             urls += [(f"{url_publica}/licitaciones/rubro/{r.slug}", hoy, "0.8") for r in RUBROS]
             urls += [(f"{url_publica}/licitacion/{f.codigo}", _fecha_iso(f.actualizada_en), "0.5") for f in fichas]
+            with Sesion() as s:
+                urls += [(f"{url_publica}/licitacion/{codigo}", _fecha_iso(fecha), "0.4")
+                         for codigo, fecha in adjudicadas_recientes(s)]
             urls += [(f"{url_publica}/terminos", None, "0.2"), (f"{url_publica}/privacidad", None, "0.2")]
             lineas = ['<?xml version="1.0" encoding="UTF-8"?>',
                       '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']

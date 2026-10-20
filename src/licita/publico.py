@@ -23,6 +23,9 @@ from .resumen import URL_FICHA, URL_FICHA_COMPRA_AGIL
 from .suscripciones import REGIONES
 
 ESTADO_PUBLICADA = 5
+ESTADO_ADJUDICADA = 8
+# Adjudicadas que se ofrecen a los buscadores en el sitemap (las más antiguas siguen indexables por enlaces).
+DIAS_ADJUDICADAS_SITEMAP = 120
 POR_PAGINA = 30
 MAX_FRASES_BUSQUEDA = 12
 
@@ -54,6 +57,7 @@ class Ficha:
     items: tuple[dict[str, Any], ...] = ()
     clasificacion: dict[str, Any] | None = None
     actualizada_en: datetime | None = None
+    fecha_adjudicacion: datetime | None = None
     raices: frozenset[str] = field(default=frozenset(), compare=False, repr=False)
 
     @classmethod
@@ -63,7 +67,8 @@ class Ficha:
             estado_codigo=lic.estado_codigo, organismo=lic.organismo or "", region=lic.region or "",
             comuna=lic.comuna or "", monto_estimado=lic.monto_estimado, moneda=lic.moneda or "",
             fecha_publicacion=lic.fecha_publicacion, fecha_cierre=lic.fecha_cierre, items=tuple(lic.items or ()),
-            clasificacion=lic.clasificacion, actualizada_en=lic.actualizada_en, raices=raices(_texto_licitacion(lic)),
+            clasificacion=lic.clasificacion, actualizada_en=lic.actualizada_en, fecha_adjudicacion=lic.fecha_adjudicacion,
+            raices=raices(_texto_licitacion(lic)),
         )
 
     @property
@@ -77,6 +82,52 @@ class Ficha:
     @property
     def resumen(self) -> str:
         return ((self.clasificacion or {}).get("resumen") or "").strip()
+
+    @property
+    def adjudicada(self) -> bool:
+        return self.estado_codigo == ESTADO_ADJUDICADA
+
+    @property
+    def resultado(self) -> list[dict[str, Any]]:
+        """Ítems adjudicados: producto, proveedor, cantidad, precio unitario y total (vacío si no hay datos)."""
+        filas = []
+        for it in self.items:
+            adj = it.get("adjudicacion") or {}
+            precio = adj.get("precio_unitario")
+            if not isinstance(precio, (int, float)) or precio <= 0:
+                continue
+            try:
+                cantidad = float(adj.get("cantidad")) if adj.get("cantidad") not in (None, "") else None
+            except (TypeError, ValueError):
+                cantidad = None
+            filas.append({
+                "producto": it.get("producto") or it.get("categoria") or "", "unidad": it.get("unidad") or "",
+                "proveedor": (adj.get("proveedor_nombre") or "").strip() or "Proveedor no informado",
+                "cantidad": cantidad, "precio_unitario": float(precio),
+                "total": float(precio) * cantidad if cantidad else None,
+            })
+        return filas
+
+    @property
+    def total_adjudicado(self) -> float | None:
+        filas = self.resultado
+        if not filas or any(f["total"] is None for f in filas):
+            return None
+        return sum(f["total"] for f in filas)
+
+    @property
+    def ganadores(self) -> list[tuple[str, float | None]]:
+        """Proveedores adjudicados, del que más se adjudicó al que menos (monto None si falta la cantidad)."""
+        montos: dict[str, float | None] = {}
+        for f in self.resultado:
+            previo = montos.get(f["proveedor"], 0.0)
+            montos[f["proveedor"]] = None if previo is None or f["total"] is None else previo + f["total"]
+        return sorted(montos.items(), key=lambda par: -(par[1] or 0))
+
+    @property
+    def indexable(self) -> bool:
+        """Abiertas (oportunidad) y adjudicadas con resultado (quién ganó y por cuánto): el resto no aporta."""
+        return self.abierta() or (self.adjudicada and bool(self.resultado))
 
     @property
     def requisitos(self) -> list[str]:
@@ -157,7 +208,7 @@ def cargar_abiertas(session: Session, momento: datetime | None = None) -> list[F
     ahora_cl = hora_chile(momento)
     columnas = [getattr(Licitacion, c) for c in (
         "codigo", "nombre", "descripcion", "tipo", "estado_codigo", "organismo", "region", "comuna", "monto_estimado",
-        "moneda", "fecha_publicacion", "fecha_cierre", "items", "clasificacion", "actualizada_en",
+        "moneda", "fecha_publicacion", "fecha_cierre", "items", "clasificacion", "actualizada_en", "fecha_adjudicacion",
     )]
     consulta = (
         select(Licitacion).options(load_only(*columnas))
@@ -169,6 +220,20 @@ def cargar_abiertas(session: Session, momento: datetime | None = None) -> list[F
         .execution_options(yield_per=500)
     )
     return [Ficha.de(lic) for lic in session.scalars(consulta)]
+
+
+def adjudicadas_recientes(session: Session, momento: datetime | None = None, dias: int = DIAS_ADJUDICADAS_SITEMAP):
+    """(código, última actualización) de las adjudicadas recientes, para el sitemap. Solo las que traen resultado."""
+    desde = hora_chile(momento) - timedelta(days=dias)
+    consulta = (
+        select(Licitacion).options(load_only(Licitacion.codigo, Licitacion.items, Licitacion.actualizada_en))
+        .where(Licitacion.estado_codigo == ESTADO_ADJUDICADA,
+               (Licitacion.fecha_adjudicacion >= desde) | (Licitacion.actualizada_en >= desde))
+        .order_by(Licitacion.actualizada_en.desc())
+        .execution_options(yield_per=500)
+    )
+    return [(lic.codigo, lic.actualizada_en) for lic in session.scalars(consulta)
+            if any((it.get("adjudicacion") or {}).get("precio_unitario") for it in lic.items or ())]
 
 
 def cargar_ficha(session: Session, codigo: str) -> Ficha | None:

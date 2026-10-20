@@ -13,28 +13,188 @@
 } | tojson }}</script>
 <script type="application/ld+json">{{ {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": faq_ld} | tojson }}</script>
 {% endblock %}
+{% block estilos %}
+<style>
+main{padding-top:0}
+.ini{display:flex;flex-direction:column;gap:88px}
+.ini h2{font-size:clamp(28px,4vw,40px);letter-spacing:-.02em;margin-bottom:12px}
+.ini .sub{color:var(--muted);font-size:18px;max-width:62ch;margin:0}
+.ini .cabeza{display:flex;flex-direction:column;gap:6px;margin-bottom:28px}
+.ini .cabeza.centro{align-items:center;text-align:center}
+.ini .eti{font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--brand)}
+/* Banda a todo el ancho dentro del contenedor */
+.banda{margin-inline:calc(50% - 50vw);padding-inline:max(16px,calc(50vw - 520px))}
+/* Hero */
+.hero{position:relative;overflow:hidden;padding-block:64px 96px;
+  background:radial-gradient(1200px 500px at 85% -10%,color-mix(in srgb,var(--brand) 22%,transparent),transparent 60%),
+             radial-gradient(800px 400px at -10% 110%,color-mix(in srgb,var(--gold) 16%,transparent),transparent 60%),var(--bg)}
+.hero::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:44px 44px;mask-image:radial-gradient(ellipse at 70% 30%,#000 10%,transparent 65%);-webkit-mask-image:radial-gradient(ellipse at 70% 30%,#000 10%,transparent 65%)}
+.hero-grid{position:relative;display:grid;grid-template-columns:1.1fr .9fr;gap:48px;align-items:center}
+@media (max-width:900px){.hero-grid{grid-template-columns:1fr}.hero{padding-block:40px 72px}}
+.hero h1{font-size:clamp(36px,5.6vw,60px);letter-spacing:-.03em;line-height:1.05;margin:16px 0}
+.hero h1 em{font-style:normal;background:linear-gradient(90deg,var(--brand),#2a9d8f);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero .lead{font-size:19px;max-width:54ch}
+.pildora{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;padding:6px 14px 6px 6px;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:var(--ink)}
+.pildora b{background:var(--gold-soft);color:var(--gold);border-radius:999px;padding:2px 10px;font-size:12px}
+.acciones-hero{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:28px}
+.boton.grande{padding:15px 26px;font-size:17px;border-radius:12px;box-shadow:0 8px 24px color-mix(in srgb,var(--brand) 30%,transparent)}
+.boton.fantasma{background:var(--surface);color:var(--ink);border:1px solid var(--line);padding:14px 22px;font-size:16px;border-radius:12px}
+.garantias{display:flex;flex-wrap:wrap;gap:6px 20px;margin-top:20px;font-size:14px;color:var(--muted)}
+.garantias span::before{content:"✓";color:var(--ok);font-weight:700;margin-right:6px}
+/* Teléfono */
+.escena{position:relative;display:flex;justify-content:center;padding:12px}
+.telefono{width:min(340px,100%);border-radius:40px;padding:12px;background:#0f1720;box-shadow:0 40px 80px -20px rgba(15,23,32,.45),0 0 0 1px rgba(255,255,255,.06) inset;transform:rotate(2deg)}
+.pantalla{border-radius:30px;overflow:hidden;background:#e7ddd4}
+.barra-wa{display:flex;align-items:center;gap:10px;background:#075e54;color:#fff;padding:14px 16px;font-size:14px}
+.barra-wa .avatar{width:32px;height:32px;border-radius:50%;background:#fff;color:#075e54;display:grid;place-items:center;font-weight:800;font-family:var(--display)}
+.barra-wa small{display:block;opacity:.8;font-size:12px}
+.pantalla .wa{border-radius:0;max-width:none;min-height:420px}
+.flota{position:absolute;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 14px;box-shadow:0 18px 40px -12px rgba(15,23,32,.28);font-size:13px;line-height:1.35}
+.flota strong{display:block;font-size:20px;font-family:var(--display)}
+.flota.uno{top:18%;left:-4%}.flota.dos{bottom:12%;right:-2%}
+@media (max-width:520px){.flota{display:none}}
+/* Cifras */
+.cifras-banda{position:relative;margin-top:-56px;display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:0 20px 50px -24px rgba(15,23,32,.25);overflow:hidden}
+.cifras-banda > div{padding:22px 24px;border-right:1px solid var(--line)}
+.cifras-banda > div:last-child{border-right:0}
+.cifras-banda .num{font-family:var(--display);font-size:clamp(28px,3.4vw,38px);font-weight:700;letter-spacing:-.02em;line-height:1.1}
+.cifras-banda .et{color:var(--muted);font-size:14px}
+@media (max-width:760px){.cifras-banda{grid-template-columns:1fr 1fr}.cifras-banda > div:nth-child(2){border-right:0}.cifras-banda > div:nth-child(-n+2){border-bottom:1px solid var(--line)}}
+.fuente{font-size:13px;color:var(--muted);margin-top:10px}
+/* Bento */
+.bento{display:grid;grid-template-columns:repeat(6,1fr);gap:16px}
+.bloque{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:26px;display:flex;flex-direction:column;gap:10px;position:relative;overflow:hidden}
+.bloque h3{font-size:21px}
+.bloque p{margin:0;color:var(--muted)}
+.bloque .icono{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:22px;background:var(--brand-soft)}
+.b-4{grid-column:span 4}.b-2{grid-column:span 2}.b-3{grid-column:span 3}
+@media (max-width:900px){.b-4,.b-2,.b-3{grid-column:span 6}}
+.bloque.destacado{background:linear-gradient(135deg,var(--brand),#1f7a6d);border-color:transparent;color:#fff}
+.bloque.destacado p{color:rgba(255,255,255,.85)}
+.bloque.destacado .icono{background:rgba(255,255,255,.16)}
+.mini-lista{list-style:none;padding:0;margin:8px 0 0;display:flex;flex-direction:column;gap:8px}
+.mini-lista li{display:flex;justify-content:space-between;gap:12px;background:rgba(255,255,255,.12);border-radius:10px;padding:10px 12px;font-size:14px}
+.mini-lista b{white-space:nowrap}
+.barras{display:flex;align-items:flex-end;gap:6px;height:64px;margin-top:auto}
+.barras span{flex:1;border-radius:4px 4px 0 0;background:var(--brand-soft)}
+.barras span.marca{background:var(--brand)}
+/* Prueba */
+.prueba{background:var(--surface);border:1px solid var(--line);border-radius:24px;padding:clamp(24px,4vw,44px)}
+/* Pasos */
+.pasos{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;counter-reset:paso}
+@media (max-width:820px){.pasos{grid-template-columns:1fr}}
+.paso{padding:26px;border-radius:20px;background:var(--surface);border:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.paso::before{counter-increment:paso;content:counter(paso);width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-weight:700;background:var(--ink);color:var(--surface);margin-bottom:6px}
+.paso p{margin:0;color:var(--muted)}
+/* Planes */
+.planes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:20px;align-items:stretch}
+.plan2{background:var(--surface);border:1px solid var(--line);border-radius:24px;padding:30px;display:flex;flex-direction:column;gap:12px;position:relative}
+.plan2.pro{border:2px solid var(--brand);box-shadow:0 30px 60px -30px color-mix(in srgb,var(--brand) 45%,transparent)}
+.plan2 .cinta{position:absolute;top:-13px;left:30px;background:var(--brand);color:var(--brand-ink);font-size:12px;font-weight:700;padding:4px 12px;border-radius:999px}
+.plan2 > :last-child{margin-top:auto}
+.plan2 .boton{width:100%;text-align:center;box-sizing:border-box}
+/* CTA final */
+.cta-final{border-radius:28px;padding:clamp(32px,6vw,64px);text-align:center;color:#fff;
+  background:radial-gradient(600px 300px at 80% 0%,rgba(255,255,255,.18),transparent 60%),linear-gradient(135deg,#123c52,var(--brand) 55%,#1f7a6d)}
+.cta-final h2{color:#fff}
+.cta-final p{color:rgba(255,255,255,.85);max-width:56ch;margin:0 auto 24px}
+.cta-final .boton{background:#fff;color:#123c52}
+@media (prefers-color-scheme: dark){.telefono{background:#05090d}.boton.grande{box-shadow:none}}
+@media (prefers-reduced-motion: no-preference){.telefono{transition:transform .4s ease}.escena:hover .telefono{transform:rotate(0)}}
+</style>
+{% endblock %}
 {% block contenido %}
-<section class="pila" style="max-width:760px;margin-bottom:40px">
-  <span class="chip oro">Para pymes que le venden al Estado</span>
-  <h1>Las licitaciones que calzan con tu empresa, cada mañana en tu WhatsApp.</h1>
-  <p class="lead">Calza revisa Mercado Público por ti, te avisa solo lo que encaja con tu negocio y te explica las bases en palabras simples: qué piden, cuándo cierra y a qué precio se ha comprado antes.</p>
-  <div class="chips" style="gap:12px;align-items:center"><a class="boton" href="/registro">Probar {{ dias_prueba }} días gratis</a><a href="#prueba">o pruébalo ahora sin registrarte ↓</a></div>
-  <p class="ayuda">Sin tarjeta. Durante la prueba tienes todo lo del plan Pro.</p>
-</section>
+<div class="ini">
 
-<section aria-label="Mercado Público hoy" class="tarjeta" style="margin-bottom:56px">
-  <div class="cifras">
-    <div><div class="cifra">{{ stats.abiertas | miles }}</div><div class="muted">licitaciones y Compras Ágiles abiertas</div></div>
-    <div><div class="cifra">{{ stats.publicadas_hoy | miles }}</div><div class="muted">publicadas hoy</div></div>
-    <div><div class="cifra">{{ stats.cierran_hoy | miles }}</div><div class="muted">cierran hoy</div></div>
-    <div><div class="cifra">{{ stats.compras_agiles | miles }}</div><div class="muted">Compras Ágiles en curso</div></div>
+<section class="banda hero" aria-labelledby="t-hero">
+  <div class="hero-grid">
+    <div>
+      <span class="pildora"><b>Nuevo</b> Para pymes que le venden al Estado</span>
+      <h1 id="t-hero">Las licitaciones que calzan con tu empresa, <em>cada mañana en tu WhatsApp.</em></h1>
+      <p class="lead">Calza revisa Mercado Público por ti, te avisa solo lo que encaja con tu negocio y te explica las bases en palabras simples: qué piden, cuándo cierra y a qué precio se ha comprado antes.</p>
+      <div class="acciones-hero">
+        <a class="boton grande" href="/registro">Probar {{ dias_prueba }} días gratis</a>
+        <a class="boton fantasma" href="#prueba">Pruébalo sin registrarte</a>
+      </div>
+      <div class="garantias"><span>Sin tarjeta</span><span>Todo el plan Pro durante la prueba</span><span>Cancela cuando quieras</span></div>
+    </div>
+    <div class="escena" role="img" aria-label="Ejemplo de resumen diario de Calza en WhatsApp">
+      <div class="telefono">
+        <div class="pantalla">
+          <div class="barra-wa"><span class="avatar">C</span><div><strong>Calza</strong><small>en línea</small></div></div>
+          <div class="wa">
+            <div class="burbuja">
+              <p>Hola Tu Pyme 👋<br>Hoy encontramos {{ ejemplos | length if ejemplos else 2 }} licitaciones para ti:</p>
+              {% if ejemplos %}{% for f in ejemplos %}
+              <p style="margin-top:8px">{{ loop.index }}. <strong>{{ f.nombre | truncate(60) }}</strong><br>{{ f.organismo | truncate(42) }}<br>Monto estimado: {{ fmt(f.monto_estimado) }} · {{ cierre(f) }}</p>
+              {% endfor %}{% else %}
+              <p style="margin-top:8px">1. <strong>Adquisición de artículos de aseo para CESFAM</strong><br>Municipalidad de ejemplo<br>Monto estimado: $4.500.000 · cierra en 9 días</p>
+              <p style="margin-top:8px">2. <strong>Compra de guantes de nitrilo</strong><br>Servicio de Salud de ejemplo<br>Monto estimado: $2.100.000 · cierra en 6 días</p>
+              {% endif %}
+              <p style="margin-top:8px">Responde con el número de una licitación para ver su detalle.</p>
+              <div class="hora">8:00</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="flota uno" aria-hidden="true"><span class="muted">Calce</span><strong>92%</strong>es tu rubro</div>
+      <div class="flota dos" aria-hidden="true"><span class="muted">Precio habitual</span><strong>$9.500</strong>por unidad</div>
+    </div>
   </div>
-  <p class="ayuda" style="margin-top:12px">Datos de Mercado Público (ChileCompra), actualizados varias veces al día. <a href="/licitaciones">Ver todas las licitaciones abiertas</a>.</p>
 </section>
 
-<section id="prueba" class="pila" style="margin-bottom:56px">
-  <h2>Pruébalo: ¿qué vende tu empresa?</h2>
-  <p class="muted">Escribe tus productos o servicios separados por comas y te mostramos las licitaciones abiertas que calzan hoy.</p>
+<section aria-label="Mercado Público hoy">
+  <div class="cifras-banda">
+    <div><div class="num">{{ stats.abiertas | miles }}</div><div class="et">licitaciones y Compras Ágiles abiertas</div></div>
+    <div><div class="num">{{ stats.publicadas_hoy | miles }}</div><div class="et">publicadas hoy</div></div>
+    <div><div class="num">{{ stats.cierran_hoy | miles }}</div><div class="et">cierran hoy</div></div>
+    <div><div class="num">{{ stats.compras_agiles | miles }}</div><div class="et">Compras Ágiles en curso</div></div>
+  </div>
+  <p class="fuente">Datos de Mercado Público (ChileCompra), actualizados varias veces al día. <a href="/licitaciones">Ver todas las licitaciones abiertas</a>.</p>
+</section>
+
+<section aria-labelledby="t-que">
+  <div class="cabeza"><span class="eti">Qué hace Calza</span><h2 id="t-que">Deja de revisar Mercado Público todos los días</h2>
+    <p class="sub">Calza lee cada licitación nueva y te trae solo las que valen tu tiempo, con lo necesario para decidir si postular.</p></div>
+  <div class="bento">
+    <article class="bloque destacado b-4">
+      <span class="icono" aria-hidden="true">💬</span>
+      <h3>Tu resumen diario, en WhatsApp</h3>
+      <p>Cada día hábil a las 8:00, solo las licitaciones nuevas que calzan con lo que vendes, tus regiones y el monto que te interesa. Responde con un número y recibes el detalle.</p>
+      <ul class="mini-lista" aria-hidden="true">
+        <li><span>Insumos de aseo para CESFAM</span><b>92% calce</b></li>
+        <li><span>Guantes de nitrilo · Compra Ágil</span><b>88% calce</b></li>
+      </ul>
+    </article>
+    <article class="bloque b-2">
+      <span class="icono" aria-hidden="true">🎯</span>
+      <h3>Calce con IA</h3>
+      <p>Entiende tu rubro en tus palabras y te dice por qué te sirve cada licitación. Aprende de lo que marcas con 👍 y 👎.</p>
+    </article>
+    <article class="bloque b-2">
+      <span class="icono" aria-hidden="true">📄</span>
+      <h3>Bases en palabras simples</h3>
+      <p>Envía el PDF o Word y te resumimos requisitos, garantías, plazos y cómo se evalúa.</p>
+    </article>
+    <article class="bloque b-2">
+      <span class="icono" aria-hidden="true">💲</span>
+      <h3>Precios de referencia</h3>
+      <p>Cuánto ha pagado el Estado por lo mismo y quién suele ganar, con 24 meses de compras.</p>
+      <div class="barras" aria-hidden="true"><span style="height:35%"></span><span style="height:55%"></span><span class="marca" style="height:80%"></span><span style="height:65%"></span><span style="height:45%"></span><span style="height:30%"></span></div>
+    </article>
+    <article class="bloque b-2">
+      <span class="icono" aria-hidden="true">⚡</span>
+      <h3>Alertas de Compra Ágil</h3>
+      <p>En el plan Pro, te avisamos apenas se publica una Compra Ágil que te calza: cierran en horas.</p>
+    </article>
+  </div>
+</section>
+
+<section id="prueba" class="prueba pila" aria-labelledby="t-prueba">
+  <div class="cabeza" style="margin-bottom:8px"><span class="eti">Pruébalo ahora</span><h2 id="t-prueba">¿Qué vende tu empresa?</h2>
+    <p class="sub">Escribe tus productos o servicios separados por comas y te mostramos las licitaciones abiertas que calzan hoy.</p></div>
   {{ buscador(regiones=regiones) }}
   <div class="chips"><span class="muted" style="font-size:14px">Ejemplos:</span>
     {% for ej in ["artículos de aseo, guantes", "computadores, notebooks", "uniformes, calzado de seguridad", "alimentos, colaciones", "mantención de áreas verdes"] %}
@@ -42,80 +202,66 @@
   </div>
 </section>
 
-<section style="margin-bottom:56px">
-  <div class="rejilla dos" style="align-items:center">
-    <div class="pila">
-      <h2>Así llega tu resumen</h2>
-      <p class="muted">Cada día hábil a las 8:00, solo las licitaciones nuevas que calzan con lo que vendes, tus regiones y el monto que te interesa. Responde con un número y te enviamos el detalle: qué piden, requisitos a los que poner ojo, plazos y la ficha oficial.</p>
-      <p class="muted">Envíanos las bases en PDF o Word y nuestra IA te las resume: garantías, documentos, criterios de evaluación y fechas clave.</p>
-      <p class="ayuda">Ejemplo armado con licitaciones reales abiertas hoy. Tu resumen incluye además el porcentaje de calce y por qué te sirve cada una.</p>
-    </div>
-    <div class="wa" role="img" aria-label="Ejemplo de resumen diario de Calza en WhatsApp">
-      <div class="burbuja">
-        <p>Hola Tu Pyme 👋<br>Hoy encontramos {{ ejemplos | length if ejemplos else 3 }} licitaciones para ti:</p>
-        {% if ejemplos %}{% for f in ejemplos %}
-        <p style="margin-top:8px">{{ loop.index }}. <strong>{{ f.nombre | truncate(70) }}</strong><br>{{ f.organismo | truncate(50) }}<br>Monto estimado: {{ fmt(f.monto_estimado) }} · {{ cierre(f) }}</p>
-        {% endfor %}{% else %}
-        <p style="margin-top:8px">1. <strong>Adquisición de artículos de aseo para CESFAM</strong><br>Municipalidad de ejemplo<br>Monto estimado: $4.500.000 · cierra en 9 días</p>
-        <p style="margin-top:8px">2. <strong>Compra de guantes de nitrilo</strong><br>Servicio de Salud de ejemplo<br>Monto estimado: $2.100.000 · cierra en 6 días</p>
-        {% endif %}
-        <p style="margin-top:8px">Responde con el número de una licitación para ver su detalle.</p>
-        <div class="hora">8:00</div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section style="margin-bottom:56px">
-  <h2>Cómo funciona</h2>
-  <div class="rejilla">
-    <div class="tarjeta pila"><span class="chip">1</span><h3>Cuéntanos qué vendes</h3><p class="muted">En tus palabras. Nuestra IA entiende tu rubro, tus regiones y el tamaño de contratos que te interesa.</p></div>
-    <div class="tarjeta pila"><span class="chip">2</span><h3>Recibe tu resumen diario</h3><p class="muted">Cada mañana, las licitaciones nuevas con su porcentaje de calce, monto y fecha de cierre. En el plan Pro, alertas urgentes de Compra Ágil.</p></div>
-    <div class="tarjeta pila"><span class="chip">3</span><h3>Postula con ventaja</h3><p class="muted">Envíanos las bases y te decimos requisitos, garantías, plazos, cómo se evalúa y a qué precio se ha comprado antes.</p></div>
+<section aria-labelledby="t-como">
+  <div class="cabeza centro"><span class="eti">Cómo funciona</span><h2 id="t-como">Empieza en 2 minutos</h2></div>
+  <div class="pasos">
+    <div class="paso"><h3>Cuéntanos qué vendes</h3><p>En tus palabras. Nuestra IA entiende tu rubro, tus regiones y el tamaño de contratos que te interesa.</p></div>
+    <div class="paso"><h3>Recibe tu resumen diario</h3><p>Cada mañana, las licitaciones nuevas con su porcentaje de calce, monto y fecha de cierre. En el plan Pro, alertas urgentes de Compra Ágil.</p></div>
+    <div class="paso"><h3>Postula con ventaja</h3><p>Envíanos las bases y te decimos requisitos, garantías, plazos, cómo se evalúa y a qué precio se ha comprado antes.</p></div>
   </div>
 </section>
 
 {% if ultimas %}
-<section style="margin-bottom:56px" class="pila">
-  <h2>Recién publicadas en Mercado Público</h2>
+<section class="pila" aria-labelledby="t-ultimas">
+  <div class="cabeza" style="margin-bottom:8px"><span class="eti">En vivo</span><h2 id="t-ultimas">Recién publicadas en Mercado Público</h2></div>
   <ul class="lista-lic">{% for f in ultimas %}{{ tarjeta_lic(f) }}{% endfor %}</ul>
   <div><a class="boton secundario" href="/licitaciones">Ver las {{ stats.abiertas | miles }} abiertas</a></div>
 </section>
 {% endif %}
 
-<section style="margin-bottom:56px" class="pila">
-  <h2>Licitaciones por rubro</h2>
-  <div class="chips">{% for r in rubros %}<a class="chip" href="/licitaciones/rubro/{{ r.slug }}">{{ r.nombre }}</a>{% endfor %}</div>
-  <h2>Licitaciones por región</h2>
-  <div class="chips">{% for r in regiones %}<a class="chip" href="/licitaciones/region/{{ r.slug }}">{{ r.titulo }}</a>{% endfor %}</div>
-</section>
-
-<section id="planes" style="margin-bottom:56px">
-  <h2>Planes</h2>
-  <div class="rejilla dos">
+<section id="planes" aria-labelledby="t-planes">
+  <div class="cabeza centro"><span class="eti">Planes</span><h2 id="t-planes">Un precio simple, sin sorpresas</h2>
+    <p class="sub">{{ dias_prueba }} días gratis con todo lo del plan Pro. Sin tarjeta para empezar.</p></div>
+  <div class="planes">
     {% for p in planes %}
-    <div class="tarjeta pila plan">
+    <div class="plan2{% if p.codigo == 'pro' %} pro{% endif %}">
+      {% if p.codigo == "pro" %}<span class="cinta">Recomendado</span>{% endif %}
       <h3>{{ p.nombre }}</h3>
       {% if p.codigo == "pro" and fundador %}
         <div><span class="chip oro">Precio fundador para los primeros clientes Pro</span></div>
         <div class="precio">{{ fmt(precio_fundador) }} <small>/ mes, de por vida</small></div>
-        <p class="muted">Precio normal {{ fmt(p.mensual) }} al mes.</p>
+        <p class="muted" style="margin:0">Precio normal {{ fmt(p.mensual) }} al mes.</p>
       {% else %}
         <div class="precio">{{ fmt(p.mensual) }} <small>/ mes</small></div>
       {% endif %}
-      <p class="muted">O {{ fmt(anual[p.codigo]) }} al año (10% de descuento). Precios con IVA.</p>
+      <p class="muted" style="margin:0">O {{ fmt(anual[p.codigo]) }} al año (10% de descuento). Precios con IVA.</p>
       <ul class="check">{% for b in p.beneficios %}<li>{{ b }}</li>{% endfor %}</ul>
-      <div><a class="boton" href="/registro?plan={{ p.codigo }}">Empezar con {{ p.nombre }}</a></div>
+      <div><a class="boton{% if p.codigo != 'pro' %} secundario{% endif %}" href="/registro?plan={{ p.codigo }}">Empezar con {{ p.nombre }}</a></div>
     </div>
     {% endfor %}
   </div>
-  <p class="muted" style="margin-top:16px">¿Gestionas licitaciones de varias empresas? Escríbenos a <a href="mailto:hola@calza.cl">hola@calza.cl</a> para el plan Consultoras.</p>
+  <p class="muted" style="margin-top:16px;text-align:center">¿Gestionas licitaciones de varias empresas? Escríbenos a <a href="mailto:hola@calza.cl">hola@calza.cl</a> para el plan Consultoras.</p>
 </section>
 
-<section id="preguntas" style="max-width:760px">
-  <h2>Preguntas frecuentes</h2>
+<section id="preguntas" style="max-width:760px;margin-inline:auto;width:100%" aria-labelledby="t-faq">
+  <div class="cabeza centro"><span class="eti">Preguntas frecuentes</span><h2 id="t-faq">Lo que suelen preguntarnos</h2></div>
   {% for pregunta, respuesta in faq %}
   <details class="faq"{% if loop.first %} open{% endif %}><summary>{{ pregunta }}</summary><p>{{ respuesta }}</p></details>
   {% endfor %}
 </section>
+
+<section class="cta-final" aria-labelledby="t-cta">
+  <h2 id="t-cta">Mañana a las 8:00 puede llegarte tu primera licitación</h2>
+  <p>Regístrate en 2 minutos, cuéntanos qué vendes y Calza empieza a buscar por ti.</p>
+  <a class="boton grande" href="/registro">Probar {{ dias_prueba }} días gratis</a>
+</section>
+
+<section class="pila" aria-label="Explorar licitaciones">
+  <h2 style="font-size:22px">Licitaciones por rubro</h2>
+  <div class="chips">{% for r in rubros %}<a class="chip" href="/licitaciones/rubro/{{ r.slug }}">{{ r.nombre }}</a>{% endfor %}</div>
+  <h2 style="font-size:22px;margin-top:12px">Licitaciones por región</h2>
+  <div class="chips">{% for r in regiones %}<a class="chip" href="/licitaciones/region/{{ r.slug }}">{{ r.titulo }}</a>{% endfor %}</div>
+</section>
+
+</div>
 {% endblock %}

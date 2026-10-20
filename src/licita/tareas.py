@@ -44,6 +44,7 @@ def ejecutar_ciclo(
     *,
     hoy: date | None = None,
     max_detalles: int | None = None,
+    momento: datetime | None = None,
 ) -> ResultadoCiclo:
     resultado = ResultadoCiclo()
     hoy = hoy or hoy_en_chile()
@@ -74,12 +75,12 @@ def ejecutar_ciclo(
     empresas = session.scalars(select(Empresa).where(Empresa.plan != "gratis", Empresa.whatsapp_activo.is_(True))).all()
     for empresa in empresas:
         try:
-            resultado.calces += len(buscar_calces(session, empresa, ia))
+            resultado.calces += len(buscar_calces(session, empresa, ia, momento=momento))
         except (ErrorIA, anthropic.APIError) as e:
             session.rollback()
             resultado.errores.append(f"calce empresa #{empresa.id}: {e}")
 
-    for error in resultado.errores + resultado.avisos:
+    for error in resultado.errores:
         log.warning(error)
     return resultado
 

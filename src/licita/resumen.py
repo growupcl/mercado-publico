@@ -183,6 +183,21 @@ def correo_resumen(
     return asunto, "\n".join(lineas), cuerpo_html
 
 
+LARGO_DESCRIPCION_ITEM = 90
+
+
+def _descripcion_item(it: dict) -> str:
+    """": descripción" del ítem si dice algo más que el nombre. Mercado Público usa el mismo nombre de categoría
+    para ítems distintos ("Software de extracción de datos" × 5): la diferencia real está en la descripción."""
+    nombre = " ".join(str(it.get("producto") or it.get("categoria") or "").split())
+    texto = " ".join(str(it.get("descripcion") or "").split())
+    if not texto or texto.lower() == nombre.lower() or texto.lower().startswith(nombre.lower()) and len(texto) <= len(nombre) + 3:
+        return ""
+    if len(texto) > LARGO_DESCRIPCION_ITEM:
+        texto = texto[:LARGO_DESCRIPCION_ITEM].rsplit(" ", 1)[0].rstrip(",;:.") + "…"
+    return f": {texto}"
+
+
 def texto_detalle(calce: Calce, lic: Licitacion) -> str:
     clasif = lic.clasificacion or {}
     lineas = [f"*{titulo(lic)}*", f"Código: {lic.codigo} · Calce: {calce.puntaje}%", ""]
@@ -200,7 +215,7 @@ def texto_detalle(calce: Calce, lic: Licitacion) -> str:
         lineas += ["", "📦 Qué piden:"]
         for it in lic.items[:5]:
             cantidad = f"{it['cantidad']:g} × " if isinstance(it.get("cantidad"), (int, float)) else ""
-            lineas.append(f"• {cantidad}{it.get('producto') or it.get('categoria')}")
+            lineas.append(f"• {cantidad}{it.get('producto') or it.get('categoria')}{_descripcion_item(it)}")
         if len(lic.items) > 5:
             lineas.append(f"• … y {len(lic.items) - 5} ítems más")
     requisitos = clasif.get("requisitos_destacados") or []

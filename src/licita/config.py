@@ -29,6 +29,7 @@ class Config:
     smtp_usuario: str = ""
     smtp_clave: str = ""
     correo_remitente: str = "hola@calza.cl"
+    admin_clave: str = ""  # contraseña del panel /admin (usuario "admin"); vacía = panel desactivado
 
     @classmethod
     def desde_entorno(cls) -> "Config":
@@ -58,4 +59,5 @@ class Config:
             smtp_usuario=os.environ.get("SMTP_USUARIO", ""),
             smtp_clave=os.environ.get("SMTP_CLAVE", ""),
             correo_remitente=os.environ.get("CORREO_REMITENTE", "hola@calza.cl"),
+            admin_clave=os.environ.get("ADMIN_CLAVE", ""),
         )

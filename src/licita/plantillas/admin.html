@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block titulo %}Panel del piloto · Calza{% endblock %}
+{% block robots %}noindex, nofollow{% endblock %}
+{% block accion %}{% endblock %}
+{% block contenido %}
+<div class="pila">
+  <h1>Panel del piloto</h1>
+  <p class="muted">Actualizado el {{ chile(momento).strftime("%d-%m-%Y %H:%M") }} (hora de Chile). Primero aparecen las empresas a contactar.</p>
+  <div class="rejilla dos" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+    <div class="tarjeta"><div class="muted">Empresas</div><div class="precio">{{ ind.empresas }}</div></div>
+    <div class="tarjeta"><div class="muted">En prueba</div><div class="precio">{{ ind.en_prueba }}</div></div>
+    <div class="tarjeta"><div class="muted">Activas</div><div class="precio">{{ ind.activas }}</div></div>
+    <div class="tarjeta"><div class="muted">Vencidas</div><div class="precio">{{ ind.vencidas }}</div></div>
+    <div class="tarjeta"><div class="muted">Con renovación automática</div><div class="precio">{{ ind.con_renovacion }}</div></div>
+    <div class="tarjeta"><div class="muted">Ingreso mensual recurrente</div><div class="precio">{{ fmt(ind.ingreso_mensual) }}</div></div>
+    <div class="tarjeta"><div class="muted">Cobrado este mes</div><div class="precio">{{ fmt(ind.cobrado_mes) }}</div></div>
+    <div class="tarjeta"><div class="muted">Por contactar</div><div class="precio">{{ ind.por_contactar }}</div></div>
+  </div>
+
+  <div class="tabla"><table>
+    <thead><tr><th>Empresa</th><th>Estado</th><th>Plan</th><th>Resúmenes</th><th>Le escribió a Calza</th><th>Pagado</th><th>Contactar</th></tr></thead>
+    <tbody>{% for f in filas %}{% set e = f.empresa %}
+      <tr>
+        <td><strong>#{{ e.id }} {{ e.nombre }}</strong><br>
+          <span class="ayuda">{% if e.whatsapp %}<a href="https://wa.me/{{ e.whatsapp }}" target="_blank" rel="noopener">+{{ e.whatsapp }}</a>{% endif %}
+          {% if e.email %}· <a href="mailto:{{ e.email }}">{{ e.email }}</a>{% endif %}</span><br>
+          <span class="ayuda">Registro: {{ e.creada_en.strftime("%d-%m-%Y") }}</span></td>
+        <td>{% if f.estado == "prueba" %}<span class="chip oro">Prueba</span>{% elif f.estado == "activa" %}<span class="chip ok">Activa</span>{% elif f.estado == "vencida" %}<span class="chip error">Vencida</span>{% else %}<span class="chip">{{ f.estado }}</span>{% endif %}
+          {% if f.suscripcion %}<br><span class="ayuda">{% if f.estado == "vencida" %}venció{% else %}hasta{% endif %} el {{ f.suscripcion.vigente_hasta.strftime("%d-%m-%Y") }}{% if f.dias_restantes is not none and f.dias_restantes >= 0 %} ({{ f.dias_restantes }} {{ "día" if f.dias_restantes == 1 else "días" }}){% endif %}</span>{% endif %}</td>
+        <td>{{ nombres.get(e.plan, e.plan) }}{% if f.suscripcion and f.suscripcion.precio_fundador %} <span class="chip oro">Fundador</span>{% endif %}
+          <br><span class="ayuda">{% if f.mandato %}🔁 {{ nombres.get(f.mandato.plan, f.mandato.plan) }} {{ f.mandato.periodicidad }}, {{ fmt(f.mandato.monto) }}{% else %}Sin renovación automática{% endif %}</span></td>
+        <td>{{ f.resumenes }}{% if f.ultimo_resumen %}<br><span class="ayuda">último {{ f.ultimo_resumen.strftime("%d-%m") }}</span>{% endif %}
+          <br><span class="ayuda">{% if e.whatsapp_activo %}WhatsApp{% else %}<s>WhatsApp</s>{% endif %} · {% if e.resumen_por_correo %}correo{% else %}<s>correo</s>{% endif %}</span></td>
+        <td>{{ f.mensajes_recibidos }} mensajes{% if e.ultimo_mensaje_entrante %}<br><span class="ayuda">último {{ chile(e.ultimo_mensaje_entrante).strftime("%d-%m %H:%M") }}</span>{% endif %}</td>
+        <td>{{ fmt(f.pagado) if f.pagado else "—" }}</td>
+        <td>{% for m in f.motivos %}<span class="chip error" style="margin:2px 0;display:inline-block">{{ m }}</span><br>{% else %}<span class="ayuda">—</span>{% endfor %}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="7">Todavía no hay empresas registradas.</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  <p class="ayuda">"Resúmenes" cuenta los días en que se le envió el resumen. "Le escribió a Calza" cuenta los mensajes que la empresa envió al número de Calza (respuestas, PRECIOS, bases, etc.). El ingreso mensual recurrente suma las suscripciones con renovación automática, con las anuales divididas en 12.</p>
+</div>
+{% endblock %}

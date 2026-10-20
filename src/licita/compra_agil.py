@@ -52,6 +52,10 @@ class CuotaAgotada(MercadoPublicoError):
     """La API respondió 429: se acabó la cuota del ticket por ahora."""
 
 
+class ApiNoDisponible(MercadoPublicoError):
+    """La API de ChileCompra no respondió (5xx o error de red) tras los reintentos: es una caída de ellos, no nuestra."""
+
+
 class ClienteCompraAgil:
     def __init__(
         self,
@@ -101,7 +105,7 @@ class ClienteCompraAgil:
                 raise MercadoPublicoError(f"Compra Ágil: HTTP {r.status_code} {errores[0].get('mensaje', '')}".strip())
             self._dormir(self._pausa)
             return datos.get("payload") or {}
-        raise MercadoPublicoError(f"Compra Ágil: sin respuesta válida tras {self._reintentos + 1} intentos ({ultimo_error})")
+        raise ApiNoDisponible(f"Compra Ágil: sin respuesta válida tras {self._reintentos + 1} intentos ({ultimo_error})")
 
     def listar(self, **params: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         """Una página del listado. La API exige al menos un filtro y tamano_pagina entre 10 y 50."""

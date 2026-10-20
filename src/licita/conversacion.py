@@ -7,6 +7,7 @@ respuestas son mensajes de texto libre, sin costo de WhatsApp.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Iterator
 
@@ -81,6 +82,47 @@ INVITACION_BASES = (
 )
 
 
+@dataclass
+class Botones:
+    """Respuesta con botones (hasta 3): se envía como mensaje interactivo de WhatsApp."""
+
+    texto: str
+    botones: list[tuple[str, str]]  # (id que vuelve en el webhook, título visible de máximo 20 caracteres)
+
+
+MOTIVOS_DESCARTE = {"rubro": "No es mi rubro", "tamano": "Monto o plazo", "otro": "Otra razón"}
+
+
+def pregunta_valoracion(calce: Calce) -> Botones:
+    return Botones("¿Te sirve esta licitación? Con tu respuesta afino las próximas que te envío.",
+                   [(f"VALOR:+:{calce.licitacion_codigo}", "👍 Me sirve"), (f"VALOR:-:{calce.licitacion_codigo}", "👎 No me sirve")])
+
+
+def _valorar(session: Session, empresa: Empresa, contenido: str, momento: datetime) -> list:
+    """Botones 👍/👎 y el motivo del 👎. Ids: VALOR:+:codigo, VALOR:-:codigo, MOTIVO:clave:codigo."""
+    accion, _, resto = contenido.partition(":")
+    valor, _, codigo = resto.partition(":")
+    calce = session.scalar(select(Calce).where(Calce.empresa_id == empresa.id, Calce.licitacion_codigo == codigo))
+    if calce is None:
+        return ["No encontré esa licitación. Escribe *TODAS* para ver tu último resumen."]
+    calce.valorado_en = momento
+    if accion == "VALOR" and valor == "+":
+        calce.valoracion, calce.motivo_valoracion = 1, ""
+        return ["¡Gracias! Te seguiré mostrando licitaciones como esta. 🙌"]
+    if accion == "VALOR":
+        calce.valoracion = -1
+        return [Botones("Gracias por avisar. ¿Por qué no te sirve?",
+                        [(f"MOTIVO:{clave}:{codigo}", titulo) for clave, titulo in MOTIVOS_DESCARTE.items()])]
+    calce.valoracion = -1
+    calce.motivo_valoracion = valor if valor in MOTIVOS_DESCARTE else "otro"
+    if calce.motivo_valoracion == "rubro":
+        return ["Anotado: tendré en cuenta que esto no es lo tuyo para las próximas. Si quieres ajustar qué vendes, "
+                "escribe *PERFIL*."]
+    if calce.motivo_valoracion == "tamano":
+        return ["Anotado. Si hay un monto máximo que puedes asumir, puedes indicarlo escribiendo *PERFIL*."]
+    return ["Anotado, gracias. Si quieres cambiar qué licitaciones recibes, escribe *PERFIL*."]
+
+
 def _detalle(empresa: Empresa, calce: Calce, lic: Licitacion, momento: datetime) -> str:
     empresa.licitacion_activa = lic.codigo
     empresa.contexto_actualizado_en = momento
@@ -130,7 +172,7 @@ def responder(
     analisis: ServicioAnalisis | None = None,
     url_publica: str = "",
     momento: datetime | None = None,
-) -> list[str]:
+) -> list[str | Botones]:
     """Decide la respuesta (uno o más mensajes) para un mensaje de texto o botón de una empresa registrada."""
     momento = momento or ahora()
     texto = contenido.strip()
@@ -142,7 +184,12 @@ def responder(
             select(Calce, Licitacion).join(Licitacion, Licitacion.codigo == Calce.licitacion_codigo)
             .where(Calce.empresa_id == empresa.id, Calce.licitacion_codigo == codigo)
         ).first()
-        return [_detalle(empresa, *fila, momento)] if fila else ["No encontré esa licitación. Escribe *TODAS* para ver tu último resumen."]
+        if not fila:
+            return ["No encontré esa licitación. Escribe *TODAS* para ver tu último resumen."]
+        return [_detalle(empresa, *fila, momento), pregunta_valoracion(fila[0])]
+
+    if tipo == "boton" and (texto.startswith("VALOR:") or texto.startswith("MOTIVO:")):
+        return _valorar(session, empresa, texto, momento)
 
     if texto == "VER_TODAS" or comando == "todas":
         filas = ultimo_resumen(session, empresa)
@@ -178,7 +225,7 @@ def responder(
         filas = ultimo_resumen(session, empresa)
         n = int(comando)
         if 1 <= n <= len(filas):
-            return [_detalle(empresa, *filas[n - 1], momento)]
+            return [_detalle(empresa, *filas[n - 1], momento), pregunta_valoracion(filas[n - 1][0])]
         return [f"Tu último resumen tiene {len(filas)} licitaciones. Responde con un número entre 1 y {len(filas)}." if filas else TEXTO_AYUDA]
 
     # Texto libre con un análisis reciente: es una pregunta sobre esas bases.
@@ -289,11 +336,15 @@ def procesar_webhook(
 
         enviados = 0
 
-        def enviar(texto: str) -> None:
+        def enviar(texto: str | Botones) -> None:
             nonlocal enviados
             try:
-                wamid = wa.enviar_texto(telefono, texto)
-                registrar(session, empresa, telefono, "saliente", "texto", texto, wamid)
+                if isinstance(texto, Botones):
+                    wamid = wa.enviar_botones(telefono, texto.texto, texto.botones)
+                    registrar(session, empresa, telefono, "saliente", "botones", texto.texto, wamid)
+                else:
+                    wamid = wa.enviar_texto(telefono, texto)
+                    registrar(session, empresa, telefono, "saliente", "texto", texto, wamid)
                 enviados += 1
             except ErrorWhatsApp as e:
                 log.warning("No se pudo responder a %s: %s", telefono, e)

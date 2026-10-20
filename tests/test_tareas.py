@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 from licita.db import Calce, Empresa, Licitacion
 from licita.ia import AsistenteIA, ClasificacionLicitacion, EvaluacionCalce, EvaluacionesCalce
@@ -24,7 +24,8 @@ def test_ciclo_completo(Sesion, cliente_mp):
             Empresa(nombre="Gratis", descripcion="", regiones=[], palabras_clave=["detergente"], plan="gratis", whatsapp="569222"),
         ])
         s.commit()
-        r = ejecutar_ciclo(s, cliente_mp, _ia(), hoy=date(2026, 10, 7))
+        # Momento fijo: las licitaciones de prueba cierran el 20-10-2026 y el ciclo busca solo las abiertas.
+        r = ejecutar_ciclo(s, cliente_mp, _ia(), hoy=date(2026, 10, 7), momento=datetime(2026, 10, 7, 12))
         assert r.errores == []
         assert r.licitaciones_nuevas == 3
         assert r.clasificadas == 2  # solo las publicadas

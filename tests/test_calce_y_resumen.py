@@ -197,3 +197,18 @@ def test_clasificar_se_corta_tras_varios_errores_seguidos_con_el_motivo(Sesion):
     with pytest.raises(ErrorIA, match="5 errores seguidos.*Saldo de créditos insuficiente"):
         clasificar_pendientes(s, IAQueFalla())
     assert IAQueFalla.llamadas == ERRORES_SEGUIDOS_MAXIMO  # no siguió intentando con el resto
+
+
+def test_las_valoraciones_de_la_empresa_llegan_a_la_ia(Sesion, cliente_mp):
+    s = _cargar(Sesion, cliente_mp)
+    e = _empresa_aseo(s)
+    # Una licitación ya vista y descartada por la empresa: no es candidata otra vez, pero orienta a la IA.
+    s.add(Calce(empresa_id=e.id, licitacion_codigo="2345-12-L126", puntaje=70, razon="x", notificado=True,
+                valoracion=-1, motivo_valoracion="rubro", valorado_en=MOMENTO))
+    s.commit()
+    falso = ClaudeFalso({EvaluacionesCalce: EvaluacionesCalce(evaluaciones=[])})
+    buscar_calces(s, e, AsistenteIA(falso), momento=MOMENTO)
+    contenido = falso.llamadas[0]["messages"][0]["content"]
+    assert "<preferencias_empresa>" in contenido and "no es mi rubro" in contenido
+    assert "Mantención" in contenido.split("<preferencias_empresa>")[1].split("</preferencias_empresa>")[0]
+    assert "preferencias_empresa" in falso.llamadas[0]["system"]

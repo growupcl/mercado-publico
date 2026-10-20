@@ -132,6 +132,11 @@ main{padding-block:28px 56px}
         <span class="su">{% if ind.terminaron_prueba %}{{ ind.pagaron }} de {{ ind.terminaron_prueba }} que terminaron la prueba{% else %}Ninguna ha terminado la prueba{% endif %}</span>
       </div>
       <div class="kpi">
+        <span class="et">Calce útil según los clientes</span>
+        <span class="va">{% if ind.calce_util is not none %}{{ ind.calce_util }}%{% else %}—{% endif %}</span>
+        <span class="su">{% if ind.utiles + ind.no_utiles %}👍 {{ ind.utiles }} · 👎 {{ ind.no_utiles }} licitaciones valoradas{% else %}Aún no valoran licitaciones{% endif %}</span>
+      </div>
+      <div class="kpi">
         <span class="et">Empresas</span>
         <span class="va">{{ ind.empresas }}</span>
         {% if ind.empresas %}
@@ -185,6 +190,7 @@ main{padding-block:28px 56px}
             <td data-et="Actividad">
               <div>Escribió {{ hace(e.ultimo_mensaje_entrante, momento) }}{% if f.mensajes_recibidos %} <span class="sec">· {{ f.mensajes_recibidos }} {{ "mensaje" if f.mensajes_recibidos == 1 else "mensajes" }}</span>{% endif %}</div>
               <div class="sec">Último resumen: {{ hace(f.ultimo_resumen, momento) }}{% if f.resumenes %} · {{ f.resumenes }} en total{% endif %}</div>
+              {% if f.utiles or f.no_utiles %}<div class="sec">Valoró: 👍 {{ f.utiles }} · 👎 {{ f.no_utiles }}</div>{% endif %}
               <div class="sec">Por {% if e.whatsapp_activo and e.resumen_por_correo %}WhatsApp y correo{% elif e.whatsapp_activo %}WhatsApp{% elif e.resumen_por_correo %}correo{% else %}ningún canal{% endif %}</div>
             </td>
             <td data-et="Pagado" class="num">{{ fmt(f.pagado) if f.pagado else "—" }}</td>

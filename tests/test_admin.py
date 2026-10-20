@@ -97,3 +97,24 @@ def test_tiempo_relativo():
     assert [hace(None, ahora_), hace(ahora_, ahora_), hace(datetime(2026, 10, 19, 23), ahora_),
             hace(datetime(2026, 10, 14), ahora_), hace(datetime(2026, 9, 29), ahora_)] == [
         "nunca", "hoy", "ayer", "hace 6 días", "hace 3 semanas"]
+
+
+def test_valoraciones_por_empresa_y_calce_util(Sesion, cliente_mp):
+    from datetime import date
+
+    from licita.db import Calce
+    from licita.sync import sincronizar_licitaciones
+
+    cliente = _cliente(Sesion)
+    _, token = _registrar(cliente)
+    with Sesion() as s:
+        sincronizar_licitaciones(s, cliente_mp, date(2026, 10, 6))
+        e = empresa_por_token(s, token)
+        s.add_all([Calce(empresa_id=e.id, licitacion_codigo="1234-56-LE26", puntaje=90, valoracion=1),
+                   Calce(empresa_id=e.id, licitacion_codigo="2345-12-L126", puntaje=70, valoracion=1),
+                   Calce(empresa_id=e.id, licitacion_codigo="3456-7-LP26", puntaje=60, valoracion=-1)])
+        s.commit()
+        ind, [fila] = datos_panel(s)
+    assert (fila.utiles, fila.no_utiles, ind.calce_util) == (2, 1, 67)
+    r = cliente.get("/admin", auth=("admin", CLAVE))
+    assert "Valoró: 👍 2 · 👎 1" in r.text and "67%" in r.text

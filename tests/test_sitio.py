@@ -248,3 +248,32 @@ def test_ficha_muestra_requisitos_y_precios_de_referencia(Sesion):
     assert 'href="/registro?plan=pro"' in r.text
     cerrada = cliente.get("/licitacion/8888-1-LE26")
     assert "Precios de referencia" not in cerrada.text  # solo se calculan para las abiertas
+
+
+def test_ficha_adjudicada_muestra_el_resultado_y_se_indexa(Sesion):
+    from datetime import datetime
+
+    items = [
+        {"codigo_producto": "53102104", "producto": "Guantes de nitrilo", "unidad": "caja", "cantidad": 100,
+         "adjudicacion": {"proveedor_nombre": "Aseo Sur SpA", "proveedor_rut": "76.123.456-0", "cantidad": 100, "precio_unitario": 9_000}},
+        {"codigo_producto": "47131604", "producto": "Detergente", "unidad": "bidón", "cantidad": 50,
+         "adjudicacion": {"proveedor_nombre": "Limpia Ya Ltda", "proveedor_rut": "", "cantidad": 50, "precio_unitario": 7_000}},
+    ]
+    with Sesion() as s:
+        s.add(_lic("9999-1-LE26", "Insumos de aseo para hospital", estado=8, cierre_dias=-20, items=items, monto=1_500_000,
+                   fecha_adjudicacion=datetime.now()))
+        s.add(_lic("9998-1-LE26", "Adjudicada sin detalle", estado=8, cierre_dias=-20))
+        s.commit()
+    cliente = TestClient(crear_app(Sesion, router_web=crear_router_web(Sesion, mp=None, ia=None, url_publica="https://calza.cl")))
+    r = cliente.get("/licitacion/9999-1-LE26")
+    assert r.status_code == 200 and "x-robots-tag" not in r.headers and 'content="index, follow' in r.text
+    assert "<title>Resultado 9999-1-LE26: Insumos de aseo para hospital · Calza</title>" in r.text
+    assert "Resultado de la adjudicación" in r.text and "Adjudicada" in r.text
+    assert "Aseo Sur SpA" in r.text and "$1.250.000" in r.text  # 100 × 9.000 + 50 × 7.000
+    assert "17% bajo el monto estimado" in r.text
+    assert "adjudicada a Aseo Sur SpA y 1 proveedor más por $1.250.000" in r.text  # meta descripción
+    sin_detalle = cliente.get("/licitacion/9998-1-LE26")
+    assert sin_detalle.headers["x-robots-tag"] == "noindex" and "Resultado de la adjudicación" not in sin_detalle.text
+    sitemap = cliente.get("/sitemap.xml").text
+    assert "<loc>https://calza.cl/licitacion/9999-1-LE26</loc>" in sitemap
+    assert "9998-1-LE26" not in sitemap

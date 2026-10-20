@@ -142,6 +142,24 @@ def candidatas(
     return puntuadas[:limite]
 
 
+MOTIVOS_PREFERENCIA = {"rubro": "no es mi rubro", "tamano": "monto o plazo", "otro": "otra razón", "": "sin motivo"}
+PREFERENCIAS_MAXIMO = 10
+
+
+def preferencias(session: Session, empresa: Empresa) -> dict[str, list]:
+    """Las últimas licitaciones que la empresa marcó con 👍 y con 👎 (y por qué), para que la IA afine el calce."""
+    filas = session.execute(
+        select(Calce.valoracion, Calce.motivo_valoracion, Licitacion.nombre)
+        .join(Licitacion, Licitacion.codigo == Calce.licitacion_codigo)
+        .where(Calce.empresa_id == empresa.id, Calce.valoracion.is_not(None))
+        .order_by(Calce.valorado_en.desc()).limit(4 * PREFERENCIAS_MAXIMO)
+    ).all()
+    le_sirven = [nombre for valor, _, nombre in filas if valor > 0][:PREFERENCIAS_MAXIMO]
+    no_le_sirven = [{"nombre": nombre, "motivo": MOTIVOS_PREFERENCIA.get(motivo, motivo)}
+                    for valor, motivo, nombre in filas if valor < 0][:PREFERENCIAS_MAXIMO]
+    return {"le_sirven": le_sirven, "no_le_sirven": no_le_sirven}
+
+
 def buscar_calces(
     session: Session,
     empresa: Empresa,
@@ -156,7 +174,7 @@ def buscar_calces(
     if not seleccion:
         return []
     prefiltro = {lic.codigo: p for lic, p in seleccion}
-    evaluaciones = ia.evaluar_calce(empresa, [lic for lic, _ in seleccion])
+    evaluaciones = ia.evaluar_calce(empresa, [lic for lic, _ in seleccion], preferencias=preferencias(session, empresa))
     nuevos: list[Calce] = []
     for ev in evaluaciones:
         if ev.codigo not in prefiltro:

@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% from "_macros.html" import tarjeta_lic, migas as migas_nav %}
-{% block titulo %}{{ f.nombre | truncate(70) }} · {{ f.codigo }} · Calza{% endblock %}
-{% block descripcion %}{% if f.es_compra_agil %}Compra Ágil{% else %}Licitación{% endif %} {{ f.codigo }} de {{ f.organismo or "un organismo público" }}{% if f.region %} ({{ f.region }}){% endif %}{% if f.monto_estimado %}, monto estimado {{ fmt(f.monto_estimado) }}{% endif %}. {{ f.descripcion_corta(110) }}{% endblock %}
-{% block robots %}{% if abierta %}index, follow, max-image-preview:large, max-snippet:-1{% else %}noindex, follow{% endif %}{% endblock %}
+{% set con_resultado = f.adjudicada and f.resultado %}
+{% block titulo %}{% if con_resultado %}Resultado {{ f.codigo }}: {{ f.nombre | truncate(60) }} · Calza{% else %}{{ f.nombre | truncate(70) }} · {{ f.codigo }} · Calza{% endif %}{% endblock %}
+{% block descripcion %}{% if con_resultado %}Licitación {{ f.codigo }} de {{ f.organismo or "un organismo público" }} adjudicada a {{ f.ganadores[0][0] }}{% if f.ganadores|length > 1 %} y {{ f.ganadores|length - 1 }} proveedor{{ "es" if f.ganadores|length > 2 else "" }} más{% endif %}{% if f.total_adjudicado %} por {{ fmt(f.total_adjudicado) }}{% endif %}. Precios adjudicados por ítem y licitaciones parecidas abiertas hoy.{% else %}{% if f.es_compra_agil %}Compra Ágil{% else %}Licitación{% endif %} {{ f.codigo }} de {{ f.organismo or "un organismo público" }}{% if f.region %} ({{ f.region }}){% endif %}{% if f.monto_estimado %}, monto estimado {{ fmt(f.monto_estimado) }}{% endif %}. {{ f.descripcion_corta(110) }}{% endif %}{% endblock %}
+{% block robots %}{% if indexable %}index, follow, max-image-preview:large, max-snippet:-1{% else %}noindex, follow{% endif %}{% endblock %}
 {% block og_tipo %}article{% endblock %}
 {% block jsonld %}
 <script type="application/ld+json">{{ {
@@ -17,13 +18,16 @@
 {% block estilos %}<style>
 .requisitos{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}
 .requisitos li{background:var(--gold-soft);border-radius:10px;padding:10px 14px}
+.resultado{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.resultado .tarjeta{padding:16px 18px}
+.resultado .dato{font-size:20px;font-weight:600;line-height:1.3;overflow-wrap:anywhere}
 </style>{% endblock %}
 {% block contenido %}
 {{ migas_nav(migas) }}
 <article class="pila" style="max-width:820px">
   <div class="chips">
     {% if f.es_compra_agil %}<span class="chip oro">Compra Ágil</span>{% else %}<span class="chip">Licitación pública</span>{% endif %}
-    {% if abierta %}<span class="chip ok">Abierta</span>{% else %}<span class="chip error">Cerrada</span>{% endif %}
+    {% if abierta %}<span class="chip ok">Abierta</span>{% elif f.adjudicada %}<span class="chip oro">Adjudicada</span>{% else %}<span class="chip error">Cerrada</span>{% endif %}
     {% if rubro %}<a class="chip" href="/licitaciones/rubro/{{ rubro.slug }}">{{ rubro.nombre }}</a>{% endif %}
   </div>
   <h1 style="font-size:clamp(26px,4vw,38px)">{{ f.nombre }}</h1>
@@ -43,11 +47,37 @@
     <p class="ayuda" style="margin-top:8px">Horas de Chile continental.</p>
   </div>
 
+  {% if con_resultado %}
+  <section class="pila" aria-labelledby="t-resultado">
+    <h2 id="t-resultado">Resultado de la adjudicación</h2>
+    <div class="resultado">
+      <div class="tarjeta"><div class="muted">Adjudicada a</div>
+        <div class="dato">{{ f.ganadores[0][0] }}</div>
+        {% if f.ganadores|length > 1 %}<div class="ayuda">y {{ f.ganadores|length - 1 }} proveedor{{ "es" if f.ganadores|length > 2 else "" }} más</div>{% endif %}</div>
+      {% if f.total_adjudicado %}<div class="tarjeta"><div class="muted">Monto adjudicado</div><div class="dato">{{ fmt(f.total_adjudicado) }}</div>
+        {% if f.monto_estimado %}{% set dif = (f.total_adjudicado / f.monto_estimado - 1) * 100 %}<div class="ayuda">{% if dif|abs < 1 %}Igual al monto estimado{% elif dif < 0 %}{{ (-dif)|round|int }}% bajo el monto estimado ({{ fmt(f.monto_estimado) }}){% else %}{{ dif|round|int }}% sobre el monto estimado ({{ fmt(f.monto_estimado) }}){% endif %}</div>{% endif %}</div>{% endif %}
+      {% if f.fecha_adjudicacion %}<div class="tarjeta"><div class="muted">Fecha de adjudicación</div><div class="dato"><time datetime="{{ f.fecha_adjudicacion.isoformat() }}">{{ f.fecha_adjudicacion.strftime("%d-%m-%Y") }}</time></div></div>{% endif %}
+    </div>
+    <div class="tabla"><table>
+      <thead><tr><th scope="col">Producto o servicio</th><th scope="col">Adjudicado a</th><th scope="col">Precio unitario</th></tr></thead>
+      <tbody>{% for r in f.resultado[:40] %}
+        <tr><td>{{ r.producto }}{% if r.cantidad %}<div class="ayuda">{{ "%g" | format(r.cantidad) }} {{ r.unidad }}</div>{% endif %}</td>
+            <td>{{ r.proveedor }}</td><td>{{ fmt(r.precio_unitario) }}</td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+    <p class="ayuda">Montos netos informados por el organismo en Mercado Público. Revisa el acta de adjudicación en la ficha oficial.</p>
+    <div class="tarjeta pila" style="background:var(--brand-soft);border-color:transparent">
+      <p style="margin:0"><strong>¿Vendes esto?</strong> Calza te avisa por WhatsApp cuando se publica una licitación parecida, con los precios a los que se ha adjudicado antes.</p>
+      <div><a class="boton" href="/registro">Probar {{ dias_prueba }} días gratis</a></div>
+    </div>
+  </section>
+  {% endif %}
+
   {% if f.descripcion and f.descripcion != f.nombre %}
   <section class="pila"><h2>Descripción</h2><p style="white-space:pre-line">{{ f.descripcion | truncate(2500) }}</p></section>
   {% endif %}
 
-  {% if f.items %}
+  {% if f.items and not con_resultado %}
   <section class="pila">
     <h2>Qué se compra</h2>
     <div class="tabla"><table>

@@ -38,6 +38,8 @@ class FilaEmpresa:
     mensajes_recibidos: int
     pagado: int
     motivos: list[tuple[str, str]]  # (texto, nivel: "critico" | "atencion" | "info"); vacío = nada urgente
+    utiles: int = 0  # licitaciones que marcó con 👍
+    no_utiles: int = 0  # y con 👎
     dias_prueba_usados: int | None = None  # para la barra de avance de la prueba
 
     @property
@@ -61,6 +63,14 @@ class Indicadores:
     por_contactar: int
     pagaron: int  # empresas con al menos un pago aprobado
     terminaron_prueba: int  # activas + vencidas: las que ya tuvieron que decidir
+    utiles: int = 0
+    no_utiles: int = 0
+
+    @property
+    def calce_util(self) -> int | None:
+        """Porcentaje de 👍 entre las licitaciones que los clientes valoraron."""
+        total = self.utiles + self.no_utiles
+        return round(100 * self.utiles / total) if total else None
 
     @property
     def conversion(self) -> int | None:
@@ -116,6 +126,12 @@ def datos_panel(session, momento: datetime | None = None) -> tuple[Indicadores, 
     pagado = dict(session.execute(
         select(Pago.empresa_id, func.sum(Pago.monto)).where(Pago.estado == "pagado").group_by(Pago.empresa_id)
     ).all())
+    valoraciones: dict[int, dict[int, int]] = {}
+    for empresa_id, valor, n in session.execute(
+        select(Calce.empresa_id, Calce.valoracion, func.count()).where(Calce.valoracion.is_not(None))
+        .group_by(Calce.empresa_id, Calce.valoracion)
+    ):
+        valoraciones.setdefault(empresa_id, {})[valor] = n
     inicio_mes = momento.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     cobrado_mes = session.scalar(select(func.sum(Pago.monto)).where(
         Pago.estado == "pagado", Pago.pagado_en >= inicio_mes)) or 0
@@ -143,6 +159,7 @@ def datos_panel(session, momento: datetime | None = None) -> tuple[Indicadores, 
             empresa=empresa, suscripcion=sus, mandato=mandato, dias_restantes=dias, resumenes=dias_resumen,
             ultimo_resumen=ultimo_resumen, mensajes_recibidos=recibidos.get(empresa.id, 0),
             pagado=int(pagado.get(empresa.id) or 0), motivos=motivos,
+            utiles=valoraciones.get(empresa.id, {}).get(1, 0), no_utiles=valoraciones.get(empresa.id, {}).get(-1, 0),
             dias_prueba_usados=(min(DIAS_PRUEBA, max(0, (momento - empresa.creada_en).days))
                                 if sus and sus.estado == "prueba" else None),
         ))
@@ -164,6 +181,7 @@ def datos_panel(session, momento: datetime | None = None) -> tuple[Indicadores, 
         por_contactar=sum(bool(f.motivos) for f in filas),
         pagaron=sum(f.pagado > 0 for f in filas),
         terminaron_prueba=sum(f.estado in ("activa", "vencida") for f in filas),
+        utiles=sum(f.utiles for f in filas), no_utiles=sum(f.no_utiles for f in filas),
     )
     return indicadores, filas
 

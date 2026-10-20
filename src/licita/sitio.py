@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import time
 from datetime import datetime
 from pathlib import Path
 from xml.sax.saxutils import escape
@@ -103,6 +104,31 @@ def ofertas_ld() -> list[dict]:
     ]
 
 
+# Precios en la ficha pública: pocos ítems y solo con código de producto (consulta por índice); se guardan 12 horas.
+ITEMS_CON_PRECIO = 3
+HORAS_CACHE_PRECIOS = 12
+MINIMO_COMPRAS_PUBLICO = 5  # en una página pública, un rango con 3 o 4 compras se ve poco confiable
+
+
+def precios_publicos(session, f: Ficha) -> list[dict]:
+    """Rango habitual de precio de los primeros ítems con referencia confiable (no dispersa)."""
+    from .precios import referencia_item
+
+    filas = []
+    for item in f.items:
+        if len(filas) >= ITEMS_CON_PRECIO:
+            break
+        if not item.get("codigo_producto"):
+            continue
+        ref = referencia_item(session, item, region=f.region, contexto=f.nombre)
+        if ref is None or ref.dispersa or ref.observaciones < MINIMO_COMPRAS_PUBLICO:
+            continue
+        filas.append({"producto": item.get("producto") or item.get("categoria") or "", "unidad": item.get("unidad") or "",
+                      "p25": ref.p25, "p75": ref.p75, "observaciones": ref.observaciones,
+                      "parecidos": ref.por_similitud or bool(ref.parecidas_a)})
+    return filas
+
+
 def crear_router_publico(
     Sesion: sessionmaker, *, plantillas: Jinja2Templates, url_publica: str, fundador_disponible,
     cache: Cache | None = None,
@@ -122,6 +148,24 @@ def crear_router_publico(
             for i, (nombre, url) in enumerate([("Inicio", "/"), *items], 1)
         ],
     }
+
+    precios_guardados: dict[str, tuple[float, list[dict]]] = {}
+
+    def precios_de(f: Ficha) -> list[dict]:
+        # Sin candado: dos visitas simultáneas pueden calcular lo mismo, pero ninguna ficha espera a otra.
+        guardado = precios_guardados.get(f.codigo)
+        if guardado and time.monotonic() < guardado[0]:
+            return guardado[1]
+        try:
+            with Sesion() as s:
+                filas = precios_publicos(s, f)
+        except Exception:
+            log.exception("No se pudieron calcular los precios públicos de %s", f.codigo)
+            filas = []
+        if len(precios_guardados) > 20_000:  # las abiertas son unas miles; esto solo evita crecer sin límite
+            precios_guardados.clear()
+        precios_guardados[f.codigo] = (time.monotonic() + HORAS_CACHE_PRECIOS * 3600, filas)
+        return filas
 
     def abiertas() -> list[Ficha]:
         def calcular():
@@ -236,6 +280,7 @@ def crear_router_publico(
         return html(request, "licitacion.html", {
             "f": f, "abierta": abierta, "dias": f.dias_para_cierre(), "rubro": rubro, "region": region,
             "similares": similares[:6], "migas": migas, "canonical": f"{url_publica}/licitacion/{f.codigo}",
+            "precios": precios_de(f) if abierta else [],
             "dias_prueba": DIAS_PRUEBA,
         }, encabezados=CACHE_PUBLICO if abierta else {**CACHE_PUBLICO, **NO_INDEXAR})
 

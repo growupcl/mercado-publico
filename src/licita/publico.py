@@ -78,6 +78,11 @@ class Ficha:
     def resumen(self) -> str:
         return ((self.clasificacion or {}).get("resumen") or "").strip()
 
+    @property
+    def requisitos(self) -> list[str]:
+        """Requisitos o restricciones que la IA detectó en la publicación (garantías, visita a terreno, plazos)."""
+        return [r.strip() for r in (self.clasificacion or {}).get("requisitos_destacados") or [] if r and r.strip()][:6]
+
     def descripcion_corta(self, largo: int = 155) -> str:
         texto = re.sub(r"\s+", " ", self.resumen or self.descripcion or self.nombre).strip()
         return texto if len(texto) <= largo else texto[: largo - 1].rstrip() + "…"

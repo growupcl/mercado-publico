@@ -26,6 +26,8 @@ from .sync import sincronizar_licitaciones
 
 log = logging.getLogger(__name__)
 
+CLASIFICAR_POR_CICLO = 300
+
 
 @dataclass
 class ResultadoCiclo:
@@ -57,9 +59,10 @@ def ejecutar_ciclo(
                 session.rollback()
                 resultado.errores.append(f"sync {fecha}: {e}")
 
-    # 2. Clasificación con IA de lo nuevo (una vez por licitación).
+    # 2. Clasificación con IA de lo nuevo (una vez por licitación). Mercado Público publica cientos al día: con 100
+    # por ciclo se acumulaban pendientes, y sin clasificación la ficha pública no muestra resumen ni requisitos.
     try:
-        ok, errores = clasificar_pendientes(session, ia)
+        ok, errores = clasificar_pendientes(session, ia, limite=CLASIFICAR_POR_CICLO)
         resultado.clasificadas = ok
         if errores:
             resultado.errores.append(f"clasificar: {errores} licitaciones con error")

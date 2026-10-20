@@ -88,7 +88,7 @@ main{padding-block:28px 56px}
   {% if e.email %}<a class="accion{% if compacto %} icono{% endif %}" href="mailto:{{ e.email }}" aria-label="Escribir un correo a {{ e.nombre }}" title="{{ e.email }}">{{ icono_correo() }}{% if not compacto %}Correo{% endif %}</a>{% endif %}
 </div>{% endmacro %}
 {% macro motivo(texto, nivel) %}<span class="motivo {{ nivel }}"><span aria-hidden="true">{% if nivel == "critico" %}!{% elif nivel == "atencion" %}●{% else %}i{% endif %}</span>{{ texto }}</span>{% endmacro %}
-{% macro estado(f) %}{% if f.estado == "prueba" %}<span class="et-estado e-prueba"><span aria-hidden="true">◷</span>En prueba</span>{% elif f.estado == "activa" %}<span class="et-estado e-activa"><span aria-hidden="true">✓</span>Activa</span>{% elif f.estado == "vencida" %}<span class="et-estado e-vencida"><span aria-hidden="true">✕</span>Vencida</span>{% else %}<span class="et-estado e-otro">{{ f.estado|capitalize }}</span>{% endif %}{% endmacro %}
+{% macro estado(f) %}{% if f.estado == "prueba" %}<span class="et-estado e-prueba"><span aria-hidden="true">◷</span>En prueba</span>{% elif f.estado == "activa" %}<span class="et-estado e-activa"><span aria-hidden="true">✓</span>Activa</span>{% elif f.estado == "vencida" %}<span class="et-estado e-vencida"><span aria-hidden="true">✕</span>Vencida</span>{% elif f.estado == "pendiente" %}<span class="et-estado e-otro"><span aria-hidden="true">…</span>Sin tarjeta</span>{% else %}<span class="et-estado e-otro">{{ f.estado|capitalize }}</span>{% endif %}{% endmacro %}
 {% block contenido %}
 <div class="adm">
   <div class="adm-cab">
@@ -176,6 +176,8 @@ main{padding-block:28px 56px}
                 {% if f.estado == "prueba" and f.dias_prueba_usados is not none %}
                   <div class="meter{% if f.dias_restantes is not none and f.dias_restantes < 3 %} critico{% endif %}" role="img" aria-label="Día {{ f.dias_prueba_usados }} de {{ dias_prueba }}"><i style="width:{{ (100 * f.dias_prueba_usados / dias_prueba)|round|int }}%"></i></div>
                   <div class="sec">Día {{ f.dias_prueba_usados }} de {{ dias_prueba }} · termina el {{ chile(f.suscripcion.vigente_hasta).strftime("%d-%m") }}</div>
+                {% elif f.estado == "pendiente" %}
+                  <div class="sec" style="margin-top:4px">Se registró {{ hace(e.creada_en, momento) }}; la prueba parte al registrar la tarjeta</div>
                 {% elif f.estado == "vencida" %}
                   <div class="sec" style="margin-top:4px">Venció {{ hace(f.suscripcion.vigente_hasta, momento) }}</div>
                 {% else %}

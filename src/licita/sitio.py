@@ -75,7 +75,8 @@ def faq() -> list[tuple[str, str]]:
         ("¿Cuánto cuesta?",
          f"El plan Pyme cuesta {formato_pesos(pyme.mensual)} al mes y el Pro {formato_pesos(pro.mensual)} "
          f"(los primeros clientes Pro pagan {formato_pesos(PRECIO_FUNDADOR_PRO)} de por vida). Pagando un año se "
-         f"ahorra un 10%. Precios con IVA. Los primeros {DIAS_PRUEBA} días son gratis y sin tarjeta, con todo lo del plan Pro."),
+         f"ahorra un 10%. Precios con IVA. Los primeros {DIAS_PRUEBA} días son gratis, con todo lo del plan Pro: registras tu tarjeta para activarlos, "
+         "el primer cobro es al terminar y si cancelas antes no pagas nada."),
         ("¿Cómo sabe Calza qué licitaciones me sirven?",
          "Describes en tus palabras lo que vendes, tus regiones y el monto que te interesa. Calza compara cada licitación "
          "nueva con tu perfil y le asigna un porcentaje de calce; solo te llegan las que superan el umbral."),

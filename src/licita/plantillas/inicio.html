@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_macros.html" import tarjeta_lic, buscador, cierre %}
 {% block titulo %}Calza · Licitaciones de Mercado Público en tu WhatsApp{% endblock %}
-{% block descripcion %}Recibe cada mañana en WhatsApp las licitaciones y Compras Ágiles de Mercado Público que calzan con tu pyme. Hoy hay {{ stats.abiertas | miles }} abiertas. Prueba {{ dias_prueba }} días gratis, sin tarjeta.{% endblock %}
+{% block descripcion %}Recibe cada mañana en WhatsApp las licitaciones y Compras Ágiles de Mercado Público que calzan con tu pyme. Hoy hay {{ stats.abiertas | miles }} abiertas. Prueba {{ dias_prueba }} días gratis.{% endblock %}
 {% block canonical %}{{ sitio }}/{% endblock %}
 {% block jsonld %}
 <script type="application/ld+json">{{ {
@@ -118,7 +118,7 @@ main{padding-top:0}
         <a class="boton grande" href="/registro">Probar {{ dias_prueba }} días gratis</a>
         <a class="boton fantasma" href="#prueba">Pruébalo sin registrarte</a>
       </div>
-      <div class="garantias"><span>Sin tarjeta</span><span>Todo el plan Pro durante la prueba</span><span>Cancela cuando quieras</span></div>
+      <div class="garantias"><span>{{ dias_prueba }} días sin costo</span><span>Todo el plan Pro durante la prueba</span><span>Cancela antes y no pagas nada</span></div>
     </div>
     <div class="escena" role="img" aria-label="Ejemplo de resumen diario de Calza en WhatsApp">
       <div class="telefono">
@@ -221,7 +221,7 @@ main{padding-top:0}
 
 <section id="planes" aria-labelledby="t-planes">
   <div class="cabeza centro"><span class="eti">Planes</span><h2 id="t-planes">Un precio simple, sin sorpresas</h2>
-    <p class="sub">{{ dias_prueba }} días gratis con todo lo del plan Pro. Sin tarjeta para empezar.</p></div>
+    <p class="sub">{{ dias_prueba }} días gratis con todo lo del plan Pro. Cancela antes de que terminen y no pagas nada.</p></div>
   <div class="planes">
     {% for p in planes %}
     <div class="plan2{% if p.codigo == 'pro' %} pro{% endif %}">

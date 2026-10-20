@@ -17,7 +17,7 @@ Calza es un servicio de {{ prestador }}. Es independiente: no está afiliado a C
 {% for p in planes %}- {{ p.nombre }}: ${{ "{:,}".format(p.mensual).replace(",", ".") }} al mes o ${{ "{:,}".format(anual[p.codigo]).replace(",", ".") }} al año. Incluye: {{ p.beneficios | join("; ") }}.
 {% endfor %}- Precio fundador Pro: ${{ "{:,}".format(precio_fundador).replace(",", ".") }} al mes de por vida para los primeros clientes Pro.
 - Consultoras (varias empresas): precio a convenir, escribir a hola@calza.cl.
-- Prueba gratuita: {{ dias_prueba }} días con todo lo del plan Pro, sin tarjeta.
+- Prueba gratuita: {{ dias_prueba }} días con todo lo del plan Pro. Se activa registrando una tarjeta en Mercado Pago; el primer cobro es al terminar la prueba y se puede cancelar antes sin costo.
 
 ## Páginas principales
 

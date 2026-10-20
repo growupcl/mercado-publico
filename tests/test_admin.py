@@ -84,7 +84,7 @@ def test_filtros_y_estado_vacio(Sesion):
     r = cliente.get("/admin?estado=vencida", auth=("admin", CLAVE))
     assert "No hay empresas en este filtro" in r.text and 'aria-current="page">Vencidas' in r.text
     r = cliente.get("/admin?estado=prueba", auth=("admin", CLAVE))
-    assert "Aseo Sur" in r.text and "Día 0 de 14" in r.text
+    assert "Aseo Sur" in r.text and "Día 0 de 7" in r.text
     assert cliente.get("/admin?estado=otra-cosa", auth=("admin", CLAVE)).status_code == 200  # cae en "Todas"
 
 

@@ -288,10 +288,10 @@ def _avisar(Sesion, wa, correo, momento):
         return avisar_fin_de_prueba(s, wa, url_publica="https://calza.cl", correo=correo, momento=momento)
 
 
-def test_avisa_tres_dias_antes_de_que_termine_la_prueba_una_sola_vez(en_prueba):
+def test_avisa_dos_dias_antes_de_que_termine_la_prueba_una_sola_vez(en_prueba):
     cliente, Sesion, wa, correo, fin = en_prueba
-    assert _avisar(Sesion, wa, correo, fin - timedelta(days=4)).total == 0  # todavía no
-    r = _avisar(Sesion, wa, correo, fin - timedelta(days=2, hours=23))
+    assert _avisar(Sesion, wa, correo, fin - timedelta(days=3)).total == 0  # todavía no
+    r = _avisar(Sesion, wa, correo, fin - timedelta(days=1, hours=23))
     assert (r.whatsapp, r.correos) == (1, 1)
     [(tipo, nombre, parametros, botones)] = wa.enviados
     assert (tipo, nombre, parametros, botones) == ("plantilla", "fin_prueba", ["Aseo Sur", fecha_larga(fin)], ["CUENTA"])
@@ -317,12 +317,25 @@ def test_con_ventana_abierta_el_aviso_va_como_texto_con_enlace(en_prueba):
         assert "/cuenta/" not in s.query(MensajeWhatsApp).filter_by(direccion="saliente").one().contenido
 
 
-def test_no_avisa_fin_de_prueba_si_ya_se_suscribio(en_prueba):
+def test_con_tarjeta_registrada_avisa_el_primer_cobro(en_prueba):
+    from licita.db import MandatoPago
+
     _, Sesion, wa, correo, fin = en_prueba
     with Sesion() as s:
-        s.query(Suscripcion).one().mandato_activo_id = 99
+        sus = s.query(Suscripcion).one()
+        m = MandatoPago(empresa_id=sus.empresa_id, referencia="R1", plan="pro", periodicidad="mensual", monto=39990,
+                        estado="authorized")
+        s.add(m)
+        s.flush()
+        sus.mandato_activo_id = m.id
         s.commit()
-    assert _avisar(Sesion, wa, correo, fin - timedelta(days=2)).total == 0
+    r = _avisar(Sesion, wa, correo, fin - timedelta(days=1))
+    # Sin ventana abierta no hay plantilla aprobada para este aviso: va solo por correo.
+    assert (r.whatsapp, r.correos) == (0, 1) and wa.enviados == []
+    [(_, asunto, texto, html)] = correo.enviados
+    assert asunto == f"Tu prueba de Calza termina el {fecha_larga(fin)}: primer cobro de $39.990"
+    assert "plan Pro mensual" in texto and "cancela la renovación antes" in texto and "$39.990" in html
+    assert _avisar(Sesion, wa, correo, fin - timedelta(hours=12)).total == 0  # una sola vez
 
 
 def test_si_fallan_ambos_canales_se_reintenta(en_prueba):

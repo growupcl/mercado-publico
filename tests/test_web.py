@@ -172,7 +172,7 @@ def test_registro_valido_crea_prueba_pro(web):
         assert e.consentimiento_whatsapp_en is not None
         sus = s.query(Suscripcion).one()
         assert (sus.estado, sus.plan) == ("prueba", "pro")
-        assert timedelta(days=13) < sus.vigente_hasta - ahora() <= timedelta(days=14)
+        assert timedelta(days=6) < sus.vigente_hasta - ahora() <= timedelta(days=7)
 
 
 def test_registro_con_errores_muestra_mensajes(web):
@@ -326,9 +326,9 @@ def test_vencimiento_pasa_a_gratis_y_deja_de_recibir_resumen(web):
     cliente, Sesion, _ = web
     _registrar(cliente)
     with Sesion() as s:
-        en_10_dias = ahora() + timedelta(days=12)
-        assert [e.nombre for e, _ in por_vencer(s, dias=3, momento=en_10_dias)] == ["Aseo Sur"]
-        vencidas = revisar_vencimientos(s, momento=ahora() + timedelta(days=15))
+        en_5_dias = ahora() + timedelta(days=5)
+        assert [e.nombre for e, _ in por_vencer(s, dias=3, momento=en_5_dias)] == ["Aseo Sur"]
+        vencidas = revisar_vencimientos(s, momento=ahora() + timedelta(days=8))
         assert [e.plan for e in vencidas] == ["gratis"]
         assert "Virtus SpA" in cliente.get("/terminos").text
 
@@ -559,3 +559,50 @@ def test_baja_del_resumen_por_correo_pide_confirmacion_y_se_reactiva_en_la_cuent
     with Sesion() as s:
         assert empresa_por_token(s, token).resumen_por_correo
     assert cliente.get("/correo/baja/no-existe-este-token-0000").status_code == 404
+
+
+# --- Prueba con tarjeta ---
+
+@pytest.fixture
+def con_tarjeta(Sesion):
+    mp = MPFalso()
+    app = crear_app(Sesion, router_web=crear_router_web(Sesion, mp=mp, ia=IAFalsa(), url_publica="https://calza.cl",
+                                                        mp_webhook_secreto=SECRETO, prueba_con_tarjeta=True))
+    return TestClient(app), Sesion, mp
+
+
+def test_con_tarjeta_la_prueba_empieza_al_registrarla(con_tarjeta):
+    cliente, Sesion, mp = con_tarjeta
+    r, token = _registrar(cliente)
+    assert "Activa tu prueba gratis" in r.text and "Hoy no se cobra nada" in r.text
+    assert f'action="/cuenta/{token}/suscribir"' in r.text and 'value="pro:mensual"' in r.text
+    with Sesion() as s:
+        e = empresa_por_token(s, token)
+        sus = s.query(Suscripcion).one()
+        assert (sus.estado, e.plan) == ("pendiente", "gratis")  # sin tarjeta: sin resumen ni gasto de IA
+        assert revisar_vencimientos(s, momento=ahora() + timedelta(days=30)) == []  # no vence: nunca empezó
+    assert "Tu prueba gratis aún no está activa" in cliente.get(f"/cuenta/{token}").text
+
+    r = cliente.post(f"/cuenta/{token}/suscribir", data={"opcion": "pro:mensual", "email_mp": "pagos@aseosur.cl"},
+                     follow_redirects=False)
+    assert r.status_code == 303 and "mercadopago" in r.headers["location"]
+    creada = mp.creadas[0]
+    assert creada["email"] == "pagos@aseosur.cl"
+    assert timedelta(days=6, hours=23) < creada["inicio"] - ahora() <= timedelta(days=7)  # primer cobro tras la prueba
+
+    mp.estados["PRE1"] = "authorized"
+    _aviso(cliente, "subscription_preapproval", "PRE1")
+    with Sesion() as s:
+        e = empresa_por_token(s, token)
+        sus = s.query(Suscripcion).one()
+        assert (sus.estado, e.plan) == ("prueba", "pro") and sus.mandato_activo_id is not None
+        assert timedelta(days=6, hours=23) < sus.vigente_hasta - ahora() <= timedelta(days=7)
+
+
+def test_sin_mercado_pago_la_prueba_empieza_sin_tarjeta(Sesion):
+    app = crear_app(Sesion, router_web=crear_router_web(Sesion, mp=None, ia=IAFalsa(), url_publica="https://calza.cl",
+                                                        prueba_con_tarjeta=True))
+    r, _ = _registrar(TestClient(app))
+    assert "Activa tu prueba gratis" not in r.text
+    with Sesion() as s:
+        assert s.query(Suscripcion).one().estado == "prueba"

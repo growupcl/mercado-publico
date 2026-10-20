@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-DIAS_PRUEBA = 14
+DIAS_PRUEBA = 7
 CUPOS_FUNDADOR = 100
 DESCUENTO_ANUAL = 0.10
 

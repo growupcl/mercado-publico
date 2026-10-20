@@ -7,6 +7,7 @@ ADMIN_CLAVE en el .env. Sin ADMIN_CLAVE el panel no existe (404), así no queda 
 from __future__ import annotations
 
 import base64
+import math
 import binascii
 import secrets
 from dataclasses import dataclass
@@ -78,8 +79,8 @@ class Indicadores:
         return round(100 * self.pagaron / self.terminaron_prueba) if self.terminaron_prueba else None
 
 
-FILTROS = (("todas", "Todas"), ("contactar", "Por contactar"), ("prueba", "En prueba"), ("activa", "Activas"),
-           ("vencida", "Vencidas"))
+FILTROS = (("todas", "Todas"), ("contactar", "Por contactar"), ("pendiente", "Sin tarjeta"), ("prueba", "En prueba"),
+           ("activa", "Activas"), ("vencida", "Vencidas"))
 
 
 def hace(fecha: datetime | None, momento: datetime) -> str:
@@ -144,6 +145,8 @@ def datos_panel(session, momento: datetime | None = None) -> tuple[Indicadores, 
         motivos: list[tuple[str, str]] = []
         if sus and sus.estado == "prueba" and mandato is None and dias is not None and dias < DIAS_POR_VENCER:
             motivos.append(("Prueba termina sin suscripción", "critico"))
+        if sus and sus.estado == "pendiente" and momento - empresa.creada_en > timedelta(hours=24):
+            motivos.append(("No activó la prueba (falta tarjeta)", "atencion"))
         if sus and sus.estado == "vencida" and dias is not None and dias > -7:
             motivos.append(("Venció hace poco", "critico"))
         if sus and sus.estado in ("prueba", "activa"):
@@ -160,11 +163,12 @@ def datos_panel(session, momento: datetime | None = None) -> tuple[Indicadores, 
             ultimo_resumen=ultimo_resumen, mensajes_recibidos=recibidos.get(empresa.id, 0),
             pagado=int(pagado.get(empresa.id) or 0), motivos=motivos,
             utiles=valoraciones.get(empresa.id, {}).get(1, 0), no_utiles=valoraciones.get(empresa.id, {}).get(-1, 0),
-            dias_prueba_usados=(min(DIAS_PRUEBA, max(0, (momento - empresa.creada_en).days))
+            # La prueba puede empezar al registrar la tarjeta (no al crear la cuenta): se cuenta desde su término.
+            dias_prueba_usados=(min(DIAS_PRUEBA, max(0, DIAS_PRUEBA - math.ceil((sus.vigente_hasta - momento).total_seconds() / 86400)))
                                 if sus and sus.estado == "prueba" else None),
         ))
     # Primero a quién contactar; luego pruebas por fecha de término, activas y vencidas.
-    orden_estado = {"prueba": 0, "activa": 1, "vencida": 2}
+    orden_estado = {"pendiente": 0, "prueba": 1, "activa": 2, "vencida": 3}
     filas.sort(key=lambda f: (not f.critica, not f.motivos, orden_estado.get(f.estado, 3),
                               f.suscripcion.vigente_hasta if f.suscripcion else momento))
 
@@ -199,7 +203,8 @@ def crear_router_admin(Sesion: sessionmaker, *, plantillas: Jinja2Templates, cla
         with Sesion() as s:
             indicadores, filas = datos_panel(s, momento)
             filtro = estado if estado in dict(FILTROS) else "todas"
-            cuentas = {"todas": len(filas), "contactar": indicadores.por_contactar, "prueba": indicadores.en_prueba,
+            cuentas = {"todas": len(filas), "contactar": indicadores.por_contactar,
+                       "pendiente": sum(f.estado == "pendiente" for f in filas), "prueba": indicadores.en_prueba,
                        "activa": indicadores.activas, "vencida": indicadores.vencidas}
             visibles = [f for f in filas if filtro == "todas" or (filtro == "contactar" and f.motivos)
                         or f.estado == filtro]

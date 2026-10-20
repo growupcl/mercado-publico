@@ -19,7 +19,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import sessionmaker
 
 from .db import Calce, Empresa, MandatoPago, MensajeWhatsApp, Pago, Suscripcion, ahora, hora_chile
-from .planes import PERIODICIDADES, PLANES
+from .planes import DIAS_PRUEBA, PERIODICIDADES, PLANES
 
 USUARIO = "admin"
 # Sin mensajes en este plazo, la empresa en prueba o activa se marca para contactar.
@@ -37,7 +37,12 @@ class FilaEmpresa:
     ultimo_resumen: datetime | None
     mensajes_recibidos: int
     pagado: int
-    motivos: list[str]  # por qué contactarla (vacío = nada urgente)
+    motivos: list[tuple[str, str]]  # (texto, nivel: "critico" | "atencion" | "info"); vacío = nada urgente
+    dias_prueba_usados: int | None = None  # para la barra de avance de la prueba
+
+    @property
+    def critica(self) -> bool:
+        return any(nivel == "critico" for _, nivel in self.motivos)
 
     @property
     def estado(self) -> str:
@@ -54,6 +59,33 @@ class Indicadores:
     ingreso_mensual: int  # suscripciones con renovación automática, llevadas a pesos al mes
     cobrado_mes: int
     por_contactar: int
+    pagaron: int  # empresas con al menos un pago aprobado
+    terminaron_prueba: int  # activas + vencidas: las que ya tuvieron que decidir
+
+    @property
+    def conversion(self) -> int | None:
+        """Porcentaje de las que terminaron la prueba y pagaron."""
+        return round(100 * self.pagaron / self.terminaron_prueba) if self.terminaron_prueba else None
+
+
+FILTROS = (("todas", "Todas"), ("contactar", "Por contactar"), ("prueba", "En prueba"), ("activa", "Activas"),
+           ("vencida", "Vencidas"))
+
+
+def hace(fecha: datetime | None, momento: datetime) -> str:
+    """Tiempo relativo corto en español: "hoy", "ayer", "hace 5 días", "hace 3 semanas"."""
+    if fecha is None:
+        return "nunca"
+    dias = (momento.date() - fecha.date()).days
+    if dias <= 0:
+        return "hoy"
+    if dias == 1:
+        return "ayer"
+    if dias < 14:
+        return f"hace {dias} días"
+    if dias < 60:
+        return f"hace {dias // 7} semanas"
+    return f"hace {dias // 30} meses"
 
 
 def _autorizado(request: Request, clave: str) -> bool:
@@ -93,28 +125,30 @@ def datos_panel(session, momento: datetime | None = None) -> tuple[Indicadores, 
         sus = suscripciones.get(empresa.id)
         mandato = mandatos.get(sus.mandato_activo_id) if sus and sus.mandato_activo_id else None
         dias = (sus.vigente_hasta - momento).days if sus else None
-        motivos = []
+        motivos: list[tuple[str, str]] = []
         if sus and sus.estado == "prueba" and mandato is None and dias is not None and dias < DIAS_POR_VENCER:
-            motivos.append("prueba por terminar sin suscripción")
+            motivos.append(("Prueba termina sin suscripción", "critico"))
+        if sus and sus.estado == "vencida" and dias is not None and dias > -7:
+            motivos.append(("Venció hace poco", "critico"))
         if sus and sus.estado in ("prueba", "activa"):
             ultimo = empresa.ultimo_mensaje_entrante
             if ultimo is None and momento - empresa.creada_en > timedelta(days=2):
-                motivos.append("nunca ha escrito por WhatsApp")
+                motivos.append(("Nunca ha escrito", "atencion"))
             elif ultimo is not None and momento - ultimo > SIN_ACTIVIDAD:
-                motivos.append(f"sin escribir hace {(momento - ultimo).days} días")  # siempre más de 7
+                motivos.append((f"Sin escribir hace {(momento - ultimo).days} días", "atencion"))  # siempre más de 7
             if not empresa.whatsapp_activo:
-                motivos.append("dio de baja WhatsApp")
-        if sus and sus.estado == "vencida" and dias is not None and dias > -7:
-            motivos.append("venció hace poco")
+                motivos.append(("Dio de baja WhatsApp", "info"))
         dias_resumen, ultimo_resumen = resumenes.get(empresa.id, (0, None))
         filas.append(FilaEmpresa(
             empresa=empresa, suscripcion=sus, mandato=mandato, dias_restantes=dias, resumenes=dias_resumen,
             ultimo_resumen=ultimo_resumen, mensajes_recibidos=recibidos.get(empresa.id, 0),
             pagado=int(pagado.get(empresa.id) or 0), motivos=motivos,
+            dias_prueba_usados=(min(DIAS_PRUEBA, max(0, (momento - empresa.creada_en).days))
+                                if sus and sus.estado == "prueba" else None),
         ))
     # Primero a quién contactar; luego pruebas por fecha de término, activas y vencidas.
     orden_estado = {"prueba": 0, "activa": 1, "vencida": 2}
-    filas.sort(key=lambda f: (not f.motivos, orden_estado.get(f.estado, 3),
+    filas.sort(key=lambda f: (not f.critica, not f.motivos, orden_estado.get(f.estado, 3),
                               f.suscripcion.vigente_hasta if f.suscripcion else momento))
 
     activas_con_mandato = [f for f in filas if f.mandato and f.estado in ("prueba", "activa")]
@@ -128,6 +162,8 @@ def datos_panel(session, momento: datetime | None = None) -> tuple[Indicadores, 
                                   for f in activas_con_mandato)),
         cobrado_mes=int(cobrado_mes),
         por_contactar=sum(bool(f.motivos) for f in filas),
+        pagaron=sum(f.pagado > 0 for f in filas),
+        terminaron_prueba=sum(f.estado in ("activa", "vencida") for f in filas),
     )
     return indicadores, filas
 
@@ -136,7 +172,7 @@ def crear_router_admin(Sesion: sessionmaker, *, plantillas: Jinja2Templates, cla
     router = APIRouter()
 
     @router.get("/admin", response_class=HTMLResponse)
-    def panel(request: Request):
+    def panel(request: Request, estado: str = "todas"):
         if not clave:
             return Response(status_code=404)
         if not _autorizado(request, clave):
@@ -144,9 +180,16 @@ def crear_router_admin(Sesion: sessionmaker, *, plantillas: Jinja2Templates, cla
         momento = ahora()
         with Sesion() as s:
             indicadores, filas = datos_panel(s, momento)
+            filtro = estado if estado in dict(FILTROS) else "todas"
+            cuentas = {"todas": len(filas), "contactar": indicadores.por_contactar, "prueba": indicadores.en_prueba,
+                       "activa": indicadores.activas, "vencida": indicadores.vencidas}
+            visibles = [f for f in filas if filtro == "todas" or (filtro == "contactar" and f.motivos)
+                        or f.estado == filtro]
             nombres = {**{c: p.nombre for c, p in PLANES.items()}, "gratis": "Gratis"}
             return plantillas.TemplateResponse(request, "admin.html", {
-                "ind": indicadores, "filas": filas, "nombres": nombres, "momento": momento, "chile": hora_chile,
+                "ind": indicadores, "filas": visibles, "nombres": nombres, "momento": momento, "chile": hora_chile,
+                "filtros": FILTROS, "filtro": filtro, "cuentas": cuentas, "hace": hace, "dias_prueba": DIAS_PRUEBA,
+                "contactar": [f for f in filas if f.motivos],
             }, headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex"})
 
     return router

@@ -1,44 +1,201 @@
 {% extends "base.html" %}
 {% block titulo %}Panel del piloto · Calza{% endblock %}
 {% block robots %}noindex, nofollow{% endblock %}
-{% block accion %}{% endblock %}
+{% block accion %}<a class="enlace" href="/" target="_blank" rel="noopener">Ver sitio ↗</a>{% endblock %}
+{% block pie_nav %}{% endblock %}
+{% block estilos %}
+<style>
+.contenedor{max-width:1240px}
+main{padding-block:28px 56px}
+.adm{display:flex;flex-direction:column;gap:28px}
+.adm-cab{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px 24px}
+.adm-cab h1{font-size:32px}
+.adm-cab p{margin:0;font-size:14px;color:var(--muted)}
+.adm h2{font-family:var(--body);font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 10px}
+/* Indicadores */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.kpi .et{font-size:14px;color:var(--muted)}
+.kpi .va{font-size:30px;font-weight:600;line-height:1.2;letter-spacing:-.01em}
+.kpi .su{font-size:13px;color:var(--muted)}
+.kpi.heroe{grid-column:span 2;background:var(--brand-soft);border-color:transparent}
+.kpi.heroe .va{font-size:48px;color:var(--ink)}
+@media (max-width:520px){.kpi.heroe{grid-column:auto}.kpi.heroe .va{font-size:38px}}
+.embudo{display:flex;gap:2px;height:8px;margin:10px 0 8px}
+.embudo span{border-radius:4px;min-width:4px}
+.leyenda{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--muted)}
+.leyenda b{color:var(--ink);font-weight:600}
+.punto{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:1px}
+.c-prueba{background:var(--gold)} .c-activa{background:var(--ok)} .c-vencida{background:var(--error)}
+/* Para contactar */
+.contactos{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.contacto{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.contacto.critico{border-left-color:var(--error)}
+.contacto strong{font-size:16px}
+.aldia{display:flex;gap:10px;align-items:center;background:var(--ok-soft);color:var(--ok);border-radius:12px;padding:14px 16px;font-weight:600}
+/* Etiquetas de estado y motivos: siempre ícono + texto */
+.et-estado,.motivo{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.e-prueba{background:var(--gold-soft);color:var(--gold)} .e-activa{background:var(--ok-soft);color:var(--ok)}
+.e-vencida{background:var(--error-soft);color:var(--error)} .e-otro{background:var(--brand-soft);color:var(--brand)}
+.motivo.critico{background:var(--error-soft);color:var(--error)} .motivo.atencion{background:var(--gold-soft);color:var(--gold)}
+.motivo.info{background:var(--brand-soft);color:var(--brand)}
+.motivos{display:flex;flex-wrap:wrap;gap:6px}
+/* Acciones */
+.acciones{display:flex;gap:6px;flex-wrap:wrap}
+.accion{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;padding:6px 10px;min-height:32px;border-radius:8px;border:1px solid var(--line);color:var(--ink);text-decoration:none;background:var(--surface)}
+.accion:hover{border-color:var(--brand);color:var(--brand)}
+.accion:focus-visible,.filtros a:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.accion svg{width:16px;height:16px;flex:none}
+.accion.icono{width:36px;height:36px;padding:0;justify-content:center}
+/* Filtros */
+.filtros{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.filtros a{font-size:14px;font-weight:600;padding:6px 12px;border-radius:999px;color:var(--muted);text-decoration:none;border:1px solid var(--line);background:var(--surface)}
+.filtros a[aria-current="page"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.filtros .n{font-weight:400;margin-left:4px;opacity:.8}
+/* Tabla */
+.tabla-adm{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.tabla-adm table{font-size:14px}
+.tabla-adm th{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--bg);padding:10px 14px;white-space:nowrap}
+.tabla-adm td{padding:14px;vertical-align:top}
+.tabla-adm tbody tr:last-child td{border-bottom:0}
+.tabla-adm tbody tr:hover{background:color-mix(in srgb,var(--brand-soft) 45%,transparent)}
+.tabla-adm .num{text-align:right}
+.tabla-adm th:first-child{width:27%}
+.tabla-adm .acciones{flex-wrap:nowrap}
+.nombre{font-weight:600;font-size:15px}
+.sec{color:var(--muted);font-size:13px;line-height:1.5}
+.meter{height:6px;border-radius:3px;background:var(--gold-soft);margin:8px 0 4px;max-width:140px;overflow:hidden}
+.meter i{display:block;height:100%;border-radius:3px;background:var(--gold)}
+.meter.critico{background:var(--error-soft)} .meter.critico i{background:var(--error)}
+.vacio{padding:32px;text-align:center;color:var(--muted)}
+/* En pantallas angostas, cada fila es una tarjeta */
+@media (max-width:860px){
+  .tabla-adm{background:transparent;border:0;overflow:visible}
+  .tabla-adm thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  .tabla-adm table,.tabla-adm tbody,.tabla-adm tr,.tabla-adm td{display:block}
+  .tabla-adm tr{background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:12px;padding:6px 0}
+  .tabla-adm td{border:0;padding:8px 16px}
+  .tabla-adm td[data-et]::before{content:attr(data-et);display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  .tabla-adm .num{text-align:left}
+  .tabla-adm .acciones{flex-wrap:wrap}
+}
+</style>
+{% endblock %}
+{% macro icono_wa() %}<svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.6.3-.2.2-.8.8-.8 2s.9 2.3 1 2.5c.1.2 1.7 2.6 4.1 3.6 1.5.7 2.1.7 2.9.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2l-.3-.2z"/></svg>{% endmacro %}
+{% macro icono_correo() %}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>{% endmacro %}
+{% macro acciones(e, compacto=False) %}<div class="acciones">
+  {% if e.whatsapp %}<a class="accion{% if compacto %} icono{% endif %}" href="https://wa.me/{{ e.whatsapp }}" target="_blank" rel="noopener" aria-label="Escribir por WhatsApp a {{ e.nombre }}" title="WhatsApp +{{ e.whatsapp }}">{{ icono_wa() }}{% if not compacto %}WhatsApp{% endif %}</a>{% endif %}
+  {% if e.email %}<a class="accion{% if compacto %} icono{% endif %}" href="mailto:{{ e.email }}" aria-label="Escribir un correo a {{ e.nombre }}" title="{{ e.email }}">{{ icono_correo() }}{% if not compacto %}Correo{% endif %}</a>{% endif %}
+</div>{% endmacro %}
+{% macro motivo(texto, nivel) %}<span class="motivo {{ nivel }}"><span aria-hidden="true">{% if nivel == "critico" %}!{% elif nivel == "atencion" %}●{% else %}i{% endif %}</span>{{ texto }}</span>{% endmacro %}
+{% macro estado(f) %}{% if f.estado == "prueba" %}<span class="et-estado e-prueba"><span aria-hidden="true">◷</span>En prueba</span>{% elif f.estado == "activa" %}<span class="et-estado e-activa"><span aria-hidden="true">✓</span>Activa</span>{% elif f.estado == "vencida" %}<span class="et-estado e-vencida"><span aria-hidden="true">✕</span>Vencida</span>{% else %}<span class="et-estado e-otro">{{ f.estado|capitalize }}</span>{% endif %}{% endmacro %}
 {% block contenido %}
-<div class="pila">
-  <h1>Panel del piloto</h1>
-  <p class="muted">Actualizado el {{ chile(momento).strftime("%d-%m-%Y %H:%M") }} (hora de Chile). Primero aparecen las empresas a contactar.</p>
-  <div class="rejilla dos" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
-    <div class="tarjeta"><div class="muted">Empresas</div><div class="precio">{{ ind.empresas }}</div></div>
-    <div class="tarjeta"><div class="muted">En prueba</div><div class="precio">{{ ind.en_prueba }}</div></div>
-    <div class="tarjeta"><div class="muted">Activas</div><div class="precio">{{ ind.activas }}</div></div>
-    <div class="tarjeta"><div class="muted">Vencidas</div><div class="precio">{{ ind.vencidas }}</div></div>
-    <div class="tarjeta"><div class="muted">Con renovación automática</div><div class="precio">{{ ind.con_renovacion }}</div></div>
-    <div class="tarjeta"><div class="muted">Ingreso mensual recurrente</div><div class="precio">{{ fmt(ind.ingreso_mensual) }}</div></div>
-    <div class="tarjeta"><div class="muted">Cobrado este mes</div><div class="precio">{{ fmt(ind.cobrado_mes) }}</div></div>
-    <div class="tarjeta"><div class="muted">Por contactar</div><div class="precio">{{ ind.por_contactar }}</div></div>
+<div class="adm">
+  <div class="adm-cab">
+    <h1>Panel del piloto</h1>
+    <p>Actualizado {{ chile(momento).strftime("%d-%m-%Y, %H:%M") }} (hora de Chile)</p>
   </div>
 
-  <div class="tabla"><table>
-    <thead><tr><th>Empresa</th><th>Estado</th><th>Plan</th><th>Resúmenes</th><th>Le escribió a Calza</th><th>Pagado</th><th>Contactar</th></tr></thead>
-    <tbody>{% for f in filas %}{% set e = f.empresa %}
-      <tr>
-        <td><strong>#{{ e.id }} {{ e.nombre }}</strong><br>
-          <span class="ayuda">{% if e.whatsapp %}<a href="https://wa.me/{{ e.whatsapp }}" target="_blank" rel="noopener">+{{ e.whatsapp }}</a>{% endif %}
-          {% if e.email %}· <a href="mailto:{{ e.email }}">{{ e.email }}</a>{% endif %}</span><br>
-          <span class="ayuda">Registro: {{ e.creada_en.strftime("%d-%m-%Y") }}</span></td>
-        <td>{% if f.estado == "prueba" %}<span class="chip oro">Prueba</span>{% elif f.estado == "activa" %}<span class="chip ok">Activa</span>{% elif f.estado == "vencida" %}<span class="chip error">Vencida</span>{% else %}<span class="chip">{{ f.estado }}</span>{% endif %}
-          {% if f.suscripcion %}<br><span class="ayuda">{% if f.estado == "vencida" %}venció{% else %}hasta{% endif %} el {{ f.suscripcion.vigente_hasta.strftime("%d-%m-%Y") }}{% if f.dias_restantes is not none and f.dias_restantes >= 0 %} ({{ f.dias_restantes }} {{ "día" if f.dias_restantes == 1 else "días" }}){% endif %}</span>{% endif %}</td>
-        <td>{{ nombres.get(e.plan, e.plan) }}{% if f.suscripcion and f.suscripcion.precio_fundador %} <span class="chip oro">Fundador</span>{% endif %}
-          <br><span class="ayuda">{% if f.mandato %}🔁 {{ nombres.get(f.mandato.plan, f.mandato.plan) }} {{ f.mandato.periodicidad }}, {{ fmt(f.mandato.monto) }}{% else %}Sin renovación automática{% endif %}</span></td>
-        <td>{{ f.resumenes }}{% if f.ultimo_resumen %}<br><span class="ayuda">último {{ f.ultimo_resumen.strftime("%d-%m") }}</span>{% endif %}
-          <br><span class="ayuda">{% if e.whatsapp_activo %}WhatsApp{% else %}<s>WhatsApp</s>{% endif %} · {% if e.resumen_por_correo %}correo{% else %}<s>correo</s>{% endif %}</span></td>
-        <td>{{ f.mensajes_recibidos }} mensajes{% if e.ultimo_mensaje_entrante %}<br><span class="ayuda">último {{ chile(e.ultimo_mensaje_entrante).strftime("%d-%m %H:%M") }}</span>{% endif %}</td>
-        <td>{{ fmt(f.pagado) if f.pagado else "—" }}</td>
-        <td>{% for m in f.motivos %}<span class="chip error" style="margin:2px 0;display:inline-block">{{ m }}</span><br>{% else %}<span class="ayuda">—</span>{% endfor %}</td>
-      </tr>
+  <section aria-labelledby="t-contactar">
+    <h2 id="t-contactar">Para contactar · {{ contactar|length }}</h2>
+    {% if contactar %}
+    <div class="contactos">
+      {% for f in contactar %}{% set e = f.empresa %}
+      <article class="contacto{% if f.critica %} critico{% endif %}">
+        <div><strong>{{ e.nombre }}</strong> <span class="sec">#{{ e.id }}</span></div>
+        <div class="motivos">{% for texto, nivel in f.motivos %}{{ motivo(texto, nivel) }}{% endfor %}</div>
+        {{ acciones(e) }}
+      </article>
+      {% endfor %}
+    </div>
     {% else %}
-      <tr><td colspan="7">Todavía no hay empresas registradas.</td></tr>
-    {% endfor %}</tbody>
-  </table></div>
-  <p class="ayuda">"Resúmenes" cuenta los días en que se le envió el resumen. "Le escribió a Calza" cuenta los mensajes que la empresa envió al número de Calza (respuestas, PRECIOS, bases, etc.). El ingreso mensual recurrente suma las suscripciones con renovación automática, con las anuales divididas en 12.</p>
+    <div class="aldia" role="status"><span aria-hidden="true">✓</span>Todo al día: ninguna empresa necesita que la contactes hoy.</div>
+    {% endif %}
+  </section>
+
+  <section aria-labelledby="t-numeros">
+    <h2 id="t-numeros">Números del piloto</h2>
+    <div class="kpis">
+      <div class="kpi heroe">
+        <span class="et">Ingreso mensual recurrente</span>
+        <span class="va">{{ fmt(ind.ingreso_mensual) }}</span>
+        <span class="su">{{ ind.con_renovacion }} {{ "suscripción" if ind.con_renovacion == 1 else "suscripciones" }} con renovación automática</span>
+      </div>
+      <div class="kpi">
+        <span class="et">Cobrado este mes</span>
+        <span class="va">{{ fmt(ind.cobrado_mes) }}</span>
+        <span class="su">Pagos aprobados en Mercado Pago</span>
+      </div>
+      <div class="kpi">
+        <span class="et">Conversión de prueba a pago</span>
+        <span class="va">{% if ind.conversion is not none %}{{ ind.conversion }}%{% else %}—{% endif %}</span>
+        <span class="su">{% if ind.terminaron_prueba %}{{ ind.pagaron }} de {{ ind.terminaron_prueba }} que terminaron la prueba{% else %}Ninguna ha terminado la prueba{% endif %}</span>
+      </div>
+      <div class="kpi">
+        <span class="et">Empresas</span>
+        <span class="va">{{ ind.empresas }}</span>
+        {% if ind.empresas %}
+        <div class="embudo" role="img" aria-label="{{ ind.en_prueba }} en prueba, {{ ind.activas }} activas, {{ ind.vencidas }} vencidas">
+          {% if ind.en_prueba %}<span class="c-prueba" style="flex:{{ ind.en_prueba }}" title="En prueba: {{ ind.en_prueba }}"></span>{% endif %}
+          {% if ind.activas %}<span class="c-activa" style="flex:{{ ind.activas }}" title="Activas: {{ ind.activas }}"></span>{% endif %}
+          {% if ind.vencidas %}<span class="c-vencida" style="flex:{{ ind.vencidas }}" title="Vencidas: {{ ind.vencidas }}"></span>{% endif %}
+        </div>
+        {% endif %}
+        <div class="leyenda">
+          <span><span class="punto c-prueba"></span>En prueba <b>{{ ind.en_prueba }}</b></span>
+          <span><span class="punto c-activa"></span>Activas <b>{{ ind.activas }}</b></span>
+          <span><span class="punto c-vencida"></span>Vencidas <b>{{ ind.vencidas }}</b></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="t-empresas">
+    <h2 id="t-empresas">Empresas</h2>
+    <nav class="filtros" aria-label="Filtrar empresas">
+      {% for clave, nombre in filtros %}<a href="/admin{% if clave != 'todas' %}?estado={{ clave }}{% endif %}"{% if clave == filtro %} aria-current="page"{% endif %}>{{ nombre }}<span class="n">{{ cuentas[clave] }}</span></a>{% endfor %}
+    </nav>
+    <div class="tabla-adm">
+      <table>
+        <thead><tr><th scope="col">Empresa</th><th scope="col">Estado</th><th scope="col">Plan</th><th scope="col">Actividad</th><th scope="col" class="num">Pagado</th><th scope="col"><span class="sr">Contacto</span></th></tr></thead>
+        <tbody>{% for f in filas %}{% set e = f.empresa %}
+          <tr>
+            <td data-et="Empresa">
+              <div class="nombre">{{ e.nombre }} <span class="sec">#{{ e.id }}</span></div>
+              <div class="sec">Registro {{ hace(e.creada_en, momento) }} · {{ chile(e.creada_en).strftime("%d-%m-%Y") }}</div>
+              {% if f.motivos %}<div class="motivos" style="margin-top:6px">{% for texto, nivel in f.motivos %}{{ motivo(texto, nivel) }}{% endfor %}</div>{% endif %}
+            </td>
+            <td data-et="Estado">
+              {{ estado(f) }}
+              {% if f.suscripcion %}
+                {% if f.estado == "prueba" and f.dias_prueba_usados is not none %}
+                  <div class="meter{% if f.dias_restantes is not none and f.dias_restantes < 3 %} critico{% endif %}" role="img" aria-label="Día {{ f.dias_prueba_usados }} de {{ dias_prueba }}"><i style="width:{{ (100 * f.dias_prueba_usados / dias_prueba)|round|int }}%"></i></div>
+                  <div class="sec">Día {{ f.dias_prueba_usados }} de {{ dias_prueba }} · termina el {{ chile(f.suscripcion.vigente_hasta).strftime("%d-%m") }}</div>
+                {% elif f.estado == "vencida" %}
+                  <div class="sec" style="margin-top:4px">Venció {{ hace(f.suscripcion.vigente_hasta, momento) }}</div>
+                {% else %}
+                  <div class="sec" style="margin-top:4px">Pagado hasta el {{ chile(f.suscripcion.vigente_hasta).strftime("%d-%m-%Y") }}{% if f.dias_restantes is not none and f.dias_restantes >= 0 %} · {{ f.dias_restantes }} {{ "día" if f.dias_restantes == 1 else "días" }}{% endif %}</div>
+                {% endif %}
+              {% endif %}
+            </td>
+            <td data-et="Plan">
+              <div>{{ nombres.get(e.plan, e.plan) }}{% if f.suscripcion and f.suscripcion.precio_fundador %} <span class="motivo atencion">Fundador</span>{% endif %}</div>
+              <div class="sec">{% if f.mandato %}Renueva solo: {{ nombres.get(f.mandato.plan, f.mandato.plan) }} {{ f.mandato.periodicidad }}, {{ fmt(f.mandato.monto) }}{% else %}Sin renovación automática{% endif %}</div>
+            </td>
+            <td data-et="Actividad">
+              <div>Escribió {{ hace(e.ultimo_mensaje_entrante, momento) }}{% if f.mensajes_recibidos %} <span class="sec">· {{ f.mensajes_recibidos }} {{ "mensaje" if f.mensajes_recibidos == 1 else "mensajes" }}</span>{% endif %}</div>
+              <div class="sec">Último resumen: {{ hace(f.ultimo_resumen, momento) }}{% if f.resumenes %} · {{ f.resumenes }} en total{% endif %}</div>
+              <div class="sec">Por {% if e.whatsapp_activo and e.resumen_por_correo %}WhatsApp y correo{% elif e.whatsapp_activo %}WhatsApp{% elif e.resumen_por_correo %}correo{% else %}ningún canal{% endif %}</div>
+            </td>
+            <td data-et="Pagado" class="num">{{ fmt(f.pagado) if f.pagado else "—" }}</td>
+            <td data-et="Contacto">{{ acciones(e, compacto=True) }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="6" class="vacio">{% if filtro == "todas" %}Todavía no hay empresas registradas.{% else %}No hay empresas en este filtro.{% endif %}</td></tr>
+        {% endfor %}</tbody>
+      </table>
+    </div>
+    <p class="ayuda">"Escribió" se refiere a mensajes que la empresa envió al número de Calza (respuestas al resumen, PRECIOS, bases). El ingreso mensual recurrente suma las suscripciones con renovación automática; las anuales se dividen en 12. La conversión cuenta las empresas con al menos un pago entre las que ya terminaron la prueba.</p>
+  </section>
 </div>
 {% endblock %}

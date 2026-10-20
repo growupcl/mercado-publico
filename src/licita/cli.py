@@ -272,6 +272,7 @@ def cmd_servidor(args, config: Config, Sesion) -> int:
         url_publica=config.url_publica, whatsapp_publico=config.whatsapp_publico,
         mp_webhook_secreto=config.mercadopago_webhook_secret, prestador=config.prestador,
         wa=wa, idioma_whatsapp=config.whatsapp_idioma, correo=_correo(config), admin_clave=config.admin_clave,
+        prueba_con_tarjeta=config.prueba_con_tarjeta,
     )
     app = crear_app(
         Sesion, wa, verify_token=config.whatsapp_verify_token,

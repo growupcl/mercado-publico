@@ -4,7 +4,7 @@ BORRADOR: deben ser revisados por un abogado antes del lanzamiento (Ley 19.628 y
 de protección de datos personales, Ley 19.496 del consumidor en lo aplicable).
 """
 
-FECHA = "octubre de 2026"
+FECHA = "20 de octubre de 2026"
 
 def terminos(prestador: str) -> list:
     return [
@@ -26,7 +26,9 @@ def terminos(prestador: str) -> list:
         "Ante cualquier diferencia, prevalece lo publicado en www.mercadopublico.cl.",
     ]),
     ("Prueba, planes y pagos", [
-        "Al registrarte tienes 14 días de prueba gratuita con las funciones del plan Pro, sin necesidad de tarjeta.",
+        "Tienes 7 días de prueba gratuita con las funciones del plan Pro. La prueba empieza cuando registras tu tarjeta en "
+        "Mercado Pago al elegir tu plan: ese día no se cobra nada, el primer cobro es al terminar la prueba y, si cancelas "
+        "la renovación antes, no se cobra.",
         "Los planes se pagan con una suscripción de Mercado Pago (tarjeta de crédito o débito) que se renueva "
         "automáticamente cada mes o cada año. Si te suscribes durante la prueba, el primer cobro es al terminar la prueba. "
         "Los precios publicados incluyen IVA.",

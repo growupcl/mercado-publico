@@ -5,14 +5,34 @@
 <div style="max-width:640px" class="pila">
   <span class="chip ok">Cuenta creada</span>
   <h1>¡Listo, {{ empresa.nombre }}!</h1>
+  {% if suscripcion.estado == "pendiente" %}
+  <p class="lead">Falta un paso para activar tus {{ dias_prueba }} días gratis con todo lo del plan Pro: registrar tu tarjeta en Mercado Pago.</p>
+  <form method="post" action="/cuenta/{{ token }}/suscribir" class="tarjeta pila" style="border:2px solid var(--brand)">
+    <h3>Activa tu prueba gratis</h3>
+    <ul class="check" style="margin:0">
+      <li><strong>Hoy no se cobra nada.</strong> Tu prueba empieza apenas registres la tarjeta.</li>
+      <li>El primer cobro es el {{ primer_cobro }}: plan <strong>{{ plan_elegido }} {{ periodicidad }}, {{ fmt(precio_plan) }}</strong>.</li>
+      <li>Si cancelas antes desde tu cuenta, no se cobra nada.</li>
+    </ul>
+    <input type="hidden" name="opcion" value="{{ suscripcion.plan }}:{{ suscripcion.periodicidad }}">
+    <div>
+      <label for="email_mp">Correo de tu cuenta de Mercado Pago</label>
+      <input type="email" id="email_mp" name="email_mp" value="{{ empresa.email }}" required maxlength="254">
+      <p class="ayuda">Mercado Pago solo acepta la tarjeta si inicias sesión con una cuenta que tenga este mismo correo.</p>
+    </div>
+    <div><button class="boton" type="submit">Registrar tarjeta y activar la prueba</button></div>
+    <p class="ayuda" style="margin:0">Pagas con tarjeta de crédito o débito a través de Mercado Pago: Calza no ve ni guarda los datos de tu tarjeta.</p>
+  </form>
+  {% else %}
   <p class="lead">Tu prueba gratis dura hasta el {{ vigente_hasta }} y, mientras tanto, tienes todo lo del plan Pro.
     Después sigues con el plan que elegiste: <strong>{{ plan_elegido }} {{ periodicidad }}, {{ fmt(precio_plan) }}</strong>.
     No cobramos nada hasta que lo actives desde tu cuenta.</p>
+  {% endif %}
   {% if wa_link %}
   <div class="tarjeta pila">
-    <h3>Último paso: salúdanos por WhatsApp</h3>
-    <p>Escríbenos "Hola" para confirmar tu número. Así podemos responderte al instante cuando nos envíes bases o preguntas. Desde mañana recibirás ahí tu resumen de licitaciones.</p>
-    <div><a class="boton" href="{{ wa_link }}" target="_blank" rel="noopener">Abrir WhatsApp</a></div>
+    <h3>{% if suscripcion.estado == "pendiente" %}Y salúdanos por WhatsApp{% else %}Último paso: salúdanos por WhatsApp{% endif %}</h3>
+    <p>Escríbenos "Hola" para confirmar tu número. Así podemos responderte al instante cuando nos envíes bases o preguntas.{% if suscripcion.estado != "pendiente" %} Desde mañana recibirás ahí tu resumen de licitaciones.{% else %} Cuando actives tu prueba, desde el día siguiente recibirás ahí tu resumen de licitaciones.{% endif %}</p>
+    <div><a class="boton{% if suscripcion.estado == 'pendiente' %} secundario{% endif %}" href="{{ wa_link }}" target="_blank" rel="noopener">Abrir WhatsApp</a></div>
   </div>
   {% endif %}
   <div class="tarjeta pila">

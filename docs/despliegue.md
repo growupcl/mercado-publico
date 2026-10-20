@@ -142,6 +142,7 @@ Completa al menos:
 | `WHATSAPP_*`, `LICITA_WHATSAPP_PUBLICO` | Ver [whatsapp.md](whatsapp.md) |
 | `SMTP_USUARIO`, `SMTP_CLAVE` | Correo de avisos desde hola@calza.cl. Ver [correo.md](correo.md) |
 | `ADMIN_CLAVE` | Contraseña del panel del piloto en `https://calza.cl/admin` (usuario `admin`). Genérala con `openssl rand -base64 24`. Vacía = panel desactivado |
+| `PRUEBA_CON_TARJETA` | `1` (por defecto): la prueba de 7 días empieza al registrar la tarjeta en Mercado Pago. `0`: empieza al registrarse, sin tarjeta |
 
 Lo que aún no tengas (ticket, WhatsApp, Mercado Pago) puede quedar vacío: el sitio funciona igual y esas partes
 se activan al completar la variable y reiniciar (`docker compose up -d`).

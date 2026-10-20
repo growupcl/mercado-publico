@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import quote
 
@@ -63,6 +63,7 @@ def crear_router_web(
     correo: ClienteCorreo | None = None,
     cache_publico: Cache | None = None,
     admin_clave: str = "",
+    prueba_con_tarjeta: bool = False,
 ) -> APIRouter:
     if mp is not None and not mp_webhook_secreto and not permitir_sin_firma:
         raise ValueError("Falta MERCADOPAGO_WEBHOOK_SECRET: sin él no se puede verificar que los avisos vengan de Mercado Pago.")
@@ -118,13 +119,15 @@ def crear_router_web(
         )
         with Sesion() as s:
             try:
-                empresa, token = registrar_empresa(s, datos, ia=ia)
+                empresa, token = registrar_empresa(s, datos, ia=ia, requiere_tarjeta=prueba_con_tarjeta and mp is not None)
             except ErrorRegistro as e:
                 return _form(request, datos, e.errores, estado=422)
             suscripcion = suscripcion_de(s, empresa)
             valor, _ = cotizar(s, suscripcion, suscripcion.plan, suscripcion.periodicidad)
             return plantillas.TemplateResponse(request, "registro_listo.html", {
-                "empresa": empresa, "vigente_hasta": _fecha(suscripcion.vigente_hasta),
+                "empresa": empresa, "vigente_hasta": _fecha(suscripcion.vigente_hasta), "suscripcion": suscripcion,
+                "token": token, "dias_prueba": DIAS_PRUEBA,
+                "primer_cobro": _fecha(ahora() + timedelta(days=DIAS_PRUEBA)),
                 "plan_elegido": PLANES[suscripcion.plan].nombre, "periodicidad": suscripcion.periodicidad,
                 "precio_plan": valor,
                 "enlace_cuenta": f"{url_publica}/cuenta/{token}", "wa_link": wa_link,
@@ -157,7 +160,7 @@ def crear_router_web(
             "rechazo": rechazo, "regiones": REGIONES, "errores_perfil": errores_perfil or {},
             "perfil": perfil or {"descripcion": empresa.descripcion, "regiones": empresa.regiones or [],
                                  "monto_max": empresa.monto_max},
-            "perfil_guardado": perfil_guardado,
+            "perfil_guardado": perfil_guardado, "dias_prueba": DIAS_PRUEBA,
         }, status_code=estado)
 
     @router.get("/cuenta/{token}", response_class=HTMLResponse)
@@ -324,7 +327,8 @@ def crear_router_web(
                         inicio_cobro = _fecha(suscripcion.vigente_hasta)
         estado = mandato.estado if mandato else None
         if estado == "authorized":
-            texto = (f"Tu plan quedó con renovación automática. El primer cobro será el {inicio_cobro}: hasta entonces no pagas nada."
+            texto = (f"Tu prueba gratis está activa y tu plan quedó con renovación automática. El primer cobro será el "
+                     f"{inicio_cobro}: hasta entonces no pagas nada, y si cancelas antes desde tu cuenta, no se cobra."
                      if inicio_cobro else "Tu plan quedó activo con renovación automática. Te enviaremos la factura a tu correo.")
             return mensaje(request, "¡Suscripción lista!", texto, chip="Activa", chip_clase="ok")
         if estado in ("cancelled", "paused"):

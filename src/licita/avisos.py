@@ -190,7 +190,7 @@ def _avisar_whatsapp(session, wa, empresa, mandato, limite, enlace, idioma, mome
 # --- Fin de la prueba gratuita ---
 
 # Cuántos días antes de que termine la prueba se avisa (día 11 de 14).
-DIAS_AVISO_FIN_PRUEBA = 3
+DIAS_AVISO_FIN_PRUEBA = 2
 # Pasado este plazo desde el vencimiento, el aviso de "terminó" ya no se envía (llegaría atrasado).
 VIGENCIA_AVISO_TERMINADA = timedelta(days=3)
 
@@ -242,6 +242,27 @@ def mensajes_fin_prueba(empresa: Empresa, termina: str, enlace: str, fundador: b
     return whatsapp, asunto, texto, _correo_html(empresa, parrafos, enlace, "Elegir mi plan")
 
 
+def mensajes_primer_cobro(empresa: Empresa, termina: str, plan: str, monto: int, enlace: str) -> tuple[str, str, str, str]:
+    """Aviso de que la prueba termina y se hará el primer cobro (la empresa ya registró su tarjeta)."""
+    valor = formato_pesos(monto)
+    whatsapp = (f"Hola {empresa.nombre}, tu prueba gratuita de Calza termina el {termina}. Ese día se hará el primer cobro "
+                f"de tu plan {plan} ({valor}) en tu tarjeta registrada en Mercado Pago y seguirás recibiendo tus licitaciones. "
+                f"Si no quieres continuar, cancela antes desde tu cuenta (enlace privado):\n{enlace}")
+    asunto = f"Tu prueba de Calza termina el {termina}: primer cobro de {valor}"
+    texto = (f"Hola {empresa.nombre}:\n\nTu prueba gratuita de Calza termina el {termina}. Ese día se hará el primer cobro "
+             f"de tu plan {plan}, {valor}, en la tarjeta que registraste en Mercado Pago, y seguirás recibiendo tus "
+             "licitaciones sin interrupciones.\n\n"
+             f"Si no quieres continuar, cancela la renovación antes de esa fecha desde tu cuenta y no se cobrará nada:\n\n{enlace}\n\n"
+             "Este enlace es privado: funciona como una contraseña, no lo compartas.\n\n"
+             "Saludos,\nEquipo Calza · hola@calza.cl")
+    e = html.escape
+    parrafos = [f"Tu prueba gratuita de Calza termina el <strong>{e(termina)}</strong>. Ese día se hará el primer cobro de tu "
+                f"plan {e(plan)}, <strong>{e(valor)}</strong>, en la tarjeta que registraste en Mercado Pago, y seguirás "
+                "recibiendo tus licitaciones sin interrupciones.",
+                "Si no quieres continuar, cancela la renovación antes de esa fecha desde tu cuenta y no se cobrará nada."]
+    return whatsapp, asunto, texto, _correo_html(empresa, parrafos, enlace, "Ir a mi cuenta")
+
+
 def mensajes_terminada(empresa: Empresa, que: str, termino: str, enlace: str, fundador: bool) -> tuple[str, str, str, str]:
     """Lo mismo para el aviso de que la prueba o el plan terminó. `que`: "prueba gratuita" o "plan Pyme mensual"."""
     fundador_txt = _texto_fundador(fundador)
@@ -270,7 +291,9 @@ def _enviar_aviso(session, wa, correo, empresa, *, texto_wa, plantilla, parametr
                   idioma, momento) -> tuple[bool, bool]:
     """Envía por WhatsApp (si lo tiene activo) y por correo. Devuelve (whatsapp_ok, correo_ok)."""
     ok_wa = ok_correo = False
-    if wa is not None and empresa.whatsapp and empresa.whatsapp_activo:
+    # Sin plantilla aprobada (plantilla=None), por WhatsApp solo va si la ventana de 24 h está abierta.
+    if wa is not None and empresa.whatsapp and empresa.whatsapp_activo and (plantilla or ventana_abierta(empresa, momento)):
+        nombre = plantilla.nombre if plantilla else "primer_cobro"
         try:
             if ventana_abierta(empresa, momento):
                 wamid = wa.enviar_texto(empresa.whatsapp, texto_wa)
@@ -281,13 +304,14 @@ def _enviar_aviso(session, wa, correo, empresa, *, texto_wa, plantilla, parametr
                 registrar(session, empresa, empresa.whatsapp, "saliente", "plantilla", " | ".join(parametros), wamid)
             ok_wa = True
         except ErrorWhatsApp as e:
-            log.warning("No se pudo enviar el aviso %s por WhatsApp a la empresa #%s: %s", plantilla.nombre, empresa.id, e)
+            log.warning("No se pudo enviar el aviso %s por WhatsApp a la empresa #%s: %s", nombre, empresa.id, e)
     if correo is not None and empresa.email:
         try:
             correo.enviar(empresa.email, asunto, texto, cuerpo_html)
             ok_correo = True
         except ErrorCorreo as e:
-            log.warning("No se pudo enviar el aviso %s por correo a la empresa #%s: %s", plantilla.nombre, empresa.id, e)
+            log.warning("No se pudo enviar el aviso %s por correo a la empresa #%s: %s",
+                        plantilla.nombre if plantilla else "primer_cobro", empresa.id, e)
     return ok_wa, ok_correo
 
 
@@ -317,16 +341,24 @@ def avisar_fin_de_prueba(
     resultado = ResultadoAvisos()
     fundador = fundador_disponible(session)
     por_terminar = session.scalars(select(Suscripcion).where(
-        Suscripcion.estado == "prueba", Suscripcion.mandato_activo_id.is_(None), Suscripcion.aviso_fin_prueba_en.is_(None),
+        Suscripcion.estado == "prueba", Suscripcion.aviso_fin_prueba_en.is_(None),
         Suscripcion.vigente_hasta > momento, Suscripcion.vigente_hasta <= momento + timedelta(days=DIAS_AVISO_FIN_PRUEBA),
     )).all()
     for suscripcion in por_terminar:
         empresa = session.get(Empresa, suscripcion.empresa_id)
         termina = fecha_larga(suscripcion.vigente_hasta)
         enlace = f"{url_publica}/cuenta/{generar_token(empresa)}"
-        texto_wa, asunto, texto, cuerpo_html = mensajes_fin_prueba(empresa, termina, enlace, fundador)
+        mandato = session.get(MandatoPago, suscripcion.mandato_activo_id) if suscripcion.mandato_activo_id else None
+        if mandato is not None:
+            # Registró su tarjeta: se le recuerda cuándo y cuánto se cobrará, y cómo cancelar si no quiere seguir.
+            texto_wa, asunto, texto, cuerpo_html = mensajes_primer_cobro(empresa, termina, nombre_plan(mandato),
+                                                                         mandato.monto, enlace)
+            plantilla, parametros = None, []
+        else:
+            texto_wa, asunto, texto, cuerpo_html = mensajes_fin_prueba(empresa, termina, enlace, fundador)
+            plantilla, parametros = FIN_PRUEBA, [empresa.nombre, termina]
         ok_wa, ok_correo = _enviar_aviso(
-            session, wa, correo, empresa, texto_wa=texto_wa, plantilla=FIN_PRUEBA, parametros=[empresa.nombre, termina],
+            session, wa, correo, empresa, texto_wa=texto_wa, plantilla=plantilla, parametros=parametros,
             asunto=asunto, texto=texto, cuerpo_html=cuerpo_html, idioma=idioma, momento=momento)
         if ok_wa or ok_correo:
             suscripcion.aviso_fin_prueba_en = momento

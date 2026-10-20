@@ -1,7 +1,7 @@
 # Mensajes del piloto
 
 Borradores para invitar pymes al piloto de Calza y acompañar a quienes ya están en la prueba.
-Usan solo las condiciones vigentes en el sitio: 14 días gratis con funciones Pro y sin tarjeta;
+Usan solo las condiciones vigentes en el sitio: 7 días gratis con funciones Pro (se activan registrando la tarjeta en Mercado Pago; el primer cobro es al terminar y se puede cancelar antes sin costo);
 precio fundador Pro de $39.990 al mes de por vida para los primeros 100 clientes; plan Pyme a $19.990 al mes;
 10 % de descuento anual. Si cambian (`src/licita/planes.py`), actualiza también estos textos.
 
@@ -23,7 +23,7 @@ Reemplaza lo que está entre corchetes antes de enviar.
 
 > Hola [Nombre], soy [tu nombre]. Estamos lanzando **Calza**, un servicio que cada día hábil a las 8:00 te manda por WhatsApp las licitaciones y Compras Ágiles de Mercado Público que calzan con lo que vende [Empresa].
 >
-> Te invito a ser parte del piloto: son 14 días gratis, sin tarjeta. Solo te pido que me cuentes qué te sirvió y qué no.
+> Te invito a ser parte del piloto: son 7 días gratis: registras tu tarjeta, pero no se cobra nada si cancelas antes de que terminen. Solo te pido que me cuentes qué te sirvió y qué no.
 >
 > Te registras en 2 minutos aquí: https://calza.cl/registro
 >
@@ -40,7 +40,7 @@ Reemplaza lo que está entre corchetes antes de enviar.
 > Por eso armamos **Calza**. Le dices qué vendes, en qué regiones trabajas y qué montos te interesan, y cada día hábil a las 8:00 te llega por WhatsApp solo lo nuevo que calza contigo. Si algo te interesa, respondes con su número y te enviamos el detalle: qué piden, los requisitos a los que hay que poner ojo, plazos, precios de referencia de compras anteriores y el link a la ficha oficial.
 >
 > Te invito a probarlo como parte de nuestro piloto:
-> - **14 días gratis** con todas las funciones, sin tarjeta.
+> - **7 días gratis** con todas las funciones. Registras tu tarjeta en Mercado Pago, pero el primer cobro es al terminar la prueba y si cancelas antes no pagas nada.
 > - Si después decides seguir, los primeros 100 clientes del plan Pro quedan con **precio fundador de $39.990 al mes, de por vida**. El plan Pyme cuesta $19.990 al mes.
 > - A cambio, te pido 10 minutos de conversación al final de la prueba para saber qué te sirvió y qué mejorarías.
 >
@@ -54,7 +54,7 @@ Reemplaza lo que está entre corchetes antes de enviar.
 
 ### 3. Seguimiento (3 a 4 días después, si no respondió)
 
-> Hola [Nombre], te escribo de nuevo por Calza. Hoy hay [N] licitaciones abiertas en Mercado Público, y varias podrían calzar con [Empresa]. Si quieres, te muestro cuáles en 2 minutos o te registras directo en https://calza.cl/registro (14 días gratis, sin tarjeta).
+> Hola [Nombre], te escribo de nuevo por Calza. Hoy hay [N] licitaciones abiertas en Mercado Público, y varias podrían calzar con [Empresa]. Si quieres, te muestro cuáles en 2 minutos o te registras directo en https://calza.cl/registro (7 días gratis).
 
 Para [N] usa el número de licitaciones abiertas que muestra la portada de calza.cl ese día.
 

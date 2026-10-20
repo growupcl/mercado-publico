@@ -260,3 +260,78 @@ def test_descargar_media_rechaza_archivos_grandes():
         lambda r: httpx.Response(200, json={"url": "https://x", "file_size": 50_000_000}))))
     with pytest.raises(ErrorWhatsApp, match="demasiado grande"):
         wa.descargar_media("MEDIA1")
+
+
+# --- Copia del resumen por correo ---
+
+class CorreoFalso:
+    def __init__(self, falla=False):
+        self.enviados, self.falla = [], falla
+
+    def enviar(self, para, asunto, texto, html=None, encabezados=None):
+        from licita.correo import ErrorCorreo
+
+        if self.falla:
+            raise ErrorCorreo("SMTP caído")
+        self.enviados.append((para, asunto, texto, html, encabezados))
+        return "<id@calza.cl>"
+
+
+def _con_correo(escenario):
+    s, e = escenario
+    e.email = "contacto@aseosur.cl"
+    s.commit()
+    return s, e
+
+
+def test_resumen_tambien_llega_por_correo_con_la_misma_numeracion(escenario):
+    s, e = _con_correo(escenario)
+    wa, correo = WhatsAppFalso(), CorreoFalso()
+    r = enviar_resumenes(s, wa, momento=MOMENTO, correo=correo, url_publica="https://calza.cl", whatsapp_publico="56900000000")
+    assert (r.plantillas, r.correos) == (1, 1)
+    [(para, asunto, texto, html, encabezados)] = correo.enviados
+    assert para == "contacto@aseosur.cl" and asunto == "2 licitaciones nuevas para Aseo Sur · 7 de octubre"
+    assert "1. Adquisición de insumos de aseo para CESFAM (92% de calce)" in texto
+    assert "https://calza.cl/licitacion/1234-56-LE26" in texto and 'href="https://calza.cl/licitacion/1234-56-LE26"' in html
+    assert "escribe el número de la licitación al WhatsApp" in texto and "https://wa.me/56900000000" in html
+    baja = f"https://calza.cl/correo/baja/{e.token_correo}"
+    assert len(e.token_correo) >= 20 and baja in texto and baja in html
+    assert encabezados == {"List-Unsubscribe": f"<{baja}>", "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"}
+    assert [c.posicion_resumen for c in s.query(Calce).order_by(Calce.puntaje.desc())] == [1, 2]
+
+
+def test_si_whatsapp_falla_el_correo_basta_y_no_se_repite(escenario):
+    s, e = _con_correo(escenario)
+    correo = CorreoFalso()
+    r = enviar_resumenes(s, WhatsAppFalso(falla=True), momento=MOMENTO, correo=correo, url_publica="https://calza.cl")
+    assert (r.errores, r.correos) == (1, 1)
+    assert s.query(Calce).filter(Calce.notificado.is_(True)).count() == 2
+
+
+def test_si_fallan_ambos_canales_se_reintenta_al_dia_siguiente(escenario):
+    s, e = _con_correo(escenario)
+    r = enviar_resumenes(s, WhatsAppFalso(falla=True), momento=MOMENTO, correo=CorreoFalso(falla=True), url_publica="https://calza.cl")
+    assert (r.errores, r.errores_correo) == (1, 1)
+    assert s.query(Calce).filter(Calce.notificado.is_(True)).count() == 0
+
+
+def test_correo_respeta_su_baja_y_llega_aunque_haya_baja_de_whatsapp(escenario):
+    s, e = _con_correo(escenario)
+    e.whatsapp_activo = False
+    s.commit()
+    wa, correo = WhatsAppFalso(), CorreoFalso()
+    assert enviar_resumenes(s, wa, momento=MOMENTO, correo=correo, url_publica="https://calza.cl").correos == 1
+    assert wa.enviados == []
+    e.resumen_por_correo = False
+    s.add(Calce(empresa_id=e.id, licitacion_codigo="3456-7-LP26", puntaje=80, razon="Calza."))
+    s.commit()
+    r = enviar_resumenes(s, wa, momento=MOMENTO, correo=correo, url_publica="https://calza.cl")
+    assert r.correos == 0 and len(correo.enviados) == 1  # sin canales activos: no se envía nada
+
+
+def test_cliente_de_correo_agrega_encabezados_de_baja():
+    from licita.correo import ClienteCorreo
+
+    c = ClienteCorreo("smtp.gmail.com", 587, "u", "c", "hola@calza.cl")
+    m = c.mensaje("a@b.cl", "Asunto", "texto", encabezados={"List-Unsubscribe": "<https://calza.cl/correo/baja/x>"})
+    assert m["List-Unsubscribe"] == "<https://calza.cl/correo/baja/x>"

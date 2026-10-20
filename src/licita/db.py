@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 from typing import Any
 
 from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, create_engine
+from sqlalchemy import true as sa_true
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
@@ -104,6 +105,10 @@ class Empresa(Base):
     comuna: Mapped[str] = mapped_column(String(100), default="", server_default="")
     email: Mapped[str] = mapped_column(String(200), default="")
     token_cuenta_hash: Mapped[str] = mapped_column(String(64), default="", index=True)
+    # Copia diaria del resumen por correo (se desactiva con el enlace de baja de cada correo o desde la cuenta).
+    resumen_por_correo: Mapped[bool] = mapped_column(Boolean, default=True, server_default=sa_true())
+    # Token del enlace de baja del correo: no da acceso a la cuenta, solo permite desactivar el resumen por correo.
+    token_correo: Mapped[str] = mapped_column(String(64), default="", server_default="", index=True)
     consentimiento_whatsapp_en: Mapped[datetime | None] = mapped_column(DateTime)
     # Último mensaje recibido del usuario: abre la ventana de 24 h en que responder es gratis.
     ultimo_mensaje_entrante: Mapped[datetime | None] = mapped_column(DateTime)

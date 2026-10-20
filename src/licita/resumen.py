@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 from datetime import datetime
 
 from sqlalchemy import select
@@ -117,6 +118,69 @@ def texto_resumen(empresa: Empresa, filas: list[Fila]) -> str:
         ]
     lineas.append("Responde con el número de una licitación para ver su detalle.")
     return "\n".join(lineas)
+
+
+MESES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre",
+         "noviembre", "diciembre")
+
+
+def correo_resumen(
+    empresa: Empresa, filas: list[Fila], *, url_publica: str, enlace_baja: str, whatsapp_publico: str = "",
+    momento: datetime | None = None,
+) -> tuple[str, str, str]:
+    """(asunto, texto, html) de la copia diaria del resumen por correo."""
+    momento = hora_chile(momento)
+    dia = f"{momento.day} de {MESES[momento.month - 1]}"
+    cantidad = "1 licitación nueva" if len(filas) == 1 else f"{len(filas)} licitaciones nuevas"
+    asunto = f"{cantidad.capitalize()} para {empresa.nombre} · {dia}"
+    e = html.escape
+    wa = f"https://wa.me/{whatsapp_publico}" if whatsapp_publico else ""
+
+    lineas = [f"Hola {empresa.nombre}:", "", f"Hoy encontramos {cantidad} que calzan con tu negocio:", ""]
+    bloques = []
+    for i, (calce, lic) in enumerate(filas, 1):
+        lugar = " · ".join(p for p in (lic.organismo, lic.region) if p)
+        ficha = f"{url_publica}/licitacion/{lic.codigo}"
+        lineas += [
+            f"{i}. {titulo(lic)} ({calce.puntaje}% de calce)",
+            f"   {lugar}",
+            f"   Monto estimado: {formato_pesos(lic.monto_estimado)} · Cierra: {formato_cierre(lic)}",
+            f"   {razon_corta(calce.razon)}",
+            f"   {ficha}",
+            "",
+        ]
+        bloques.append(f"""<tr><td style="padding:14px 0;border-top:1px solid #e4e7eb">
+<p style="margin:0 0 4px;font-weight:bold"><a href="{e(ficha)}" style="color:#0b6e4f;text-decoration:none">{i}. {e(titulo(lic))}</a>
+<span style="font-weight:normal;color:#52606d">({calce.puntaje}% de calce)</span></p>
+<p style="margin:0 0 4px;font-size:14px;color:#52606d">{e(lugar)}</p>
+<p style="margin:0 0 4px;font-size:14px">Monto estimado: {e(formato_pesos(lic.monto_estimado))} · Cierra: {e(formato_cierre(lic))}</p>
+<p style="margin:0;font-size:14px">{e(razon_corta(calce.razon))}</p>
+</td></tr>""")
+    if wa:
+        lineas += ["Para ver qué piden, precios de referencia o analizar las bases, escribe el número de la licitación "
+                   f"al WhatsApp de Calza: {wa}", ""]
+    lineas += [
+        "Recibes este correo porque te registraste en Calza (calza.cl). Para no recibir más el resumen por correo:",
+        enlace_baja, "", "Equipo Calza · hola@calza.cl",
+    ]
+    boton_wa = ('<p style="font-size:14px">Para ver qué piden, precios de referencia o analizar las bases, escribe el '
+                'número de la licitación al WhatsApp de Calza.</p>'
+                f'<p style="text-align:center;margin:24px 0"><a href="{e(wa)}" style="background:#0b6e4f;color:#ffffff;'
+                'text-decoration:none;padding:12px 22px;border-radius:6px;font-weight:bold">Abrir WhatsApp</a></p>'
+                if wa else "")
+    cuerpo_html = f"""<!doctype html>
+<html lang="es"><body style="margin:0;padding:24px;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#1f2933">
+<div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:8px;padding:28px">
+<p style="font-size:20px;font-weight:bold;margin:0 0 16px">Calza</p>
+<p>Hola {e(empresa.nombre)}:</p>
+<p>Hoy encontramos <strong>{e(cantidad)}</strong> que calzan con tu negocio:</p>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0">{"".join(bloques)}</table>
+{boton_wa}
+<p style="font-size:13px;color:#52606d">Recibes este correo porque te registraste en Calza.
+<a href="{e(enlace_baja)}" style="color:#52606d">No recibir más el resumen por correo</a>.</p>
+<p style="font-size:13px;color:#52606d">Equipo Calza · hola@calza.cl</p>
+</div></body></html>"""
+    return asunto, "\n".join(lineas), cuerpo_html
 
 
 def texto_detalle(calce: Calce, lic: Licitacion) -> str:

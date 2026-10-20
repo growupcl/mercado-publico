@@ -114,7 +114,7 @@ def test_inicio_dinamico_con_seo(sitio):
     assert '<html lang="es-CL">' in html
     assert '<link rel="canonical" href="https://calza.cl/">' in html
     assert 'content="index, follow' in html
-    assert 'property="og:image" content="https://calza.cl/og.png"' in html
+    assert 'property="og:image" content="https://calza.cl/og.png?v=2"' in html
     assert "Hoy hay 4 abiertas" in html  # la descripción usa los datos del día
     assert "Adquisición de artículos de aseo" in html  # recién publicadas
     assert 'href="/licitaciones/region/biobio"' in html and 'href="/licitaciones/rubro/aseo"' in html

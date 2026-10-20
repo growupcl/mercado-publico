@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from .alertas import ResultadoAlertas, enviar_alertas_compra_agil
 from .calce import buscar_calces, interes_de_clientes
-from .compra_agil import ClienteCompraAgil, ResumenCompraAgil, sincronizar_compras_agiles
+from .compra_agil import ApiNoDisponible, ClienteCompraAgil, ResumenCompraAgil, sincronizar_compras_agiles
 from .db import Empresa, hoy_en_chile
 from .planes import PLANES_CON_COMPRA_AGIL
 from .whatsapp import ClienteWhatsApp
@@ -79,7 +79,7 @@ def ejecutar_ciclo(
             session.rollback()
             resultado.errores.append(f"calce empresa #{empresa.id}: {e}")
 
-    for error in resultado.errores:
+    for error in resultado.errores + resultado.avisos:
         log.warning(error)
     return resultado
 
@@ -90,6 +90,7 @@ class ResultadoCompraAgil:
     calces: int = 0
     alertas: ResultadoAlertas | None = None
     errores: list[str] = field(default_factory=list)
+    avisos: list[str] = field(default_factory=list)  # problemas externos pasajeros (API de ChileCompra caída)
 
 
 def ciclo_compra_agil(
@@ -117,6 +118,10 @@ def ciclo_compra_agil(
             interes = interes_de_clientes(session, planes=PLANES_CON_COMPRA_AGIL)
             resultado.sync = sincronizar_compras_agiles(
                 session, cliente, interes=interes, max_detalles=max_detalles, momento=momento)
+        except ApiNoDisponible as e:
+            # Caída de ChileCompra: no es un error de Calza. Lo que no se trajo ahora llega en la próxima ejecución.
+            session.rollback()
+            resultado.avisos.append(f"compra ágil: {e}; se reintenta en la próxima ejecución")
         except MercadoPublicoError as e:
             session.rollback()
             resultado.errores.append(f"compra ágil: {e}")
@@ -131,6 +136,6 @@ def ciclo_compra_agil(
     if wa is not None:
         resultado.alertas = enviar_alertas_compra_agil(session, wa, idioma=idioma, momento=momento)
 
-    for error in resultado.errores:
+    for error in resultado.errores + resultado.avisos:
         log.warning(error)
     return resultado

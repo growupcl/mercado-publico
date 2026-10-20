@@ -292,3 +292,17 @@ def test_limpieza_borra_solo_las_antiguas_sin_calce(Sesion):
         assert limpiar_compras_agiles(s, momento=despues) == 2
         assert s.get(Licitacion, GUANTES) is not None  # tiene un calce: se conserva
         assert s.get(Licitacion, SOPORTE) is None and s.get(Licitacion, LICEO) is None
+
+
+def test_caida_de_la_api_de_chilecompra_es_aviso_y_no_error(Sesion):
+    from licita.compra_agil import ApiNoDisponible, ClienteCompraAgil
+
+    cliente = ClienteCompraAgil("TICKET-PRUEBA", pausa=0, dormir=lambda s: None,
+                                http=httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(504))))
+    with pytest.raises(ApiNoDisponible, match="HTTP 504"):
+        cliente.listar(estado="publicada", tamano_pagina=10)
+    ia, _ = _ia({})
+    with Sesion() as s:
+        _empresa(s)
+        r = ciclo_compra_agil(s, cliente, ia, None, momento=MOMENTO)
+    assert r.errores == [] and len(r.avisos) == 1 and "se reintenta" in r.avisos[0]

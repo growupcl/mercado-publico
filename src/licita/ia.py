@@ -10,6 +10,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 
 import json
+import logging
 from typing import Literal, Sequence
 
 import anthropic
@@ -17,6 +18,8 @@ from pydantic import BaseModel
 
 from .db import Empresa, Licitacion
 
+
+log = logging.getLogger(__name__)
 
 class ErrorIA(Exception):
     pass
@@ -147,6 +150,9 @@ def _describir_licitacion(lic: Licitacion, *, detalle: bool) -> str:
     return f"<licitacion>\n{json.dumps(datos, ensure_ascii=False)}\n</licitacion>"
 
 
+ERRORES_SEGUIDOS_MAXIMO = 5
+
+
 def clasificar_pendientes(session, ia: AsistenteIA, *, limite: int = 100) -> tuple[int, int]:
     """Clasifica las licitaciones publicadas que aún no tienen clasificación. Devuelve (ok, errores)."""
     from sqlalchemy import select
@@ -161,14 +167,21 @@ def clasificar_pendientes(session, ia: AsistenteIA, *, limite: int = 100) -> tup
         .order_by(Licitacion.fecha_publicacion.desc())
         .limit(limite)
     ).all()
-    ok = errores = 0
+    ok = errores = seguidos = 0
     for lic in pendientes:
         try:
             lic.clasificacion = ia.clasificar_licitacion(lic).model_dump()
             lic.clasificada_en = ahora()
             session.commit()
             ok += 1
-        except (ErrorIA, anthropic.APIError):
+            seguidos = 0
+        except (ErrorIA, anthropic.APIError) as e:
             session.rollback()
             errores += 1
+            seguidos += 1
+            log.warning("No se pudo clasificar %s: %s", lic.codigo, e)
+            # Varios errores seguidos suelen ser de configuración (clave, saldo, modelo): no tiene sentido insistir
+            # con cientos de licitaciones. Se corta con el motivo, que el ciclo deja en logs/tareas.log.
+            if seguidos >= ERRORES_SEGUIDOS_MAXIMO:
+                raise ErrorIA(f"{seguidos} errores seguidos al clasificar ({ok} clasificadas antes). Último: {e}") from e
     return ok, errores

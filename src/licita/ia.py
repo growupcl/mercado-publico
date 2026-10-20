@@ -68,7 +68,8 @@ Para cada licitación entrega:
 - razon: máximo 12 palabras en español, para leer en el celular. Di qué piden que calza (o no) con lo que vende la empresa.
   No repitas organismo, región, monto ni fecha de cierre: ya se muestran aparte. Sin "Esta licitación" ni "La empresa".
   Ejemplos: "Piden detergente, guantes y bolsas: es tu rubro." · "Solo 2 de 10 ítems son de aseo." · "Es mantención de jardines, no venta de insumos."
-Considera rubro, productos o servicios pedidos, región y monto respecto del perfil. No inventes datos que no estén en la información recibida."""
+Considera rubro, productos o servicios pedidos, región y monto respecto del perfil. No inventes datos que no estén en la información recibida.
+Si recibes <preferencias_empresa>, son licitaciones que la empresa marcó como útiles o no. Úsalas para afinar: baja el puntaje de licitaciones del mismo tipo que las descartadas por "no es mi rubro", considera el motivo "monto o plazo" al evaluar el tamaño, y sube las parecidas a las útiles. Una sola licitación descartada no excluye todo un rubro."""
 
 
 @contextmanager
@@ -111,7 +112,10 @@ class AsistenteIA:
     def extraer_perfil(self, descripcion_negocio: str) -> PerfilExtraido:
         return self._parse(SISTEMA_PERFIL, f"<negocio>\n{descripcion_negocio}\n</negocio>", PerfilExtraido, 2000)
 
-    def evaluar_calce(self, empresa: Empresa, licitaciones: Sequence[Licitacion]) -> list[EvaluacionCalce]:
+    def evaluar_calce(
+        self, empresa: Empresa, licitaciones: Sequence[Licitacion], preferencias: dict[str, list] | None = None
+    ) -> list[EvaluacionCalce]:
+        """`preferencias`: {"le_sirven": [nombre…], "no_le_sirven": [{"nombre", "motivo"}…]} según sus 👍/👎."""
         perfil = {
             "nombre": empresa.nombre,
             "descripcion": empresa.descripcion,
@@ -120,10 +124,10 @@ class AsistenteIA:
             "monto_max": empresa.monto_max,
         }
         bloques = "\n\n".join(_describir_licitacion(lic, detalle=False) for lic in licitaciones)
-        contenido = (
-            f"<perfil_empresa>\n{json.dumps(perfil, ensure_ascii=False)}\n</perfil_empresa>\n\n"
-            f"<licitaciones>\n{bloques}\n</licitaciones>"
-        )
+        contenido = f"<perfil_empresa>\n{json.dumps(perfil, ensure_ascii=False)}\n</perfil_empresa>\n\n"
+        if preferencias and (preferencias.get("le_sirven") or preferencias.get("no_le_sirven")):
+            contenido += f"<preferencias_empresa>\n{json.dumps(preferencias, ensure_ascii=False)}\n</preferencias_empresa>\n\n"
+        contenido += f"<licitaciones>\n{bloques}\n</licitaciones>"
         resultado = self._parse(SISTEMA_CALCE, contenido, EvaluacionesCalce, 4000)
         return resultado.evaluaciones
 

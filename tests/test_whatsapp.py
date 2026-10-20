@@ -24,6 +24,7 @@ class WhatsAppFalso:
 
     def __init__(self, falla=False):
         self.enviados = []
+        self.botones = []  # mensajes con botones (👍/👎), aparte para no mezclarlos con los textos
         self.falla = falla
 
     def enviar_texto(self, telefono, texto):
@@ -31,6 +32,12 @@ class WhatsAppFalso:
             raise ErrorWhatsApp("caído")
         self.enviados.append(("texto", telefono, texto))
         return f"wamid.{len(self.enviados)}"
+
+    def enviar_botones(self, telefono, texto, botones):
+        if self.falla:
+            raise ErrorWhatsApp("caído")
+        self.botones.append((telefono, texto, botones))
+        return f"wamid.b{len(self.botones)}"
 
     def enviar_plantilla(self, telefono, nombre, *, idioma="es", parametros=None, payloads_botones=None):
         if self.falla:
@@ -170,7 +177,8 @@ def test_flujo_boton_y_numero(escenario):
 
     procesar_webhook(s, wa, mensaje_entrante("hola"), momento=MOMENTO)
     assert "Soy el asistente de Calza" in wa.enviados[-1][2]
-    assert s.query(MensajeWhatsApp).count() == 10 + 1  # 5 entrantes + 5 respuestas + la plantilla
+    # 5 entrantes + 5 respuestas + la plantilla + la pregunta 👍/👎 tras cada uno de los 2 detalles
+    assert s.query(MensajeWhatsApp).count() == 10 + 1 + 2
 
 
 def test_baja_y_alta(escenario):
@@ -335,3 +343,46 @@ def test_cliente_de_correo_agrega_encabezados_de_baja():
     c = ClienteCorreo("smtp.gmail.com", 587, "u", "c", "hola@calza.cl")
     m = c.mensaje("a@b.cl", "Asunto", "texto", encabezados={"List-Unsubscribe": "<https://calza.cl/correo/baja/x>"})
     assert m["List-Unsubscribe"] == "<https://calza.cl/correo/baja/x>"
+
+
+
+# --- 👍/👎 en el detalle ---
+
+def test_tras_el_detalle_pregunta_si_sirve_y_guarda_la_valoracion(escenario):
+    from licita.conversacion import responder
+
+    s, e = escenario
+    wa = WhatsAppFalso()
+    enviar_resumenes(s, wa, momento=MOMENTO)
+    procesar_webhook(s, wa, mensaje_entrante(texto="1"), momento=MOMENTO)
+    [(tel, texto, botones)] = wa.botones
+    assert "¿Te sirve esta licitación?" in texto
+    assert botones == [("VALOR:+:1234-56-LE26", "👍 Me sirve"), ("VALOR:-:1234-56-LE26", "👎 No me sirve")]
+
+    procesar_webhook(s, wa, mensaje_entrante(payload="VALOR:-:1234-56-LE26"), momento=MOMENTO)
+    _, texto, botones = wa.botones[-1]
+    assert "¿Por qué no te sirve?" in texto
+    assert [titulo for _, titulo in botones] == ["No es mi rubro", "Monto o plazo", "Otra razón"]
+    procesar_webhook(s, wa, mensaje_entrante(payload="MOTIVO:rubro:1234-56-LE26"), momento=MOMENTO)
+    assert "*PERFIL*" in wa.enviados[-1][2]
+    calce = s.query(Calce).filter_by(licitacion_codigo="1234-56-LE26").one()
+    assert (calce.valoracion, calce.motivo_valoracion) == (-1, "rubro") and calce.valorado_en == MOMENTO
+
+    assert responder(s, e, "boton", "VALOR:+:2345-12-L126", momento=MOMENTO) == [
+        "¡Gracias! Te seguiré mostrando licitaciones como esta. 🙌"]
+    assert s.query(Calce).filter_by(licitacion_codigo="2345-12-L126").one().valoracion == 1
+    assert "No encontré" in responder(s, e, "boton", "VALOR:+:NO-EXISTE", momento=MOMENTO)[0]
+
+
+def test_cliente_envia_botones_con_formato_de_meta():
+    capturado = {}
+
+    def handler(request):
+        capturado["json"] = json.loads(request.content)
+        return httpx.Response(200, json={"messages": [{"id": "wamid.B"}]})
+
+    wa = ClienteWhatsApp("T", "PHONE", http=httpx.Client(transport=httpx.MockTransport(handler)))
+    assert wa.enviar_botones("+56 9 8929 9524", "¿Te sirve?", [("VALOR:+:X", "👍 Me sirve")]) == "wamid.B"
+    assert capturado["json"]["type"] == "interactive"
+    assert capturado["json"]["interactive"]["action"]["buttons"] == [
+        {"type": "reply", "reply": {"id": "VALOR:+:X", "title": "👍 Me sirve"}}]

@@ -166,6 +166,9 @@ class WhatsAppConArchivos:
         self.enviados.append(texto)
         return f"wamid.out{len(self.enviados)}"
 
+    def enviar_botones(self, telefono, texto, botones):
+        return "wamid.b"  # la pregunta 👍/👎 se prueba en test_whatsapp
+
     def enviar_plantilla(self, *a, **k):
         self.enviados.append("<plantilla>")
         return "wamid.p"

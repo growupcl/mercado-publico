@@ -118,6 +118,9 @@ class WA:
         self.enviados.append(texto)
         return "w"
 
+    def enviar_botones(self, tel, texto, botones):
+        return "w"
+
 
 def _empresa(s, plan):
     e = Empresa(nombre="Aseo Sur", descripcion="", regiones=[], palabras_clave=[], whatsapp=TEL, plan=plan)

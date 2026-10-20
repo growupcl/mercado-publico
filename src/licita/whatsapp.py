@@ -107,6 +107,20 @@ class ClienteWhatsApp:
             "text": {"body": texto[:4096], "preview_url": False},
         })
 
+    def enviar_botones(self, telefono: str, texto: str, botones: list[tuple[str, str]]) -> str:
+        """Mensaje con hasta 3 botones de respuesta (dentro de la ventana de 24 h). Cada botón es (id, título): el id
+        vuelve en el webhook al tocarlo; el título se muestra (máximo 20 caracteres)."""
+        return self._enviar({
+            "to": normalizar_telefono(telefono),
+            "type": "interactive",
+            "interactive": {
+                "type": "button",
+                "body": {"text": texto[:1024]},
+                "action": {"buttons": [{"type": "reply", "reply": {"id": id_[:256], "title": titulo[:20]}}
+                                       for id_, titulo in botones[:3]]},
+            },
+        })
+
     def enviar_plantilla(
         self,
         telefono: str,

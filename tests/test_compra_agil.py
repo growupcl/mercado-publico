@@ -172,7 +172,7 @@ def test_ciclo_completo_envia_alerta_urgente_con_plantilla(Sesion):
 
         # El botón abre el detalle, con la ficha de Compra Ágil.
         e.ultimo_mensaje_entrante = MOMENTO
-        [detalle] = responder(s, e, "boton", f"DETALLE:{GUANTES}", momento=MOMENTO)
+        detalle, _pregunta = responder(s, e, "boton", f"DETALLE:{GUANTES}", momento=MOMENTO)
         assert "⚡ Compra Ágil: Guantes de nitrilo" in detalle and "Plazo de entrega: 2 días" in detalle
         assert f"https://buscador.mercadopublico.cl/ficha?code={GUANTES}" in detalle
         assert "40 × Guantes de nitrilo" in detalle
@@ -272,7 +272,7 @@ def test_el_detalle_de_una_compra_agil_invita_a_ver_precios(Sesion):
         e = _empresa(s, ultimo_mensaje_entrante=MOMENTO)
         s.add(Calce(empresa_id=e.id, licitacion_codigo=GUANTES, puntaje=90, razon="Es tu rubro."))
         s.commit()
-        [detalle] = responder(s, e, "boton", f"DETALLE:{GUANTES}", momento=MOMENTO)
+        detalle, _pregunta = responder(s, e, "boton", f"DETALLE:{GUANTES}", momento=MOMENTO)
         assert "Escribe *PRECIOS* para ver a cuánto cotiza la competencia" in detalle
         assert "📎 Tiene 2 adjuntos:\n• Especificaciones técnicas CESFAM.pdf\n• Anexo cotización.docx" in detalle
         assert "Descárgalos desde la ficha (PDF o Word) y envíamelos aquí" in detalle and "PDF de las bases" not in detalle

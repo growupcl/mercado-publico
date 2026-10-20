@@ -135,6 +135,10 @@ class Calce(Base):
     notificado_en: Mapped[datetime | None] = mapped_column(DateTime)
     # Número con que apareció en el último resumen ("responde 1, 2, 3...").
     posicion_resumen: Mapped[int | None] = mapped_column(Integer)
+    # Lo que dijo la empresa al ver el detalle: 1 = le sirve, -1 = no le sirve (None = no respondió), y por qué no.
+    valoracion: Mapped[int | None] = mapped_column(Integer)
+    motivo_valoracion: Mapped[str] = mapped_column(String(20), default="", server_default="")
+    valorado_en: Mapped[datetime | None] = mapped_column(DateTime)
     creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
 
 

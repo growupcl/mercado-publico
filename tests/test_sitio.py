@@ -214,3 +214,37 @@ def test_pie_muestra_la_empresa_que_presta_el_servicio(sitio):
     org = next(b for b in _jsonld(html) if "@graph" in b)["@graph"][0]
     assert org["parentOrganization"]["name"] == "Virtus SpA"
     assert "Calza es un servicio de Virtus SpA" in sitio.get("/llms.txt").text
+
+
+def test_ficha_muestra_requisitos_y_precios_de_referencia(Sesion):
+    from datetime import datetime
+
+    from licita.db import Precio
+
+    items = [
+        {"codigo_producto": "53102104", "producto": "Guantes de nitrilo", "cantidad": 200, "unidad": "caja"},
+        {"codigo_producto": "90151802", "producto": "Producción de eventos", "cantidad": 1, "unidad": "unidad"},
+        {"producto": "Ítem sin código", "cantidad": 1},
+    ]
+    with Sesion() as s:
+        s.add(_lic("7777-1-LE26", "Insumos de aseo para hospital", items=items, clasificacion={
+            "resumen": "Compra de guantes.", "requisitos_destacados": ["Garantía de seriedad de la oferta", "Visita a terreno obligatoria"]}))
+        for i, valor in enumerate([9000, 9500, 10000, 10500, 11000]):  # guantes: referencia confiable
+            s.add(Precio(fuente="orden_de_compra", referencia=f"OC-{i}", posicion=0, codigo_producto="53102104",
+                         producto="Guantes de nitrilo", precio_unitario=valor, cantidad=10, proveedor_nombre="Aseo Sur",
+                         region="Región del Biobío", fecha=datetime.now()))
+        for i, valor in enumerate([90_000, 150_000, 400_000, 2_000_000, 4_000_000]):  # eventos: demasiado disperso
+            s.add(Precio(fuente="orden_de_compra", referencia=f"OC-e{i}", posicion=0, codigo_producto="90151802",
+                         producto="Producción de eventos", precio_unitario=valor, cantidad=1, fecha=datetime.now()))
+        s.add(_lic("8888-1-LE26", "Guantes, cerrada", items=items[:1], cierre_dias=-1,
+                   clasificacion={"requisitos_destacados": ["Garantía"]}))
+        s.commit()
+    cliente = TestClient(crear_app(Sesion, router_web=crear_router_web(Sesion, mp=None, ia=None, url_publica="https://calza.cl")))
+    r = cliente.get("/licitacion/7777-1-LE26")
+    assert "Requisitos a revisar" in r.text and "Visita a terreno obligatoria" in r.text
+    assert "Precios de referencia" in r.text and "$9.500 – $10.500" in r.text
+    assert "Producción de eventos" in r.text.split("Precios de referencia")[0]  # aparece en "Qué se compra"…
+    assert "Producción de eventos" not in r.text.split("Precios de referencia")[1].split("Con Calza Pro")[0]  # …pero sin precio
+    assert 'href="/registro?plan=pro"' in r.text
+    cerrada = cliente.get("/licitacion/8888-1-LE26")
+    assert "Precios de referencia" not in cerrada.text  # solo se calculan para las abiertas

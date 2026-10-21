@@ -4,7 +4,7 @@ BORRADOR: deben ser revisados por un abogado antes del lanzamiento (Ley 19.628 y
 de protección de datos personales, Ley 19.496 del consumidor en lo aplicable).
 """
 
-FECHA = "20 de octubre de 2026"
+FECHA = "21 de octubre de 2026"
 
 def terminos(prestador: str) -> list:
     return [
@@ -28,7 +28,9 @@ def terminos(prestador: str) -> list:
     ("Prueba, planes y pagos", [
         "Tienes 7 días de prueba gratuita con las funciones del plan Pro. La prueba empieza cuando registras tu tarjeta en "
         "Mercado Pago al elegir tu plan: ese día no se cobra nada, el primer cobro es al terminar la prueba y, si cancelas "
-        "la renovación antes, no se cobra.",
+        "la renovación antes, no se cobra. La prueba es una sola por empresa, por número de WhatsApp y por cuenta de "
+        "Mercado Pago: si la tarjeta se registra con una cuenta de Mercado Pago que ya tuvo la prueba, anulamos esa "
+        "suscripción sin cobrar y, para usar Calza, el primer cobro es al suscribirte.",
         "Los planes se pagan con una suscripción de Mercado Pago (tarjeta de crédito o débito) que se renueva "
         "automáticamente cada mes o cada año. Si te suscribes durante la prueba, el primer cobro es al terminar la prueba. "
         "Los precios publicados incluyen IVA.",

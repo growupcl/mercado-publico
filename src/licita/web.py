@@ -314,7 +314,7 @@ def crear_router_web(
     @router.get("/pagos/mercadopago/retorno", response_class=HTMLResponse)
     def retorno(request: Request, preapproval_id: str = ""):
         """Mercado Pago devuelve aquí al cliente después de suscribirse."""
-        mandato, inicio_cobro = None, None
+        mandato, inicio_cobro, repetida = None, None, False
         if mp is not None and preapproval_id:
             with Sesion() as s:
                 try:
@@ -323,6 +323,7 @@ def crear_router_web(
                     log.error("No se pudo confirmar la suscripción en el retorno: %s", e)
                 if mandato is not None:
                     suscripcion = s.scalar(select(Suscripcion).where(Suscripcion.empresa_id == mandato.empresa_id))
+                    repetida = suscripcion.prueba_repetida and mandato.estado == "cancelled"
                     if suscripcion.vigente_hasta > ahora():
                         inicio_cobro = _fecha(suscripcion.vigente_hasta)
         estado = mandato.estado if mandato else None
@@ -331,6 +332,11 @@ def crear_router_web(
                      f"{inicio_cobro}: hasta entonces no pagas nada, y si cancelas antes desde tu cuenta, no se cobra."
                      if inicio_cobro else "Tu plan quedó activo con renovación automática. Te enviaremos la factura a tu correo.")
             return mensaje(request, "¡Suscripción lista!", texto, chip="Activa", chip_clase="ok")
+        if repetida:
+            return mensaje(request, "Ya usaste la prueba gratis",
+                           "Esta cuenta de Mercado Pago ya tuvo la prueba gratis de Calza con otra empresa, así que anulamos "
+                           "la suscripción y no se cobró nada. Si quieres seguir, puedes suscribirte desde tu cuenta: "
+                           "el primer cobro es al suscribirte.", chip="Sin cargo", chip_clase="error")
         if estado in ("cancelled", "paused"):
             return mensaje(request, "La suscripción no se completó", "No se realizó ningún cargo. Puedes intentarlo de nuevo desde tu cuenta.", chip="Sin cargo", chip_clase="error")
         return mensaje(request, "Estamos confirmando tu suscripción", "Puede tardar unos minutos. Te avisaremos cuando esté lista.", chip="Pendiente", chip_clase="oro")

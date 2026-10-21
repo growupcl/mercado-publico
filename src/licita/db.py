@@ -242,6 +242,8 @@ class Suscripcion(Base):
     # cuando vuelve a pagar, para avisar si vence de nuevo). None = no enviado.
     aviso_fin_prueba_en: Mapped[datetime | None] = mapped_column(DateTime)
     aviso_vencida_en: Mapped[datetime | None] = mapped_column(DateTime)
+    # Registró una tarjeta cuya cuenta de Mercado Pago ya tuvo la prueba en otra empresa: no recibe otra.
+    prueba_repetida: Mapped[bool] = mapped_column(Boolean, default=False)
     creada_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
 
 
@@ -259,6 +261,8 @@ class MandatoPago(Base):
     monto: Mapped[int] = mapped_column(Integer)  # CLP con IVA, por período
     precio_fundador: Mapped[bool] = mapped_column(Boolean, default=False)
     estado: Mapped[str] = mapped_column(String(12), default="pending")  # pending, authorized, paused, cancelled
+    # Cuenta de Mercado Pago que autorizó el cobro (para no dar la prueba gratis dos veces a la misma).
+    payer_id: Mapped[str] = mapped_column(String(32), default="", index=True)
     creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
 
 

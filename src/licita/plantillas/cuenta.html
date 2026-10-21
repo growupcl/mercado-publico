@@ -24,6 +24,9 @@
     {% if suscripcion.estado == "pendiente" %}
       <p><strong>Tu prueba gratis aún no está activa.</strong> Elige tu plan aquí abajo y registra tu tarjeta en Mercado Pago:
       empiezan tus {{ dias_prueba }} días gratis con todo lo del plan Pro, y el primer cobro es al terminarlos. Si cancelas antes, no se cobra nada.</p>
+    {% elif suscripcion.prueba_repetida and suscripcion.estado == "vencida" %}
+      <p><strong>La cuenta de Mercado Pago con que registraste la tarjeta ya usó la prueba gratis de Calza</strong>, así que
+      anulamos esa suscripción sin cobrarte nada. Si quieres usar Calza, elige tu plan aquí abajo: el primer cobro es al suscribirte.</p>
     {% elif suscripcion.estado == "vencida" %}
       <p>Tu suscripción venció el {{ vigente_hasta }}. Ahora estás en el plan gratis: no recibes el resumen diario por WhatsApp. Elige un plan para volver.</p>
     {% else %}

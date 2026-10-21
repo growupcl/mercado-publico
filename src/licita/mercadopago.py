@@ -41,6 +41,7 @@ class SuscripcionMP:
     referencia: str
     monto: float
     url_pago: str = ""
+    payer_id: str = ""  # cuenta de Mercado Pago que la autorizó
 
 
 @dataclass
@@ -101,6 +102,7 @@ class ClienteMercadoPago:
         return SuscripcionMP(
             id=str(datos["id"]), estado=datos.get("status", ""), referencia=datos.get("external_reference", ""),
             monto=float((datos.get("auto_recurring") or {}).get("transaction_amount") or 0), url_pago=datos.get("init_point", ""),
+            payer_id=str(datos.get("payer_id") or ""),
         )
 
     def crear_suscripcion(

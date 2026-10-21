@@ -20,6 +20,7 @@ from licita.planes import monto
 from licita.servidor import crear_app
 from licita.suscripciones import (
     DatosRegistro, empresa_por_token, por_vencer, registrar_empresa, revisar_vencimientos, sumar_meses,
+    suscripcion_de,
 )
 from licita.web import crear_router_web
 
@@ -55,6 +56,7 @@ class MPFalso:
         self.estados = {}
         self.cobros = {}
         self.canceladas = []
+        self.pagadores = {}  # mp_id → cuenta de Mercado Pago que la autorizó
 
     def crear_suscripcion(self, **kw):
         self.creadas.append(kw)
@@ -65,7 +67,8 @@ class MPFalso:
 
     def obtener_suscripcion(self, mp_id):
         kw = self.creadas[int(mp_id.removeprefix("PRE")) - 1]
-        return SuscripcionMP(id=mp_id, estado=self.estados[mp_id], referencia=kw["referencia"], monto=kw["monto"])
+        return SuscripcionMP(id=mp_id, estado=self.estados[mp_id], referencia=kw["referencia"], monto=kw["monto"],
+                             payer_id=self.pagadores.get(mp_id, ""))
 
     def cancelar_suscripcion(self, mp_id):
         self.estados[mp_id] = "cancelled"
@@ -606,3 +609,50 @@ def test_sin_mercado_pago_la_prueba_empieza_sin_tarjeta(Sesion):
     assert "Activa tu prueba gratis" not in r.text
     with Sesion() as s:
         assert s.query(Suscripcion).one().estado == "prueba"
+
+
+def _activar_prueba(cliente, mp, token, payer_id):
+    cliente.post(f"/cuenta/{token}/suscribir", data={"opcion": "pro:mensual", "email_mp": "pagos@aseosur.cl"},
+                 follow_redirects=False)
+    mp_id = f"PRE{len(mp.creadas)}"
+    mp.estados[mp_id], mp.pagadores[mp_id] = "authorized", payer_id
+    return mp_id
+
+
+def test_la_misma_cuenta_de_mercado_pago_no_repite_la_prueba(con_tarjeta):
+    cliente, Sesion, mp = con_tarjeta
+    _, token1 = _registrar(cliente)
+    _aviso(cliente, "subscription_preapproval", _activar_prueba(cliente, mp, token1, "MP-777"))
+
+    # Otra empresa (otro RUT y otro WhatsApp), pero la tarjeta se registra con la misma cuenta de Mercado Pago.
+    otro_rut = "77123456-" + rutlib.digito_verificador("77123456")
+    r = cliente.post("/registro", data={**FORM, "rut": otro_rut, "whatsapp": "+56 9 7000 0001"})
+    token2 = r.text.split("https://calza.cl/cuenta/")[1].split('"')[0]
+    mp_id = _activar_prueba(cliente, mp, token2, "MP-777")
+    retorno = cliente.get("/pagos/mercadopago/retorno", params={"preapproval_id": mp_id})
+    assert "Ya usaste la prueba gratis" in retorno.text
+    assert mp.canceladas == [mp_id]  # se anula antes de su primer cobro
+    with Sesion() as s:
+        e = empresa_por_token(s, token2)
+        sus = suscripcion_de(s, e)
+        assert (sus.estado, sus.prueba_repetida, e.plan, sus.mandato_activo_id) == ("vencida", True, "gratis", None)
+        assert sus.aviso_vencida_en is not None  # sin el aviso de "tu prueba terminó"
+        assert suscripcion_de(s, empresa_por_token(s, token1)).estado == "prueba"  # la primera sigue igual
+    assert "ya usó la prueba gratis" in cliente.get(f"/cuenta/{token2}").text
+
+    # Si se suscribe de nuevo, el cobro es inmediato.
+    cliente.post(f"/cuenta/{token2}/suscribir", data={"opcion": "pro:mensual", "email_mp": "pagos@aseosur.cl"},
+                 follow_redirects=False)
+    assert mp.creadas[-1]["inicio"] is None
+
+
+def test_otra_cuenta_de_mercado_pago_si_tiene_prueba(con_tarjeta):
+    cliente, Sesion, mp = con_tarjeta
+    _, token1 = _registrar(cliente)
+    _aviso(cliente, "subscription_preapproval", _activar_prueba(cliente, mp, token1, "MP-777"))
+    otro_rut = "77123456-" + rutlib.digito_verificador("77123456")
+    r = cliente.post("/registro", data={**FORM, "rut": otro_rut, "whatsapp": "+56 9 7000 0001"})
+    token2 = r.text.split("https://calza.cl/cuenta/")[1].split('"')[0]
+    _aviso(cliente, "subscription_preapproval", _activar_prueba(cliente, mp, token2, "MP-888"))
+    with Sesion() as s:
+        assert suscripcion_de(s, empresa_por_token(s, token2)).estado == "prueba"

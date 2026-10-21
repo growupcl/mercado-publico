@@ -238,6 +238,16 @@ def iniciar_suscripcion(
     return creada.url_pago
 
 
+def _prueba_ya_usada(session: Session, mandato: MandatoPago) -> bool:
+    """¿La cuenta de Mercado Pago de este mandato ya autorizó un cobro para otra empresa?"""
+    if not mandato.payer_id:
+        return False
+    return session.scalar(select(MandatoPago.id).where(
+        MandatoPago.payer_id == mandato.payer_id, MandatoPago.empresa_id != mandato.empresa_id,
+        MandatoPago.estado != "pending",
+    ).limit(1)) is not None
+
+
 def actualizar_mandato(session: Session, mp: ClienteMercadoPago, mp_id: str) -> MandatoPago | None:
     """Sincroniza el estado de una suscripción de Mercado Pago (autorizada, pausada o cancelada)."""
     remota = mp.obtener_suscripcion(mp_id)
@@ -246,7 +256,19 @@ def actualizar_mandato(session: Session, mp: ClienteMercadoPago, mp_id: str) -> 
         log.warning("Suscripción de Mercado Pago %s sin mandato conocido", mp_id)
         return None
     mandato.mp_id, mandato.estado = remota.id, remota.estado
+    mandato.payer_id = remota.payer_id or mandato.payer_id
     suscripcion = session.scalar(select(Suscripcion).where(Suscripcion.empresa_id == mandato.empresa_id))
+    if remota.estado == "authorized" and suscripcion.estado == "pendiente" and _prueba_ya_usada(session, mandato):
+        # La misma cuenta de Mercado Pago ya tuvo la prueba con otra empresa: se anula esta suscripción antes de su
+        # primer cobro y la cuenta queda sin prueba; al suscribirse de nuevo, el cobro es inmediato.
+        log.warning("Prueba repetida: la cuenta de Mercado Pago %s ya la usó; empresa %s sin prueba",
+                    mandato.payer_id, mandato.empresa_id)
+        mp.cancelar_suscripcion(mandato.mp_id)
+        mandato.estado = "cancelled"
+        suscripcion.estado, suscripcion.prueba_repetida = "vencida", True
+        suscripcion.aviso_vencida_en = ahora()  # no corresponde el aviso de "tu prueba terminó"
+        session.commit()
+        return mandato
     if remota.estado == "authorized" and suscripcion.estado == "pendiente":
         # Registró su tarjeta: empieza la prueba con todo lo del plan Pro.
         empresa = session.get(Empresa, mandato.empresa_id)

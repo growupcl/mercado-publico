@@ -143,7 +143,7 @@ def crear_router_web(
                 valor, fundador = cotizar(s, suscripcion, codigo, periodicidad)
                 actual = mandato is not None and (mandato.plan, mandato.periodicidad) == (codigo, periodicidad)
                 opciones.append({"plan": codigo, "nombre": plan.nombre, "periodicidad": periodicidad, "monto": valor,
-                                 "fundador": fundador, "actual": actual})
+                                 "fundador": fundador, "actual": actual, "beneficios": plan.beneficios})
         pagos = list(s.scalars(select(Pago).where(Pago.empresa_id == empresa.id).order_by(Pago.creado_en.desc()).limit(12)))
         # Último cobro rechazado de la suscripción activa, si no hubo uno aprobado después.
         rechazo = None

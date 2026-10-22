@@ -14,20 +14,25 @@ class Plan:
     codigo: str
     nombre: str
     mensual: int
+    analisis_mes: int  # análisis de bases incluidos al mes
+    resumen: str  # una línea para elegir el plan en el registro
     beneficios: tuple[str, ...]
 
 
 PLANES = {
-    "pyme": Plan("pyme", "Pyme", 19_990, (
-        "Resumen diario por WhatsApp con las licitaciones que calzan con tu empresa",
-        "Detalle de cada licitación y puntaje de calce",
-        "Análisis de bases en PDF o Word (hasta 15 al mes)",
+    "pyme": Plan("pyme", "Pyme", 19_990, 15, "Licitaciones que calzan contigo, cada mañana", (
+        "Resumen cada día hábil a las 8:00 por WhatsApp con las licitaciones nuevas que calzan con tu empresa",
+        "Copia del resumen en tu correo (la puedes desactivar)",
+        "Detalle de cada licitación: qué piden, requisitos a revisar, plazos y por qué te calza",
+        "Afina lo que recibes con 👍 o 👎 y cambia tu perfil cuando quieras",
+        "Análisis de bases en PDF o Word: hasta 15 al mes",
     )),
-    "pro": Plan("pro", "Pro", 59_990, (
+    "pro": Plan("pro", "Pro", 59_990, 50, "Suma Compras Ágiles, alertas y precios de referencia", (
         "Todo lo del plan Pyme",
-        "Precios de referencia y quién suele ganar",
-        "Alertas urgentes de Compra Ágil",
-        "Análisis de bases en PDF o Word (hasta 50 al mes)",
+        "Compras Ágiles que calzan contigo, en tu resumen diario",
+        "Alertas urgentes por WhatsApp apenas se publica una Compra Ágil para ti",
+        "Precios de referencia: cuánto ha pagado el Estado por lo mismo y quién suele ganar",
+        "Análisis de bases en PDF o Word: hasta 50 al mes",
     )),
 }
 PRECIO_FUNDADOR_PRO = 39_990

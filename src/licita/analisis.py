@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 
 from .db import AnalisisBases, Documento, Empresa, Licitacion, SolicitudAnalisis, ahora
 from .ia import ErrorIA, sin_credenciales_como_error
+from .planes import PLANES
 from .word import WordInvalido, es_doc_antiguo, es_docx, texto_de_docx
 
 MODELO_ANALISIS = "claude-sonnet-5-5"
@@ -190,7 +191,12 @@ class DocumentoInvalido(Exception):
 class ServicioAnalisis:
     almacen: AlmacenDocumentos
     analizador: AnalizadorBases
-    limite_mensual: int = 15
+    limite_mensual: int | None = None  # None: el que incluye el plan de la empresa
+
+    def limite(self, empresa: Empresa) -> int:
+        if self.limite_mensual is not None:
+            return self.limite_mensual
+        return PLANES.get(empresa.plan, PLANES["pyme"]).analisis_mes
 
     def usados_en_el_mes(self, session: Session, empresa: Empresa, momento: datetime) -> int:
         inicio = momento.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -223,8 +229,8 @@ class ServicioAnalisis:
         ya_solicitado = empresa is not None and existente is not None and session.scalar(
             select(SolicitudAnalisis).where(SolicitudAnalisis.empresa_id == empresa.id, SolicitudAnalisis.analisis_id == existente.id)
         ) is not None
-        if empresa is not None and not ya_solicitado and self.usados_en_el_mes(session, empresa, momento) >= self.limite_mensual:
-            raise LimiteAlcanzado(f"Ya usaste los {self.limite_mensual} análisis de bases de tu plan este mes.")
+        if empresa is not None and not ya_solicitado and self.usados_en_el_mes(session, empresa, momento) >= self.limite(empresa):
+            raise LimiteAlcanzado(f"Ya usaste los {self.limite(empresa)} análisis de bases de tu plan este mes.")
 
         analisis, reutilizado = existente, existente is not None
         if analisis is None:

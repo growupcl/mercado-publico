@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block titulo %}Invitar al piloto · Calza{% endblock %}
+{% block robots %}noindex, nofollow{% endblock %}
+{% block accion %}<a class="enlace" href="/admin">← Panel</a><form method="post" action="/admin/salir" style="display:inline"><button class="boton secundario" type="submit">Cerrar sesión</button></form>{% endblock %}
+{% block pie_nav %}{% endblock %}
+{% block estilos %}
+<style>
+.inv{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:24px;align-items:start}
+@media (max-width:860px){.inv{grid-template-columns:1fr}}
+.inv textarea{min-height:340px;font-size:15px;line-height:1.5}
+.inv .res{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.inv .res li{border-top:1px solid var(--line);padding-top:10px;font-size:14px}
+.inv .res li:first-child{border-top:0;padding-top:0}
+.inv .res a{font-weight:600}
+.inv .acciones{display:flex;flex-wrap:wrap;gap:8px}
+</style>
+{% endblock %}
+{% block contenido %}
+<div class="pila" style="gap:24px">
+  <div>
+    <h1 style="font-size:32px">Invitar al piloto</h1>
+    <p class="muted" style="margin:6px 0 0">Escribe qué vende la pyme: busco lo que tiene abierto hoy en Mercado Público y armo la invitación con un ejemplo real.</p>
+  </div>
+  <div class="inv">
+    <form method="get" action="/admin/invitar" class="tarjeta pila">
+      <div class="rejilla" style="gap:12px">
+        <div><label for="nombre">Nombre del contacto</label><input type="text" id="nombre" name="nombre" value="{{ f.nombre }}" maxlength="80" placeholder="María"></div>
+        <div><label for="empresa">Empresa</label><input type="text" id="empresa" name="empresa" value="{{ f.empresa }}" maxlength="120" placeholder="Aseo Sur"></div>
+      </div>
+      <div>
+        <label for="vende">Qué vende</label>
+        <input type="text" id="vende" name="vende" value="{{ f.vende }}" maxlength="300" required placeholder="artículos de aseo, guantes, bolsas de basura">
+        <p class="ayuda">Separa productos o servicios con comas.</p>
+      </div>
+      <div class="rejilla" style="gap:12px">
+        <div><label for="region">Región</label>
+          <select id="region" name="region"><option value="">Todo Chile</option>
+            {% for r in regiones %}<option value="{{ r.slug }}" {% if f.region == r.slug %}selected{% endif %}>{{ r.nombre }}</option>{% endfor %}
+          </select></div>
+        <div><label for="telefono">WhatsApp (opcional)</label><input type="tel" id="telefono" name="telefono" value="{{ f.telefono }}" maxlength="20" placeholder="+56 9 1234 5678"></div>
+      </div>
+      <div><label for="remitente">Tu nombre</label><input type="text" id="remitente" name="remitente" value="{{ f.remitente }}" maxlength="80" placeholder="Cómo firmas el mensaje"></div>
+      <div><button class="boton" type="submit">Armar invitación</button></div>
+    </form>
+
+    <div class="pila">
+      {% if texto %}
+      <div class="tarjeta pila">
+        <label for="texto">Mensaje{% if total %} · {{ total }} {{ "licitación abierta" if total == 1 else "licitaciones abiertas" }} para esta empresa{% endif %}</label>
+        {% if not total %}<p class="aviso" style="margin:0">No encontré nada abierto con esas palabras{% if region %} en {{ region.nombre }}{% endif %}. El mensaje va sin ejemplo; prueba con otras palabras o con todo Chile.</p>{% endif %}
+        <textarea id="texto">{{ texto }}</textarea>
+        <div class="acciones">
+          <button class="boton" type="button" id="copiar">Copiar mensaje</button>
+          {% if numero %}<a class="boton secundario" id="abrir-wa" href="https://wa.me/{{ numero }}?text={{ texto | urlencode }}" target="_blank" rel="noopener">Abrir en WhatsApp</a>{% endif %}
+        </div>
+        <p class="ayuda" style="margin:0">Puedes editar el texto antes de copiarlo. Envíalo desde tu WhatsApp personal, no desde el número de Calza.</p>
+      </div>
+      {% if resultados %}
+      <div class="tarjeta pila">
+        <h3 style="font-size:18px">Lo que tiene abierto hoy</h3>
+        <ul class="res">
+          {% for ficha, puntaje in resultados %}
+          <li><a href="/licitacion/{{ ficha.codigo }}" target="_blank" rel="noopener">{% if ficha.es_compra_agil %}⚡ {% endif %}{{ ficha.nombre }}</a><br>
+            <span class="muted">{{ ficha.organismo }}{% if ficha.region %} · {{ ficha.region }}{% endif %}{% if ficha.monto_estimado %} · {{ fmt(ficha.monto_estimado) }}{% endif %}{% if cierre(ficha) %} · {{ cierre(ficha) }}{% endif %}</span></li>
+          {% endfor %}
+        </ul>
+        <p class="ayuda" style="margin:0">El mensaje usa la primera. Si te parece mejor otra, cámbiala en el texto.</p>
+      </div>
+      {% endif %}
+      {% else %}
+      <div class="tarjeta"><p class="muted" style="margin:0">Completa el formulario y aquí aparece la invitación lista para enviar.</p></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  var texto = document.getElementById("texto"), copiar = document.getElementById("copiar"), wa = document.getElementById("abrir-wa");
+  if (!texto) return;
+  if (copiar) copiar.addEventListener("click", function () {
+    var listo = function () { copiar.textContent = "¡Copiado!"; setTimeout(function () { copiar.textContent = "Copiar mensaje"; }, 2000); };
+    if (navigator.clipboard) { navigator.clipboard.writeText(texto.value).then(listo); } else { texto.select(); document.execCommand("copy"); listo(); }
+  });
+  if (wa) texto.addEventListener("input", function () { wa.href = wa.href.split("?")[0] + "?text=" + encodeURIComponent(texto.value); });
+  try { var r = document.getElementById("remitente"); if (!r.value) r.value = localStorage.getItem("calza_remitente") || "";
+        r.form.addEventListener("submit", function () { localStorage.setItem("calza_remitente", r.value); }); } catch (e) {}
+})();
+</script>
+{% endblock %}

@@ -207,3 +207,34 @@ def test_activacion_uso_y_prueba_repetida(Sesion, cliente_mp):
     assert fila.motivos == [("Prueba repetida: su cuenta de Mercado Pago ya la usó", "info")]
     r = cliente.get("/admin", auth=("admin", CLAVE))
     assert "2 de 3 registraron la tarjeta" in r.text and "1 de 2 que reciben el resumen" in r.text
+
+
+def test_invitar_arma_el_mensaje_con_un_ejemplo_real(Sesion):
+    from licita.db import Licitacion, hora_chile
+
+    cliente = _cliente(Sesion)
+    cierre = hora_chile(ahora()).replace(tzinfo=None) + timedelta(days=5)
+    with Sesion() as s:
+        s.add_all([
+            Licitacion(codigo="1-1-LE26", nombre="Adquisición de artículos de aseo para CESFAM", estado_codigo=5,
+                       organismo="Municipalidad de Chillán", region="Región del Ñuble", monto_estimado=4_500_000,
+                       fecha_cierre=cierre),
+            Licitacion(codigo="2-2-LE26", nombre="Artículos de aseo para liceo", estado_codigo=5,
+                       organismo="Slep Santiago", region="Región Metropolitana de Santiago", fecha_cierre=cierre),
+            Licitacion(codigo="3-3-LE26", nombre="Notebooks", estado_codigo=5, region="Región del Ñuble", fecha_cierre=cierre),
+        ])
+        s.commit()
+    assert cliente.get("/admin/invitar", follow_redirects=False).status_code == 303  # sin sesión
+    cliente.post("/admin/entrar", data={"usuario": "admin", "clave": CLAVE})
+    r = cliente.get("/admin/invitar", params={"nombre": "María", "empresa": "Aseo Sur", "vende": "artículos de aseo",
+                                              "region": "nuble", "telefono": "+56 9 8929 9524", "remitente": "Matías"})
+    assert r.status_code == 200 and r.headers["cache-control"] == "no-store"
+    assert "Hola María, soy Matías. Hoy vi una licitación abierta en Mercado Público en Región de Ñuble" in r.text
+    assert "de Municipalidad de Chillán, por $4.500.000, cierra en 5 días" in r.text
+    assert "Liceo" not in r.text and "Notebooks" not in r.text  # otra región y otro rubro
+    assert 'href="https://wa.me/56989299524?text=Hola%20Mar' in r.text
+    r = cliente.get("/admin/invitar", params={"vende": "artículos de aseo"})
+    assert "Hoy vi 2 licitaciones abiertas en Mercado Público que calzan con lo que vende tu empresa" in r.text
+    assert "wa.me" not in r.text  # sin teléfono, solo copiar
+    r = cliente.get("/admin/invitar", params={"vende": "helicópteros"})
+    assert "No encontré nada abierto" in r.text and "Hola [Nombre], soy [tu nombre].\n" in r.text

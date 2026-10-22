@@ -10,7 +10,9 @@ import json
 import logging
 
 from fastapi import APIRouter, BackgroundTasks, FastAPI, HTTPException, Request
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
 from .analisis import ServicioAnalisis
@@ -61,6 +63,13 @@ def crear_app(
 
     @app.get("/salud")
     def salud():
+        """Para el monitor externo (UptimeRobot): 503 si la base de datos no responde."""
+        try:
+            with Sesion() as s:
+                s.execute(text("SELECT 1"))
+        except SQLAlchemyError as e:
+            log.error("Salud: la base de datos no responde: %s", e)
+            return JSONResponse({"ok": False}, status_code=503)
         return {"ok": True}
 
     if wa is None:

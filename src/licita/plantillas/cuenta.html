@@ -89,6 +89,7 @@
       <div class="precio">{{ fmt(o.monto) }} <small>/ {% if o.periodicidad == "anual" %}año{% else %}mes{% endif %}</small></div>
       {% if o.fundador %}<p class="ayuda">Precio fundador: se mantiene mientras sigas con Calza.</p>{% endif %}
       {% if o.periodicidad == "anual" %}<p class="ayuda">Equivale a {{ fmt(o.monto / 12) }} al mes.</p>{% endif %}
+      <ul class="check" style="margin:0">{% for b in o.beneficios %}<li>{{ b }}</li>{% endfor %}</ul>
       {% if o.actual %}<div><span class="chip ok">Tu plan actual</span></div>
       {% else %}<div><button class="boton" type="submit" name="opcion" value="{{ o.plan }}:{{ o.periodicidad }}" {% if not pagos_activos %}disabled{% endif %}>{% if mandato %}Cambiar a este plan{% else %}Suscribirme{% endif %}</button></div>{% endif %}
     </div>

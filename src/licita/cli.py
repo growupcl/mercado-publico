@@ -172,7 +172,6 @@ def _servicio_analisis(config: Config):
 
     return ServicioAnalisis(
         AlmacenDocumentos(config.dir_documentos), AnalizadorBases(modelo=config.modelo_analisis),
-        limite_mensual=config.limite_analisis_mes,
     )
 
 

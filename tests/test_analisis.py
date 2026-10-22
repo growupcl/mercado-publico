@@ -258,3 +258,14 @@ def test_rechazo_del_modelo_avisa_al_usuario(base, tmp_path):
     procesar_webhook(s, wa, _pdf(), analisis=srv, momento=MOMENTO)
     assert wa.enviados[-1].startswith("No pude analizar las bases en este momento")
     assert s.query(AnalisisBases).count() == 0
+
+
+def test_el_limite_depende_del_plan(base, tmp_path):
+    s, e = base
+    srv = ServicioAnalisis(AlmacenDocumentos(tmp_path), AnalizadorBases(ClaudeFalso()))
+    e.plan = "pyme"
+    assert srv.limite(e) == 15
+    e.plan = "pro"
+    assert srv.limite(e) == 50
+    e.plan = "gratis"
+    assert srv.limite(e) == 15

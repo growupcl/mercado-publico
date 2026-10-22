@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block titulo %}Entrar al panel · Calza{% endblock %}
+{% block robots %}noindex, nofollow{% endblock %}
+{% block accion %}<a class="enlace" href="/">Ir al sitio</a>{% endblock %}
+{% block pie_nav %}{% endblock %}
+{% block contenido %}
+<div style="max-width:400px;margin:40px auto" class="pila">
+  <h1 style="font-size:32px">Panel del piloto</h1>
+  <p class="muted" style="margin:0">Acceso solo para el equipo de Calza.</p>
+  {% if error %}<p class="aviso" role="alert">{{ error }}</p>{% endif %}
+  {% if salio %}<p class="aviso ok" role="status">Cerraste la sesión.</p>{% endif %}
+  <form method="post" action="/admin/entrar" class="tarjeta pila">
+    <div>
+      <label for="usuario">Usuario</label>
+      <input type="text" id="usuario" name="usuario" value="{{ usuario }}" autocomplete="username" required autofocus maxlength="64">
+    </div>
+    <div>
+      <label for="clave">Contraseña</label>
+      <input type="password" id="clave" name="clave" autocomplete="current-password" required maxlength="256">
+    </div>
+    <div><button class="boton" type="submit" style="width:100%">Entrar</button></div>
+    <p class="ayuda" style="margin:0">La sesión dura {{ dias_sesion }} días en este navegador. En un computador compartido, ciérrala al terminar.</p>
+  </form>
+</div>
+{% endblock %}

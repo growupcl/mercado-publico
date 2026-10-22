@@ -19,7 +19,7 @@ import anthropic
 from .analisis import DocumentoInvalido, LimiteAlcanzado, ServicioAnalisis, detectar_codigo, textos_analisis
 from .db import AnalisisBases, Calce, Empresa, Licitacion, MensajeWhatsApp, ahora
 from .ia import ErrorIA
-from .planes import PLANES_CON_PRECIOS
+from .planes import PLANES, PLANES_CON_PRECIOS
 from .precios import informe_precios, texto_precios
 from .notificaciones import VENTANA, registrar
 from .suscripciones import generar_token
@@ -275,7 +275,8 @@ def procesar_documento(
             session, contenido, empresa=empresa, nombre_archivo=documento.get("filename", ""), codigo=codigo, momento=momento,
         )
     except LimiteAlcanzado as e:
-        enviar(f"{e} Si necesitas más, puedes cambiarte al plan Pro.")
+        enviar(f"{e} Si necesitas más, " + ("escríbenos a hola@calza.cl." if empresa.plan == "pro"
+                                            else f"cámbiate al plan Pro: incluye {PLANES['pro'].analisis_mes} al mes."))
         return
     except DocumentoInvalido as e:
         enviar(f"No pude analizar ese archivo: {e}")

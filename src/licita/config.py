@@ -18,7 +18,6 @@ class Config:
     url_registro: str = ""
     modelo_analisis: str = "claude-sonnet-5-5"
     dir_documentos: str = "documentos"
-    limite_analisis_mes: int = 15
     url_publica: str = "http://localhost:8000"
     whatsapp_publico: str = ""
     mercadopago_access_token: str = ""
@@ -49,7 +48,6 @@ class Config:
             url_registro=os.environ.get("LICITA_URL_REGISTRO", ""),
             modelo_analisis=os.environ.get("LICITA_MODELO_ANALISIS", "claude-sonnet-5-5"),
             dir_documentos=os.environ.get("LICITA_DIR_DOCUMENTOS", "documentos"),
-            limite_analisis_mes=int(os.environ.get("LICITA_LIMITE_ANALISIS_MES", "15")),
             url_publica=os.environ.get("LICITA_URL_PUBLICA", "http://localhost:8000").rstrip("/"),
             whatsapp_publico=os.environ.get("LICITA_WHATSAPP_PUBLICO", ""),
             mercadopago_access_token=os.environ.get("MERCADOPAGO_ACCESS_TOKEN", ""),

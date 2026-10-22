@@ -1,20 +1,25 @@
 """Panel privado del piloto (/admin): estado de cada empresa y a quién contactar.
 
-Protegido con usuario y contraseña (HTTP Basic, sobre HTTPS gracias a Caddy). Usuario "admin" y la contraseña de
-ADMIN_CLAVE en el .env. Sin ADMIN_CLAVE el panel no existe (404), así no queda expuesto por error.
+Se entra en /admin/entrar con el usuario "admin" y la contraseña de ADMIN_CLAVE en el .env. La sesión es una cookie
+firmada con esa clave (cambiarla cierra todas las sesiones) que dura DIAS_SESION días. Tras INTENTOS_MAXIMOS claves
+erradas desde una misma IP, esa IP queda bloqueada durante BLOQUEO. Para scripts (curl) sigue sirviendo HTTP Basic.
+Sin ADMIN_CLAVE el panel no existe (404), así no queda expuesto por error.
 """
 
 from __future__ import annotations
 
 import base64
-import math
 import binascii
+import hashlib
+import hmac
+import math
 import secrets
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi import APIRouter, Form, Request
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 from sqlalchemy.orm import sessionmaker
@@ -23,6 +28,10 @@ from .db import Calce, Empresa, MandatoPago, MensajeWhatsApp, Pago, Suscripcion,
 from .planes import DIAS_PRUEBA, PERIODICIDADES, PLANES
 
 USUARIO = "admin"
+COOKIE = "calza_admin"
+DIAS_SESION = 7
+INTENTOS_MAXIMOS = 5
+BLOQUEO = timedelta(minutes=15)
 # Sin mensajes en este plazo, la empresa en prueba o activa se marca para contactar.
 SIN_ACTIVIDAD = timedelta(days=7)
 DIAS_POR_VENCER = 3
@@ -113,7 +122,52 @@ def hace(fecha: datetime | None, momento: datetime) -> str:
     return f"hace {dias // 30} meses"
 
 
-def _autorizado(request: Request, clave: str) -> bool:
+def _iguales(a: str, b: str) -> bool:
+    return secrets.compare_digest(a.encode(), b.encode())
+
+
+def _firma(clave: str, expira: int) -> str:
+    return hmac.new(clave.encode(), f"admin:{expira}".encode(), hashlib.sha256).hexdigest()
+
+
+def token_sesion(clave: str, ahora_ts: float | None = None) -> str:
+    expira = int((ahora_ts if ahora_ts is not None else time.time()) + DIAS_SESION * 86400)
+    return f"{expira}.{_firma(clave, expira)}"
+
+
+def sesion_valida(token: str, clave: str, ahora_ts: float | None = None) -> bool:
+    expira, _, firma = token.partition(".")
+    if not expira.isdigit() or int(expira) < (ahora_ts if ahora_ts is not None else time.time()):
+        return False
+    return _iguales(firma, _firma(clave, int(expira)))
+
+
+class Intentos:
+    """Claves erradas por IP en la ventana de BLOQUEO (en memoria: se reinicia con la app, lo que basta aquí)."""
+
+    def __init__(self) -> None:
+        self._fallos: dict[str, list[float]] = {}
+
+    def _recientes(self, ip: str, ahora_ts: float) -> list[float]:
+        fallos = [t for t in self._fallos.get(ip, []) if ahora_ts - t < BLOQUEO.total_seconds()]
+        if fallos:
+            self._fallos[ip] = fallos
+        else:
+            self._fallos.pop(ip, None)
+        return fallos
+
+    def bloqueada(self, ip: str, ahora_ts: float | None = None) -> bool:
+        return len(self._recientes(ip, ahora_ts if ahora_ts is not None else time.time())) >= INTENTOS_MAXIMOS
+
+    def fallo(self, ip: str, ahora_ts: float | None = None) -> None:
+        ahora_ts = ahora_ts if ahora_ts is not None else time.time()
+        self._fallos[ip] = self._recientes(ip, ahora_ts) + [ahora_ts]
+
+    def limpiar(self, ip: str) -> None:
+        self._fallos.pop(ip, None)
+
+
+def _basic_valido(request: Request, clave: str) -> bool:
     encabezado = request.headers.get("authorization", "")
     if not encabezado.lower().startswith("basic "):
         return False
@@ -121,7 +175,15 @@ def _autorizado(request: Request, clave: str) -> bool:
         usuario, _, dada = base64.b64decode(encabezado[6:]).decode("utf-8").partition(":")
     except (binascii.Error, UnicodeDecodeError):
         return False
-    return secrets.compare_digest(usuario.encode(), USUARIO.encode()) & secrets.compare_digest(dada.encode(), clave.encode())
+    return _iguales(usuario, USUARIO) & _iguales(dada, clave)
+
+
+def _autorizado(request: Request, clave: str) -> bool:
+    return sesion_valida(request.cookies.get(COOKIE, ""), clave) or _basic_valido(request, clave)
+
+
+def _es_https(request: Request) -> bool:
+    return request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
 
 
 def datos_panel(session, momento: datetime | None = None) -> tuple[Indicadores, list[FilaEmpresa]]:
@@ -215,13 +277,51 @@ def datos_panel(session, momento: datetime | None = None) -> tuple[Indicadores, 
 
 def crear_router_admin(Sesion: sessionmaker, *, plantillas: Jinja2Templates, clave: str) -> APIRouter:
     router = APIRouter()
+    intentos = Intentos()
+    sin_cache = {"Cache-Control": "no-store", "X-Robots-Tag": "noindex"}
+
+    def entrar_html(request: Request, *, error: str = "", usuario: str = "", salio: bool = False, estado: int = 200):
+        return plantillas.TemplateResponse(request, "admin_entrar.html", {
+            "error": error, "usuario": usuario, "salio": salio, "dias_sesion": DIAS_SESION,
+        }, status_code=estado, headers=sin_cache)
+
+    @router.get("/admin/entrar", response_class=HTMLResponse)
+    def entrar(request: Request, salio: str = ""):
+        if not clave:
+            return Response(status_code=404)
+        if _autorizado(request, clave):
+            return RedirectResponse("/admin", status_code=303)
+        return entrar_html(request, salio=bool(salio))
+
+    @router.post("/admin/entrar", response_class=HTMLResponse)
+    def entrar_post(request: Request, usuario: str = Form(""), clave_dada: str = Form("", alias="clave")):
+        if not clave:
+            return Response(status_code=404)
+        ip = request.client.host if request.client else ""
+        if intentos.bloqueada(ip):
+            return entrar_html(request, usuario=usuario, estado=429,
+                               error=f"Demasiados intentos. Espera {int(BLOQUEO.total_seconds() // 60)} minutos e inténtalo de nuevo.")
+        if not (_iguales(usuario.strip(), USUARIO) & _iguales(clave_dada, clave)):
+            intentos.fallo(ip)
+            return entrar_html(request, usuario=usuario, estado=401, error="Usuario o contraseña incorrectos.")
+        intentos.limpiar(ip)
+        r = RedirectResponse("/admin", status_code=303, headers=sin_cache)
+        r.set_cookie(COOKIE, token_sesion(clave), max_age=DIAS_SESION * 86400, path="/admin", httponly=True,
+                     secure=_es_https(request), samesite="strict")
+        return r
+
+    @router.post("/admin/salir")
+    def salir(request: Request):
+        r = RedirectResponse("/admin/entrar?salio=1", status_code=303, headers=sin_cache)
+        r.delete_cookie(COOKIE, path="/admin", httponly=True, secure=_es_https(request), samesite="strict")
+        return r
 
     @router.get("/admin", response_class=HTMLResponse)
     def panel(request: Request, estado: str = "todas"):
         if not clave:
             return Response(status_code=404)
         if not _autorizado(request, clave):
-            return Response(status_code=401, headers={"WWW-Authenticate": 'Basic realm="Calza admin", charset="UTF-8"'})
+            return RedirectResponse("/admin/entrar", status_code=303, headers=sin_cache)
         momento = ahora()
         with Sesion() as s:
             indicadores, filas = datos_panel(s, momento)
@@ -236,6 +336,6 @@ def crear_router_admin(Sesion: sessionmaker, *, plantillas: Jinja2Templates, cla
                 "ind": indicadores, "filas": visibles, "nombres": nombres, "momento": momento, "chile": hora_chile,
                 "filtros": FILTROS, "filtro": filtro, "cuentas": cuentas, "hace": hace, "dias_prueba": DIAS_PRUEBA,
                 "contactar": [f for f in filas if f.motivos],
-            }, headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex"})
+            }, headers=sin_cache)
 
     return router

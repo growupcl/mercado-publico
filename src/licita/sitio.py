@@ -82,7 +82,12 @@ def faq() -> list[tuple[str, str]]:
          "nueva con tu perfil y le asigna un porcentaje de calce; solo te llegan las que superan el umbral."),
         ("¿Qué es una Compra Ágil?",
          "Es la modalidad de Mercado Público para compras de menor monto: el organismo pide cotizaciones con plazos muy "
-         "cortos, a veces de uno o dos días. En el plan Pro, Calza te avisa apenas se publica una que te calza."),
+         "cortos, a veces de uno o dos días. En el plan Pro aparecen en tu resumen diario y, como suele ganar quien "
+         "cotiza primero, Calza te avisa por WhatsApp apenas se publica una que te calza."),
+        ("¿Me llega solo por WhatsApp?",
+         "El resumen diario llega por WhatsApp y además una copia a tu correo, que puedes desactivar desde tu cuenta. "
+         "Por WhatsApp puedes pedir el detalle de cada licitación, marcar con 👍 o 👎 las que te sirven para afinar lo "
+         "que recibes y escribir PERFIL para cambiar qué vendes, tus regiones o tu monto máximo."),
         ("¿Cómo funciona el análisis de bases?",
          "Envías el PDF o Word de las bases por WhatsApp y recibes un resumen con requisitos, garantías, documentos, "
          "plazos y criterios de evaluación. Es una ayuda para leer más rápido: lo que vale son siempre las bases oficiales."),

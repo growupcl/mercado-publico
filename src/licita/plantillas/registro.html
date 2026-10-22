@@ -51,7 +51,7 @@
     <div class="rejilla" style="gap:12px">
       {% for p in planes %}
       <label class="opcion tarjeta" style="padding:14px"><input type="radio" name="plan" value="{{ p.codigo }}" {% if datos.plan == p.codigo %}checked{% endif %}>
-        <span><strong>{{ p.nombre }}</strong><br><span class="muted">{{ fmt(precios[p.codigo]) }} al mes</span></span></label>
+        <span><strong>{{ p.nombre }}</strong><br><span class="muted">{{ fmt(precios[p.codigo]) }} al mes</span><br><span class="ayuda">{{ p.resumen }}</span></span></label>
       {% endfor %}
     </div>{{ err("plan") }}
     <div class="rejilla" style="gap:12px">

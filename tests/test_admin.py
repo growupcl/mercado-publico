@@ -2,7 +2,9 @@ from datetime import timedelta
 
 from fastapi.testclient import TestClient
 
-from licita.admin import datos_panel
+from licita.admin import (
+    BLOQUEO, DIAS_SESION, INTENTOS_MAXIMOS, Intentos, datos_panel, sesion_valida, token_sesion,
+)
 from licita.db import Empresa, MandatoPago, Pago, Suscripcion, ahora
 from licita.servidor import crear_app
 from licita.suscripciones import empresa_por_token
@@ -22,15 +24,63 @@ def test_sin_clave_configurada_el_panel_no_existe(Sesion):
     assert _cliente(Sesion, clave="").get("/admin", auth=("admin", "")).status_code == 404
 
 
-def test_pide_usuario_y_clave(Sesion):
+def test_sin_sesion_lleva_a_la_pagina_de_entrada(Sesion):
     cliente = _cliente(Sesion)
+    r = cliente.get("/admin", follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/admin/entrar"
+    assert "www-authenticate" not in r.headers  # sin la ventana del navegador
+    r = cliente.get("/admin/entrar")
+    assert r.status_code == 200 and 'type="password"' in r.text and r.headers["cache-control"] == "no-store"
+
+
+def test_entrar_y_cerrar_sesion(Sesion):
+    cliente = _cliente(Sesion)
+    r = cliente.post("/admin/entrar", data={"usuario": "admin", "clave": "otra"})
+    assert r.status_code == 401 and "Usuario o contraseña incorrectos" in r.text
+    r = cliente.post("/admin/entrar", data={"usuario": "admin", "clave": CLAVE}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/admin"
+    galleta = r.headers["set-cookie"]
+    assert "HttpOnly" in galleta and "SameSite=strict" in galleta and "Path=/admin" in galleta
     r = cliente.get("/admin")
-    assert r.status_code == 401 and r.headers["www-authenticate"].startswith("Basic")
-    assert cliente.get("/admin", auth=("admin", "otra")).status_code == 401
-    assert cliente.get("/admin", auth=("otro", CLAVE)).status_code == 401
-    r = cliente.get("/admin", auth=("admin", CLAVE))
-    assert r.status_code == 200 and "Panel del piloto" in r.text
+    assert r.status_code == 200 and "Panel del piloto" in r.text and "Cerrar sesión" in r.text
     assert r.headers["cache-control"] == "no-store"
+    assert cliente.get("/admin/entrar", follow_redirects=False).status_code == 303  # ya tiene sesión
+    r = cliente.post("/admin/salir")
+    assert "Cerraste la sesión" in r.text
+    assert cliente.get("/admin", follow_redirects=False).status_code == 303
+
+
+def test_cookie_secure_detras_de_https(Sesion):
+    r = _cliente(Sesion).post("/admin/entrar", data={"usuario": "admin", "clave": CLAVE},
+                              headers={"x-forwarded-proto": "https"}, follow_redirects=False)
+    assert "Secure" in r.headers["set-cookie"]
+
+
+def test_bloquea_tras_varios_intentos_fallidos(Sesion):
+    cliente = _cliente(Sesion)
+    for _ in range(INTENTOS_MAXIMOS):
+        assert cliente.post("/admin/entrar", data={"usuario": "admin", "clave": "mala"}).status_code == 401
+    r = cliente.post("/admin/entrar", data={"usuario": "admin", "clave": CLAVE})
+    assert r.status_code == 429 and "Demasiados intentos" in r.text  # ni con la clave correcta
+
+
+def test_bloqueo_y_sesion_vencen():
+    intentos = Intentos()
+    for _ in range(INTENTOS_MAXIMOS):
+        intentos.fallo("1.2.3.4", ahora_ts=1000)
+    assert intentos.bloqueada("1.2.3.4", ahora_ts=1001) and not intentos.bloqueada("5.6.7.8", ahora_ts=1001)
+    assert not intentos.bloqueada("1.2.3.4", ahora_ts=1000 + BLOQUEO.total_seconds() + 1)
+    token = token_sesion(CLAVE, ahora_ts=1000)
+    assert sesion_valida(token, CLAVE, ahora_ts=1001)
+    assert not sesion_valida(token, CLAVE, ahora_ts=1000 + DIAS_SESION * 86400 + 1)
+    assert not sesion_valida(token, "otra-clave", ahora_ts=1001)  # cambiar ADMIN_CLAVE cierra las sesiones
+    assert not sesion_valida(token.split(".")[0] + ".x", CLAVE, ahora_ts=1001)
+
+
+def test_basic_sigue_sirviendo_para_scripts(Sesion):
+    cliente = _cliente(Sesion)
+    assert cliente.get("/admin", auth=("admin", CLAVE)).status_code == 200
+    assert cliente.get("/admin", auth=("admin", "otra"), follow_redirects=False).status_code == 303
 
 
 def test_muestra_empresas_e_indica_a_quien_contactar(Sesion):

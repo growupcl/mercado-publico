@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}Panel del piloto · Calza{% endblock %}
 {% block robots %}noindex, nofollow{% endblock %}
-{% block accion %}<a class="enlace" href="/" target="_blank" rel="noopener">Ver sitio ↗</a>{% endblock %}
+{% block accion %}<a class="enlace" href="/" target="_blank" rel="noopener">Ver sitio ↗</a><form method="post" action="/admin/salir" style="display:inline"><button class="boton secundario" type="submit">Cerrar sesión</button></form>{% endblock %}
 {% block pie_nav %}{% endblock %}
 {% block estilos %}
 <style>

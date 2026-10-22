@@ -118,3 +118,42 @@ def test_valoraciones_por_empresa_y_calce_util(Sesion, cliente_mp):
     assert (fila.utiles, fila.no_utiles, ind.calce_util) == (2, 1, 67)
     r = cliente.get("/admin", auth=("admin", CLAVE))
     assert "Valoró: 👍 2 · 👎 1" in r.text and "67%" in r.text
+
+
+def test_activacion_uso_y_prueba_repetida(Sesion, cliente_mp):
+    from datetime import date
+
+    from licita.db import Calce, MensajeWhatsApp
+    from licita.sync import sincronizar_licitaciones
+
+    cliente = _cliente(Sesion)
+    tokens = [_registrar(cliente)[1]]
+    for i, rut in enumerate(("11.111.111-1", "22.222.222-2", "33.333.333-3")):
+        r = cliente.post("/registro", data={**FORM, "nombre": f"Empresa {i}", "rut": rut, "whatsapp": f"+56 9 1111 222{i}"})
+        tokens.append(r.text.split("https://calza.cl/cuenta/")[1].split('"')[0])
+    with Sesion() as s:
+        sincronizar_licitaciones(s, cliente_mp, date(2026, 10, 6))
+        usa, solo_saluda, sin_tarjeta, repetida = (empresa_por_token(s, t) for t in tokens)
+        sus = {e.id: s.query(Suscripcion).filter_by(empresa_id=e.id).one() for e in (usa, solo_saluda, sin_tarjeta, repetida)}
+        for e in (usa, solo_saluda, repetida):
+            s.add(MandatoPago(empresa_id=e.id, referencia=f"R{e.id}", plan="pro", periodicidad="mensual", monto=39990,
+                              estado="cancelled" if e is repetida else "authorized"))
+        sus[sin_tarjeta.id].estado = "pendiente"
+        sus[repetida.id].estado, sus[repetida.id].prueba_repetida = "vencida", True
+        sus[repetida.id].vigente_hasta = ahora() - timedelta(days=1)
+        enviado = ahora() - timedelta(days=1)
+        s.add_all([Calce(empresa_id=usa.id, licitacion_codigo="1234-56-LE26", puntaje=90, notificado_en=enviado),
+                   Calce(empresa_id=solo_saluda.id, licitacion_codigo="1234-56-LE26", puntaje=90, notificado_en=enviado)])
+        s.add_all([MensajeWhatsApp(empresa_id=usa.id, telefono=usa.whatsapp, direccion="entrante", tipo="texto", contenido=c)
+                   for c in ("Hola", "1")])
+        s.add(MensajeWhatsApp(empresa_id=solo_saluda.id, telefono=solo_saluda.whatsapp, direccion="entrante",
+                              tipo="texto", contenido="Hola"))
+        s.commit()
+        ind, filas = datos_panel(s)
+    assert (ind.con_tarjeta, ind.sin_tarjeta, ind.activacion) == (2, 1, 67)  # la repetida no cuenta
+    assert (ind.usan, ind.reciben_resumen, ind.uso) == (1, 2, 50)
+    assert ind.terminaron_prueba == 0  # la repetida nunca tuvo prueba
+    [fila] = [f for f in filas if f.empresa.id == repetida.id]
+    assert fila.motivos == [("Prueba repetida: su cuenta de Mercado Pago ya la usó", "info")]
+    r = cliente.get("/admin", auth=("admin", CLAVE))
+    assert "2 de 3 registraron la tarjeta" in r.text and "1 de 2 que reciben el resumen" in r.text

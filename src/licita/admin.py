@@ -66,6 +66,20 @@ class Indicadores:
     terminaron_prueba: int  # activas + vencidas: las que ya tuvieron que decidir
     utiles: int = 0
     no_utiles: int = 0
+    con_tarjeta: int = 0  # registraron la tarjeta (activaron la prueba)
+    sin_tarjeta: int = 0  # se registraron y aún no la registran
+    reciben_resumen: int = 0  # en prueba o activas que ya recibieron al menos un resumen
+    usan: int = 0  # de esas, las que respondieron algo más que el saludo o valoraron una licitación
+
+    @property
+    def activacion(self) -> int | None:
+        """Porcentaje de las que registraron la tarjeta, entre las que se registraron con la prueba con tarjeta."""
+        total = self.con_tarjeta + self.sin_tarjeta
+        return round(100 * self.con_tarjeta / total) if total else None
+
+    @property
+    def uso(self) -> int | None:
+        return round(100 * self.usan / self.reciben_resumen) if self.reciben_resumen else None
 
     @property
     def calce_util(self) -> int | None:
@@ -114,6 +128,8 @@ def datos_panel(session, momento: datetime | None = None) -> tuple[Indicadores, 
     momento = momento or ahora()
     suscripciones = {s.empresa_id: s for s in session.scalars(select(Suscripcion))}
     mandatos = {m.id: m for m in session.scalars(select(MandatoPago))}
+    # Empresas que alguna vez autorizaron un cobro en Mercado Pago (un mandato que dejó de estar pendiente).
+    autorizaron = {m.empresa_id for m in mandatos.values() if m.estado != "pending"}
     resumenes = {
         empresa_id: (dias, ultimo) for empresa_id, dias, ultimo in session.execute(
             select(Calce.empresa_id, func.count(func.distinct(Calce.notificado_en)), func.max(Calce.notificado_en))
@@ -147,7 +163,9 @@ def datos_panel(session, momento: datetime | None = None) -> tuple[Indicadores, 
             motivos.append(("Prueba termina sin suscripción", "critico"))
         if sus and sus.estado == "pendiente" and momento - empresa.creada_en > timedelta(hours=24):
             motivos.append(("No activó la prueba (falta tarjeta)", "atencion"))
-        if sus and sus.estado == "vencida" and dias is not None and dias > -7:
+        if sus and sus.prueba_repetida and sus.estado == "vencida":
+            motivos.append(("Prueba repetida: su cuenta de Mercado Pago ya la usó", "info"))
+        elif sus and sus.estado == "vencida" and dias is not None and dias > -7:
             motivos.append(("Venció hace poco", "critico"))
         if sus and sus.estado in ("prueba", "activa"):
             ultimo = empresa.ultimo_mensaje_entrante
@@ -184,8 +202,13 @@ def datos_panel(session, momento: datetime | None = None) -> tuple[Indicadores, 
         cobrado_mes=int(cobrado_mes),
         por_contactar=sum(bool(f.motivos) for f in filas),
         pagaron=sum(f.pagado > 0 for f in filas),
-        terminaron_prueba=sum(f.estado in ("activa", "vencida") for f in filas),
+        terminaron_prueba=sum(f.estado in ("activa", "vencida") and not f.suscripcion.prueba_repetida for f in filas),
         utiles=sum(f.utiles for f in filas), no_utiles=sum(f.no_utiles for f in filas),
+        con_tarjeta=sum(f.empresa.id in autorizaron and not f.suscripcion.prueba_repetida
+                        for f in filas if f.suscripcion),
+        sin_tarjeta=sum(f.estado == "pendiente" for f in filas),
+        reciben_resumen=len(reciben := [f for f in filas if f.estado in ("prueba", "activa") and f.resumenes]),
+        usan=sum(f.mensajes_recibidos >= 2 or f.utiles + f.no_utiles > 0 for f in reciben),
     )
     return indicadores, filas
 

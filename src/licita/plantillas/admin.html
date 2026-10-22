@@ -127,6 +127,16 @@ main{padding-block:28px 56px}
         <span class="su">Pagos aprobados en Mercado Pago</span>
       </div>
       <div class="kpi">
+        <span class="et">Activación</span>
+        <span class="va">{% if ind.activacion is not none %}{{ ind.activacion }}%{% else %}—{% endif %}</span>
+        <span class="su">{% if ind.con_tarjeta + ind.sin_tarjeta %}{{ ind.con_tarjeta }} de {{ ind.con_tarjeta + ind.sin_tarjeta }} registraron la tarjeta{% else %}Nadie se ha registrado con tarjeta{% endif %}</span>
+      </div>
+      <div class="kpi">
+        <span class="et">Usan Calza</span>
+        <span class="va">{% if ind.uso is not none %}{{ ind.uso }}%{% else %}—{% endif %}</span>
+        <span class="su">{% if ind.reciben_resumen %}{{ ind.usan }} de {{ ind.reciben_resumen }} que reciben el resumen respondieron o valoraron{% else %}Aún nadie recibe el resumen{% endif %}</span>
+      </div>
+      <div class="kpi">
         <span class="et">Conversión de prueba a pago</span>
         <span class="va">{% if ind.conversion is not none %}{{ ind.conversion }}%{% else %}—{% endif %}</span>
         <span class="su">{% if ind.terminaron_prueba %}{{ ind.pagaron }} de {{ ind.terminaron_prueba }} que terminaron la prueba{% else %}Ninguna ha terminado la prueba{% endif %}</span>

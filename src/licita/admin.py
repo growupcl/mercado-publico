@@ -25,7 +25,9 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import sessionmaker
 
 from .db import Calce, Empresa, MandatoPago, MensajeWhatsApp, Pago, Suscripcion, ahora, hora_chile
-from .planes import DIAS_PRUEBA, PERIODICIDADES, PLANES
+from .planes import DIAS_PRUEBA, PERIODICIDADES, PLANES, formato_pesos
+from .publico import REGION_POR_SLUG, REGIONES_PUBLICAS, Ficha, Region, buscar, cargar_abiertas
+from .whatsapp import normalizar_telefono
 
 USUARIO = "admin"
 COOKIE = "calza_admin"
@@ -178,6 +180,43 @@ def _basic_valido(request: Request, clave: str) -> bool:
     return _iguales(usuario, USUARIO) & _iguales(dada, clave)
 
 
+def _cierre(ficha: Ficha) -> str:
+    dias = ficha.dias_para_cierre()
+    if dias is None:
+        return ""
+    return "cierra hoy" if dias <= 0 else "cierra mañana" if dias == 1 else f"cierra en {dias} días"
+
+
+def texto_invitacion(*, nombre: str, empresa: str, remitente: str, total: int, ejemplo: Ficha | None,
+                     region: Region | None) -> str:
+    """Invitación al piloto (docs/piloto.md) con un ejemplo real de lo que hay abierto hoy para esa empresa."""
+    nombre, empresa, remitente = nombre.strip() or "[Nombre]", empresa.strip() or "tu empresa", remitente.strip() or "[tu nombre]"
+    lineas = [f"Hola {nombre}, soy {remitente}."]
+    if ejemplo is not None:
+        donde = f" en {region.titulo}" if region else ""
+        cantidad = "una licitación abierta" if total == 1 else f"{total} licitaciones abiertas"
+        detalle = ", ".join(d for d in (
+            f"de {ejemplo.organismo}" if ejemplo.organismo else "",
+            f"por {formato_pesos(ejemplo.monto_estimado)}" if ejemplo.monto_estimado else "", _cierre(ejemplo),
+        ) if d)
+        tipo = "una Compra Ágil" if ejemplo.es_compra_agil else "una"
+        lineas[0] += (f" Hoy vi {cantidad} en Mercado Público{donde} que calzan con lo que vende {empresa}. "
+                      f"Por ejemplo, {tipo} de \"{ejemplo.nombre.strip()}\"" + (f" {detalle}" if detalle else "") + ".")
+    lineas += [
+        "",
+        f"Estamos lanzando *Calza*, un servicio que cada día hábil a las 8:00 te manda por WhatsApp las licitaciones y "
+        f"Compras Ágiles de Mercado Público que calzan con lo que vende {empresa}.",
+        "",
+        f"Te invito a ser parte del piloto: son {DIAS_PRUEBA} días gratis. Registras tu tarjeta, pero no se cobra nada si "
+        "cancelas antes de que terminen. Solo te pido que me cuentes qué te sirvió y qué no.",
+        "",
+        "Te registras en 2 minutos aquí: https://calza.cl/registro",
+        "",
+        "¿Te animas?",
+    ]
+    return "\n".join(lineas)
+
+
 def _autorizado(request: Request, clave: str) -> bool:
     return sesion_valida(request.cookies.get(COOKIE, ""), clave) or _basic_valido(request, clave)
 
@@ -315,6 +354,28 @@ def crear_router_admin(Sesion: sessionmaker, *, plantillas: Jinja2Templates, cla
         r = RedirectResponse("/admin/entrar?salio=1", status_code=303, headers=sin_cache)
         r.delete_cookie(COOKIE, path="/admin", httponly=True, secure=_es_https(request), samesite="strict")
         return r
+
+    @router.get("/admin/invitar", response_class=HTMLResponse)
+    def invitar(request: Request, nombre: str = "", empresa: str = "", vende: str = "", region: str = "",
+                telefono: str = "", remitente: str = ""):
+        if not clave:
+            return Response(status_code=404)
+        if not _autorizado(request, clave):
+            return RedirectResponse("/admin/entrar", status_code=303, headers=sin_cache)
+        vende, reg = vende.strip()[:300], REGION_POR_SLUG.get(region)
+        resultados: list[tuple[Ficha, float]] = []
+        if vende:
+            with Sesion() as s:
+                resultados = buscar(cargar_abiertas(s), vende, reg, limite=500)
+        texto = texto_invitacion(nombre=nombre, empresa=empresa, remitente=remitente, total=len(resultados),
+                                 ejemplo=resultados[0][0] if resultados else None, region=reg) if vende else ""
+        numero = normalizar_telefono(telefono) if telefono.strip() else ""
+        return plantillas.TemplateResponse(request, "admin_invitar.html", {
+            "f": {"nombre": nombre, "empresa": empresa, "vende": vende, "region": region, "telefono": telefono,
+                  "remitente": remitente},
+            "regiones": REGIONES_PUBLICAS, "region": reg, "resultados": resultados[:5], "total": len(resultados),
+            "texto": texto, "numero": numero if len(numero) >= 11 else "", "fmt": formato_pesos, "cierre": _cierre,
+        }, headers=sin_cache)
 
     @router.get("/admin", response_class=HTMLResponse)
     def panel(request: Request, estado: str = "todas"):

@@ -13,8 +13,10 @@ Reemplaza lo que está entre corchetes antes de enviar.
   mensaje del cliente, Meta solo deja escribir desde el número de Calza con plantillas aprobadas, y escribir en frío
   a gente que no lo pidió aumenta el riesgo de bloqueos (más aún sin el negocio verificado en Meta).
 - Invita solo a personas que conoces o que te dieron permiso.
-- Personaliza con un ejemplo real: busca lo que vende la empresa en el buscador de https://calza.cl.
-  Una línea como "hoy vi 3 licitaciones de aseo en tu región" pesa más que todo el resto del mensaje.
+- Personaliza con un ejemplo real. Una línea como "hoy vi 3 licitaciones de aseo en tu región" pesa más que todo el
+  resto del mensaje. En el panel, **Invitar al piloto** (https://calza.cl/admin/invitar) lo hace por ti: escribes qué
+  vende la pyme y su región, busca lo que tiene abierto hoy y arma la invitación 1 con el ejemplo, lista para copiar o
+  abrir en WhatsApp.
 - A quien escriba BAJA, Calza deja de enviarle mensajes automáticamente. Tú tampoco le vuelvas a escribir.
 
 ## Invitación

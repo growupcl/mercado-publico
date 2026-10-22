@@ -16,7 +16,8 @@ Reemplaza lo que está entre corchetes antes de enviar.
 - Personaliza con un ejemplo real. Una línea como "hoy vi 3 licitaciones de aseo en tu región" pesa más que todo el
   resto del mensaje. En el panel, **Invitar al piloto** (https://calza.cl/admin/invitar) lo hace por ti: escribes qué
   vende la pyme y su región, busca lo que tiene abierto hoy y arma la invitación 1 con el ejemplo, lista para copiar o
-  abrir en WhatsApp.
+  abrir en WhatsApp. Ahí mismo queda anotada: la lista de invitaciones muestra quién se registró y, a los 3 días sin
+  registrarse, marca "Toca seguimiento" con el botón que abre el mensaje 3 ya escrito.
 - A quien escriba BAJA, Calza deja de enviarle mensajes automáticamente. Tú tampoco le vuelvas a escribir.
 
 ## Invitación

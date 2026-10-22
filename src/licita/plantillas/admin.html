@@ -127,6 +127,11 @@ main{padding-block:28px 56px}
         <span class="su">Pagos aprobados en Mercado Pago</span>
       </div>
       <div class="kpi">
+        <span class="et">Invitaciones</span>
+        <span class="va">{{ ind.invitadas }}</span>
+        <span class="su">{% if ind.invitadas %}{{ ind.invitadas_registradas }} se {{ "registró" if ind.invitadas_registradas == 1 else "registraron" }} · <a href="/admin/invitar#invitaciones">ver seguimiento</a>{% else %}<a href="/admin/invitar">Invita a la primera pyme</a>{% endif %}</span>
+      </div>
+      <div class="kpi">
         <span class="et">Activación</span>
         <span class="va">{% if ind.activacion is not none %}{{ ind.activacion }}%{% else %}—{% endif %}</span>
         <span class="su">{% if ind.con_tarjeta + ind.sin_tarjeta %}{{ ind.con_tarjeta }} de {{ ind.con_tarjeta + ind.sin_tarjeta }} registraron la tarjeta{% else %}Nadie se ha registrado con tarjeta{% endif %}</span>

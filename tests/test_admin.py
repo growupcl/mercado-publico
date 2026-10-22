@@ -232,9 +232,60 @@ def test_invitar_arma_el_mensaje_con_un_ejemplo_real(Sesion):
     assert "Hola María, soy Matías. Hoy vi una licitación abierta en Mercado Público en Región de Ñuble" in r.text
     assert "de Municipalidad de Chillán, por $4.500.000, cierra en 5 días" in r.text
     assert "Liceo" not in r.text and "Notebooks" not in r.text  # otra región y otro rubro
-    assert 'href="https://wa.me/56989299524?text=Hola%20Mar' in r.text
+    assert 'id="abrir-wa"' in r.text and 'name="telefono" value="+56 9 8929 9524"' in r.text
     r = cliente.get("/admin/invitar", params={"vende": "artículos de aseo"})
     assert "Hoy vi 2 licitaciones abiertas en Mercado Público que calzan con lo que vende tu empresa" in r.text
-    assert "wa.me" not in r.text  # sin teléfono, solo copiar
+    assert 'id="abrir-wa"' not in r.text and "Marcar como enviada" in r.text  # sin teléfono: copiar y anotar
     r = cliente.get("/admin/invitar", params={"vende": "helicópteros"})
     assert "No encontré nada abierto" in r.text and "Hola [Nombre], soy [tu nombre].\n" in r.text
+
+
+def test_anota_invitaciones_y_avisa_el_seguimiento(Sesion):
+    from licita.db import Invitacion
+
+    cliente = _cliente(Sesion)
+    cliente.post("/admin/entrar", data={"usuario": "admin", "clave": CLAVE})
+    datos = {"nombre": "María", "empresa": "Aseo Sur", "telefono": "+56 9 8929 9524", "vende": "artículos de aseo",
+             "region": "nuble", "texto": "Hola María, ¿te animas?"}
+    r = cliente.post("/admin/invitaciones", data={**datos, "abrir": "1"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "https://wa.me/56989299524?text=Hola%20Mar%C3%ADa%2C%20%C2%BFte%20animas%3F"
+    r = cliente.post("/admin/invitaciones", data={**datos, "nombre": "Pedro", "empresa": "Jardines Norte", "telefono": ""})
+    assert "Invitación anotada" in r.text
+    r = cliente.get("/admin/invitar")
+    assert "Invitaciones enviadas · 2" in r.text and r.text.count("Esperando") == 2
+
+    # A los 3 días sin registrarse, toca seguimiento.
+    with Sesion() as s:
+        for inv in s.query(Invitacion):
+            inv.enviada_en = ahora() - timedelta(days=3, hours=1)
+        s.commit()
+        [maria] = s.query(Invitacion).filter_by(nombre="María").all()
+        [pedro] = s.query(Invitacion).filter_by(nombre="Pedro").all()
+        ids = maria.id, pedro.id
+    assert cliente.get("/admin/invitar").text.count("Toca seguimiento") == 2
+    r = cliente.post(f"/admin/invitaciones/{ids[0]}/seguimiento", follow_redirects=False)
+    assert r.headers["location"].startswith("https://wa.me/56989299524?text=Hola%20Mar%C3%ADa%2C%20te%20escribo%20de%20nuevo")
+    r = cliente.post(f"/admin/invitaciones/{ids[1]}/seguimiento")  # sin WhatsApp: el texto queda en la página
+    assert "Hola Pedro, te escribo de nuevo por Calza" in r.text and "Jardines Norte" in r.text
+    r = cliente.get("/admin/invitar")
+    assert "Toca seguimiento" not in r.text and r.text.count("No insistas más") == 2
+
+    # María se registra con su WhatsApp; Jardines Norte, con el nombre de la empresa.
+    _registrar(cliente)
+    assert cliente.post("/registro", data={**FORM, "nombre": "jardines  norte", "rut": "11.111.111-1",
+                                           "whatsapp": "+56 9 1111 2222"}).status_code == 200
+    r = cliente.get("/admin/invitar")
+    assert r.text.count("Se registró") == 2
+    with Sesion() as s:
+        ind, _ = datos_panel(s)
+    assert (ind.invitadas, ind.invitadas_registradas) == (2, 2)
+    assert "2 se registraron" in cliente.get("/admin").text
+
+    cliente.post(f"/admin/invitaciones/{ids[1]}/borrar")
+    assert "Invitaciones enviadas · 1" in cliente.get("/admin/invitar").text
+
+
+def test_invitaciones_requieren_sesion(Sesion):
+    cliente = _cliente(Sesion)
+    assert cliente.post("/admin/invitaciones", data={"texto": "x"}, follow_redirects=False).status_code == 303
+    assert cliente.post("/admin/invitaciones/1/seguimiento", follow_redirects=False).headers["location"] == "/admin/entrar"

@@ -13,6 +13,13 @@
 .inv .res li:first-child{border-top:0;padding-top:0}
 .inv .res a{font-weight:600}
 .inv .acciones{display:flex;flex-wrap:wrap;gap:8px}
+.tabla-inv{width:100%;border-collapse:collapse;font-size:14px}
+.tabla-inv th{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:12px 16px;border-bottom:1px solid var(--line)}
+.tabla-inv td{padding:12px 16px;border-bottom:1px solid var(--line);vertical-align:top}
+.tabla-inv tr:last-child td{border-bottom:0}
+.tabla-inv .acc{white-space:nowrap;text-align:right}
+.tabla-inv .acc form{display:inline-block;margin-left:8px}
+.tabla-inv button.enlace{background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;font:inherit}
 </style>
 {% endblock %}
 {% block contenido %}
@@ -45,16 +52,18 @@
 
     <div class="pila">
       {% if texto %}
-      <div class="tarjeta pila">
+      <form method="post" action="/admin/invitaciones" class="tarjeta pila" id="form-enviar">
+        {% for campo in ("nombre", "empresa", "telefono", "vende", "region") %}<input type="hidden" name="{{ campo }}" value="{{ f[campo] }}">{% endfor %}
         <label for="texto">Mensaje{% if total %} · {{ total }} {{ "licitación abierta" if total == 1 else "licitaciones abiertas" }} para esta empresa{% endif %}</label>
         {% if not total %}<p class="aviso" style="margin:0">No encontré nada abierto con esas palabras{% if region %} en {{ region.nombre }}{% endif %}. El mensaje va sin ejemplo; prueba con otras palabras o con todo Chile.</p>{% endif %}
-        <textarea id="texto">{{ texto }}</textarea>
+        <textarea id="texto" name="texto">{{ texto }}</textarea>
         <div class="acciones">
-          <button class="boton" type="button" id="copiar">Copiar mensaje</button>
-          {% if numero %}<a class="boton secundario" id="abrir-wa" href="https://wa.me/{{ numero }}?text={{ texto | urlencode }}" target="_blank" rel="noopener">Abrir en WhatsApp</a>{% endif %}
+          {% if numero %}<button class="boton" type="submit" name="abrir" value="1" formtarget="_blank" id="abrir-wa">Abrir en WhatsApp</button>{% endif %}
+          <button class="boton{% if numero %} secundario{% endif %}" type="button" id="copiar">Copiar mensaje</button>
+          {% if not numero %}<button class="boton secundario" type="submit">Marcar como enviada</button>{% endif %}
         </div>
-        <p class="ayuda" style="margin:0">Puedes editar el texto antes de copiarlo. Envíalo desde tu WhatsApp personal, no desde el número de Calza.</p>
-      </div>
+        <p class="ayuda" style="margin:0">Puedes editar el texto antes de enviarlo. {% if numero %}"Abrir en WhatsApp" la deja anotada como enviada.{% else %}Cuando la envíes, márcala como enviada para hacerle seguimiento.{% endif %} Envíala desde tu WhatsApp personal, no desde el número de Calza.</p>
+      </form>
       {% if resultados %}
       <div class="tarjeta pila">
         <h3 style="font-size:18px">Lo que tiene abierto hoy</h3>
@@ -68,20 +77,68 @@
       </div>
       {% endif %}
       {% else %}
+      {% if enviada %}<p class="aviso ok" role="status" style="margin:0">Invitación anotada. Te aviso aquí abajo cuando toque el seguimiento.</p>{% endif %}
       <div class="tarjeta"><p class="muted" style="margin:0">Completa el formulario y aquí aparece la invitación lista para enviar.</p></div>
       {% endif %}
     </div>
   </div>
 </div>
+{% if texto_seguimiento %}
+<div class="tarjeta pila" id="seguimiento" style="margin-top:24px">
+  <label for="texto-seg">Mensaje de seguimiento</label>
+  <textarea id="texto-seg" style="min-height:120px">{{ texto_seguimiento }}</textarea>
+  <p class="ayuda" style="margin:0">Esta invitación no tiene WhatsApp: cópialo y envíalo por donde la invitaste. Ya quedó anotado.</p>
+</div>
+{% endif %}
+
+<section id="invitaciones" class="pila" style="margin-top:32px;gap:12px">
+  <h2 style="font-size:22px">Invitaciones enviadas · {{ invitaciones|length }}</h2>
+  {% if invitaciones %}
+  <div class="tarjeta" style="padding:0;overflow-x:auto">
+    <table class="tabla-inv">
+      <thead><tr><th>Contacto</th><th>Enviada</th><th>Estado</th><th></th></tr></thead>
+      <tbody>
+      {% for fi in invitaciones %}{% set inv = fi.invitacion %}
+      <tr>
+        <td><strong>{{ inv.empresa or "Sin empresa" }}</strong>{% if inv.nombre %} · {{ inv.nombre }}{% endif %}<br>
+          <span class="muted">{{ inv.vende or "—" }}{% if inv.telefono %} · +{{ inv.telefono }}{% endif %}</span></td>
+        <td>{{ hace(inv.enviada_en, momento) }}</td>
+        <td>
+          {% if fi.empresa %}<span class="chip ok">Se registró</span>{% if fi.estado == "pendiente" %} <span class="chip oro">Sin tarjeta</span>{% elif fi.estado == "prueba" %} <span class="chip">En prueba</span>{% elif fi.estado == "activa" %} <span class="chip ok">Pagando</span>{% endif %}
+          {% elif fi.toca_seguimiento %}<span class="chip oro">Toca seguimiento</span>
+          {% elif inv.seguimiento_en %}<span class="chip">Seguimiento {{ hace(inv.seguimiento_en, momento) }}</span><br><span class="ayuda">No insistas más</span>
+          {% else %}<span class="chip">Esperando</span><br><span class="ayuda">Seguimiento a los {{ dias_seguimiento }} días si no se registra</span>{% endif %}
+        </td>
+        <td class="acc">
+          {% if fi.toca_seguimiento %}<form method="post" action="/admin/invitaciones/{{ inv.id }}/seguimiento"{% if inv.telefono %} target="_blank"{% endif %} class="js-recargar"><button class="boton" type="submit">Enviar seguimiento</button></form>{% endif %}
+          <form method="post" action="/admin/invitaciones/{{ inv.id }}/borrar" onsubmit="return confirm('¿Borrar esta invitación?')"><button class="enlace" type="submit">Borrar</button></form>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">Aún no anotas invitaciones. Cuando envíes una desde aquí, aparece en esta lista y te aviso cuándo toca el seguimiento.</p>
+  {% endif %}
+</section>
 <script>
 (function () {
-  var texto = document.getElementById("texto"), copiar = document.getElementById("copiar"), wa = document.getElementById("abrir-wa");
+  // Al abrir WhatsApp en otra pestaña, esta se recarga para mostrar la invitación anotada.
+  var recargar = function (url) { setTimeout(function () { location.href = url; }, 800); };
+  var envio = document.getElementById("form-enviar");
+  if (envio) envio.addEventListener("submit", function (e) {
+    if (e.submitter && e.submitter.name === "abrir") recargar("/admin/invitar?enviada=1#invitaciones");
+  });
+  document.querySelectorAll("form.js-recargar[target=_blank]").forEach(function (f) {
+    f.addEventListener("submit", function () { recargar("/admin/invitar#invitaciones"); });
+  });
+  var texto = document.getElementById("texto"), copiar = document.getElementById("copiar");
   if (!texto) return;
   if (copiar) copiar.addEventListener("click", function () {
     var listo = function () { copiar.textContent = "¡Copiado!"; setTimeout(function () { copiar.textContent = "Copiar mensaje"; }, 2000); };
     if (navigator.clipboard) { navigator.clipboard.writeText(texto.value).then(listo); } else { texto.select(); document.execCommand("copy"); listo(); }
   });
-  if (wa) texto.addEventListener("input", function () { wa.href = wa.href.split("?")[0] + "?text=" + encodeURIComponent(texto.value); });
   try { var r = document.getElementById("remitente"); if (!r.value) r.value = localStorage.getItem("calza_remitente") || "";
         r.form.addEventListener("submit", function () { localStorage.setItem("calza_remitente", r.value); }); } catch (e) {}
 })();

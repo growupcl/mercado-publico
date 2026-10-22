@@ -266,6 +266,22 @@ class MandatoPago(Base):
     creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
 
 
+class Invitacion(Base):
+    """Invitación al piloto enviada a mano desde el panel (/admin/invitar), para hacerle seguimiento."""
+
+    __tablename__ = "invitaciones"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    nombre: Mapped[str] = mapped_column(String(80), default="")
+    empresa: Mapped[str] = mapped_column(String(120), default="")
+    telefono: Mapped[str] = mapped_column(String(20), default="", index=True)  # normalizado: 569XXXXXXXX
+    vende: Mapped[str] = mapped_column(String(300), default="")
+    region: Mapped[str] = mapped_column(String(40), default="")  # slug de la región; vacío = todo Chile
+    texto: Mapped[str] = mapped_column(Text, default="")
+    enviada_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
+    seguimiento_en: Mapped[datetime | None] = mapped_column(DateTime)
+
+
 class Pago(Base):
     __tablename__ = "pagos"
 

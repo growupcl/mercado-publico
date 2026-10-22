@@ -17,6 +17,7 @@ import secrets
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from urllib.parse import quote
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
@@ -24,7 +25,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 from sqlalchemy.orm import sessionmaker
 
-from .db import Calce, Empresa, MandatoPago, MensajeWhatsApp, Pago, Suscripcion, ahora, hora_chile
+from .db import Calce, Empresa, Invitacion, MandatoPago, MensajeWhatsApp, Pago, Suscripcion, ahora, hora_chile
 from .planes import DIAS_PRUEBA, PERIODICIDADES, PLANES, formato_pesos
 from .publico import REGION_POR_SLUG, REGIONES_PUBLICAS, Ficha, Region, buscar, cargar_abiertas
 from .whatsapp import normalizar_telefono
@@ -37,6 +38,8 @@ BLOQUEO = timedelta(minutes=15)
 # Sin mensajes en este plazo, la empresa en prueba o activa se marca para contactar.
 SIN_ACTIVIDAD = timedelta(days=7)
 DIAS_POR_VENCER = 3
+# Días sin registrarse tras la invitación para el seguimiento (docs/piloto.md: "3 a 4 días después").
+DIAS_SEGUIMIENTO = 3
 
 
 @dataclass
@@ -77,6 +80,8 @@ class Indicadores:
     terminaron_prueba: int  # activas + vencidas: las que ya tuvieron que decidir
     utiles: int = 0
     no_utiles: int = 0
+    invitadas: int = 0  # invitaciones enviadas desde el panel
+    invitadas_registradas: int = 0  # de esas, las que ya se registraron
     con_tarjeta: int = 0  # registraron la tarjeta (activaron la prueba)
     sin_tarjeta: int = 0  # se registraron y aún no la registran
     reciben_resumen: int = 0  # en prueba o activas que ya recibieron al menos un resumen
@@ -102,6 +107,52 @@ class Indicadores:
     def conversion(self) -> int | None:
         """Porcentaje de las que terminaron la prueba y pagaron."""
         return round(100 * self.pagaron / self.terminaron_prueba) if self.terminaron_prueba else None
+
+
+@dataclass
+class FilaInvitacion:
+    invitacion: Invitacion
+    empresa: Empresa | None  # la empresa que se registró con ese WhatsApp o nombre, si ya lo hizo
+    estado: str | None  # estado de su suscripción
+
+    @property
+    def toca_seguimiento(self) -> bool:
+        return (self.empresa is None and self.invitacion.seguimiento_en is None
+                and ahora() - self.invitacion.enviada_en >= timedelta(days=DIAS_SEGUIMIENTO))
+
+
+def _clave_nombre(texto: str) -> str:
+    return " ".join(texto.lower().split())
+
+
+def invitaciones_con_estado(session) -> list[FilaInvitacion]:
+    """Invitaciones de la más nueva a la más antigua, cada una con la empresa que se registró (por WhatsApp o por
+    nombre de empresa)."""
+    empresas = list(session.scalars(select(Empresa)))
+    por_telefono = {e.whatsapp: e for e in empresas if e.whatsapp}
+    por_nombre = {_clave_nombre(e.nombre): e for e in empresas}
+    estados = dict(session.execute(select(Suscripcion.empresa_id, Suscripcion.estado)).all())
+    filas = []
+    for inv in session.scalars(select(Invitacion).order_by(Invitacion.enviada_en.desc(), Invitacion.id.desc())):
+        empresa = por_telefono.get(inv.telefono) if inv.telefono else None
+        if empresa is None and inv.empresa.strip():
+            empresa = por_nombre.get(_clave_nombre(inv.empresa))
+        filas.append(FilaInvitacion(inv, empresa, estados.get(empresa.id) if empresa else None))
+    return filas
+
+
+def texto_seguimiento(inv: Invitacion, total: int) -> str:
+    """Mensaje 3 de la invitación (docs/piloto.md), con lo que hay abierto hoy para esa empresa."""
+    nombre, empresa = inv.nombre.strip() or "[Nombre]", inv.empresa.strip() or "tu empresa"
+    hoy = (f"Hoy hay {total} licitaciones abiertas en Mercado Público que podrían calzar con {empresa}" if total > 1
+           else f"Hoy hay una licitación abierta en Mercado Público que podría calzar con {empresa}" if total == 1
+           else f"Cada día se publican licitaciones nuevas en Mercado Público que podrían calzar con {empresa}")
+    return (f"Hola {nombre}, te escribo de nuevo por Calza. {hoy}. Si quieres, te muestro cuáles en 2 minutos o te "
+            f"registras directo en https://calza.cl/registro ({DIAS_PRUEBA} días gratis).")
+
+
+def enlace_whatsapp(telefono: str, texto: str) -> str:
+    return f"https://wa.me/{telefono}?text={quote(texto)}"
 
 
 FILTROS = (("todas", "Todas"), ("contactar", "Por contactar"), ("pendiente", "Sin tarjeta"), ("prueba", "En prueba"),
@@ -311,6 +362,9 @@ def datos_panel(session, momento: datetime | None = None) -> tuple[Indicadores, 
         reciben_resumen=len(reciben := [f for f in filas if f.estado in ("prueba", "activa") and f.resumenes]),
         usan=sum(f.mensajes_recibidos >= 2 or f.utiles + f.no_utiles > 0 for f in reciben),
     )
+    invitaciones = invitaciones_con_estado(session)
+    indicadores.invitadas = len(invitaciones)
+    indicadores.invitadas_registradas = sum(f.empresa is not None for f in invitaciones)
     return indicadores, filas
 
 
@@ -357,7 +411,7 @@ def crear_router_admin(Sesion: sessionmaker, *, plantillas: Jinja2Templates, cla
 
     @router.get("/admin/invitar", response_class=HTMLResponse)
     def invitar(request: Request, nombre: str = "", empresa: str = "", vende: str = "", region: str = "",
-                telefono: str = "", remitente: str = ""):
+                telefono: str = "", remitente: str = "", enviada: str = "", seguimiento: int = 0):
         if not clave:
             return Response(status_code=404)
         if not _autorizado(request, clave):
@@ -370,12 +424,75 @@ def crear_router_admin(Sesion: sessionmaker, *, plantillas: Jinja2Templates, cla
         texto = texto_invitacion(nombre=nombre, empresa=empresa, remitente=remitente, total=len(resultados),
                                  ejemplo=resultados[0][0] if resultados else None, region=reg) if vende else ""
         numero = normalizar_telefono(telefono) if telefono.strip() else ""
+        texto_seg = ""
+        with Sesion() as s:
+            invitaciones = invitaciones_con_estado(s)
+            if (inv := s.get(Invitacion, seguimiento) if seguimiento else None) is not None:
+                reg_inv = REGION_POR_SLUG.get(inv.region)
+                texto_seg = texto_seguimiento(inv, len(buscar(cargar_abiertas(s), inv.vende, reg_inv, limite=500))
+                                              if inv.vende else 0)
         return plantillas.TemplateResponse(request, "admin_invitar.html", {
+            "invitaciones": invitaciones, "hace": hace, "momento": ahora(), "enviada": enviada,
+            "dias_seguimiento": DIAS_SEGUIMIENTO, "texto_seguimiento": texto_seg,
             "f": {"nombre": nombre, "empresa": empresa, "vende": vende, "region": region, "telefono": telefono,
                   "remitente": remitente},
             "regiones": REGIONES_PUBLICAS, "region": reg, "resultados": resultados[:5], "total": len(resultados),
             "texto": texto, "numero": numero if len(numero) >= 11 else "", "fmt": formato_pesos, "cierre": _cierre,
         }, headers=sin_cache)
+
+    def _bloqueado(request: Request) -> Response | None:
+        if not clave:
+            return Response(status_code=404)
+        if not _autorizado(request, clave):
+            return RedirectResponse("/admin/entrar", status_code=303, headers=sin_cache)
+        return None
+
+    @router.post("/admin/invitaciones")
+    def registrar_invitacion(request: Request, nombre: str = Form(""), empresa: str = Form(""), telefono: str = Form(""),
+                             vende: str = Form(""), region: str = Form(""), texto: str = Form(""),
+                             abrir: str = Form("")):
+        """Guarda la invitación como enviada y, con "abrir", lleva a WhatsApp con el mensaje."""
+        if (r := _bloqueado(request)) is not None:
+            return r
+        numero = normalizar_telefono(telefono) if telefono.strip() else ""
+        numero = numero if len(numero) >= 11 else ""
+        with Sesion() as s:
+            s.add(Invitacion(nombre=nombre.strip()[:80], empresa=empresa.strip()[:120], telefono=numero,
+                             vende=vende.strip()[:300], region=region[:40], texto=texto[:4000]))
+            s.commit()
+        if abrir and numero:
+            return RedirectResponse(enlace_whatsapp(numero, texto), status_code=303)
+        return RedirectResponse("/admin/invitar?enviada=1#invitaciones", status_code=303)
+
+    @router.post("/admin/invitaciones/{invitacion_id}/seguimiento")
+    def seguimiento(request: Request, invitacion_id: int):
+        """Marca el seguimiento y lleva a WhatsApp con el mensaje 3 de la invitación."""
+        if (r := _bloqueado(request)) is not None:
+            return r
+        with Sesion() as s:
+            inv = s.get(Invitacion, invitacion_id)
+            if inv is None:
+                return Response(status_code=404)
+            reg = REGION_POR_SLUG.get(inv.region)
+            total = len(buscar(cargar_abiertas(s), inv.vende, reg, limite=500)) if inv.vende else 0
+            texto = texto_seguimiento(inv, total)
+            inv.seguimiento_en = ahora()
+            telefono = inv.telefono
+            s.commit()
+        if telefono:
+            return RedirectResponse(enlace_whatsapp(telefono, texto), status_code=303)
+        return RedirectResponse(f"/admin/invitar?seguimiento={invitacion_id}#seguimiento", status_code=303)
+
+    @router.post("/admin/invitaciones/{invitacion_id}/borrar")
+    def borrar_invitacion(request: Request, invitacion_id: int):
+        if (r := _bloqueado(request)) is not None:
+            return r
+        with Sesion() as s:
+            inv = s.get(Invitacion, invitacion_id)
+            if inv is not None:
+                s.delete(inv)
+                s.commit()
+        return RedirectResponse("/admin/invitar#invitaciones", status_code=303)
 
     @router.get("/admin", response_class=HTMLResponse)
     def panel(request: Request, estado: str = "todas"):

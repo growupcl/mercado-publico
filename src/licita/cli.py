@@ -155,7 +155,9 @@ def cmd_whatsapp_enviar(args, config: Config, Sesion) -> int:
         )
     print(f"Plantillas: {r.plantillas} · Textos gratis (ventana abierta): {r.textos} · Sin novedades: {r.sin_novedades} · Errores: {r.errores}")
     print(f"Correos: {r.correos} · Errores de correo: {r.errores_correo}")
-    return 0
+    # Un número con problemas no es una falla; que no salga ni la mitad, sí (deploy/tareas.sh avisa por correo).
+    enviados = r.plantillas + r.textos
+    return 1 if r.errores and r.errores >= enviados else 0
 
 
 def _correo(config: Config):
@@ -462,6 +464,20 @@ def cmd_correo_prueba(args, config: Config, Sesion) -> int:
     return 0
 
 
+def cmd_avisar_falla(args, config: Config, Sesion) -> int:
+    from .operacion import correo_falla
+
+    correo = _correo(config)
+    if correo is None:
+        raise ValueError("Configura SMTP_USUARIO y SMTP_CLAVE en .env para recibir los avisos de fallas.")
+    detalle = "" if args.resuelta or sys.stdin.isatty() else sys.stdin.read()
+    asunto, texto = correo_falla(args.tarea, detalle, resuelta=args.resuelta)
+    para = config.alertas_email or config.correo_remitente
+    correo.enviar(para, asunto, texto)
+    print(f"Aviso enviado a {para}: {asunto}")
+    return 0
+
+
 def cmd_limpiar(args, config: Config, Sesion) -> int:
     from .compra_agil import limpiar_compras_agiles
 
@@ -578,6 +594,11 @@ def construir_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("correo-prueba", help="Envía un correo de prueba para revisar la configuración SMTP")
     s.add_argument("para", help="Dirección de destino")
     s.set_defaults(fn=cmd_correo_prueba)
+
+    s = sub.add_parser("avisar-falla", help="Avisa por correo que una tarea programada falló (lee el detalle de la entrada)")
+    s.add_argument("tarea")
+    s.add_argument("--resuelta", action="store_true", help="Avisa que la tarea volvió a funcionar")
+    s.set_defaults(fn=cmd_avisar_falla)
 
     s = sub.add_parser("limpiar", help="Borra Compras Ágiles cerradas hace tiempo que no le sirvieron a ningún cliente")
     s.add_argument("--dias", type=int, default=60, help="Antigüedad mínima desde el cierre")

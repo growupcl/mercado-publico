@@ -28,6 +28,7 @@ class Config:
     smtp_usuario: str = ""
     smtp_clave: str = ""
     correo_remitente: str = "hola@calza.cl"
+    alertas_email: str = ""  # a quién avisar si falla una tarea (vacío = correo_remitente)
     admin_clave: str = ""
     prueba_con_tarjeta: bool = True  # la prueba empieza al registrar la tarjeta (necesita Mercado Pago)  # contraseña del panel /admin (usuario "admin"); vacía = panel desactivado
 
@@ -58,6 +59,7 @@ class Config:
             smtp_usuario=os.environ.get("SMTP_USUARIO", ""),
             smtp_clave=os.environ.get("SMTP_CLAVE", ""),
             correo_remitente=os.environ.get("CORREO_REMITENTE", "hola@calza.cl"),
+            alertas_email=os.environ.get("ALERTAS_EMAIL", ""),
             admin_clave=os.environ.get("ADMIN_CLAVE", ""),
             prueba_con_tarjeta=os.environ.get("PRUEBA_CON_TARJETA", "1").strip().lower() not in ("0", "no", "false", ""),
         )

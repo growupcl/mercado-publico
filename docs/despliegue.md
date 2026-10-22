@@ -141,6 +141,7 @@ Completa al menos:
 | `LICITA_PRESTADOR` | `Virtus SpA` |
 | `WHATSAPP_*`, `LICITA_WHATSAPP_PUBLICO` | Ver [whatsapp.md](whatsapp.md) |
 | `SMTP_USUARIO`, `SMTP_CLAVE` | Correo de avisos desde hola@calza.cl. Ver [correo.md](correo.md) |
+| `ALERTAS_EMAIL` | Correo que recibe los avisos cuando falla una tarea programada. Vacío = `CORREO_REMITENTE` |
 | `ADMIN_CLAVE` | Contraseña del panel del piloto en `https://calza.cl/admin` (usuario `admin`). Genérala con `openssl rand -base64 24`. Se entra en `https://calza.cl/admin/entrar`; la sesión dura 7 días y cambiar la clave cierra todas las sesiones. Vacía = panel desactivado |
 | `PRUEBA_CON_TARJETA` | `1` (por defecto): la prueba de 7 días empieza al registrar la tarjeta en Mercado Pago. `0`: empieza al registrarse, sin tarjeta |
 
@@ -180,6 +181,19 @@ crontab -l
 | 2:45 | Respaldo de la base de datos (se guardan 14 días en `/var/backups/calza`) |
 
 El registro de cada tarea queda en `/opt/calza/logs/tareas.log`.
+
+**Avisos de fallas.** Si una tarea o el respaldo fallan, llega un correo a `ALERTAS_EMAIL` (o a `CORREO_REMITENTE` si
+está vacío) con qué significa para los clientes y las últimas líneas de la ejecución. Mientras siga fallando se repite
+cada 6 horas como máximo, y llega otro correo cuando vuelve a funcionar. El envío del resumen diario cuenta como falla
+si no salió ni la mitad de los mensajes. Para probarlo:
+
+```bash
+echo "esto es una prueba" | docker compose exec -T app licita avisar-falla prueba
+```
+
+Estos avisos los envía la propia aplicación, así que no llegan si el servidor o el contenedor están caídos. Para eso,
+crea un monitor gratuito en [UptimeRobot](https://uptimerobot.com) (o similar) que revise `https://calza.cl/salud`
+cada 5 minutos y te avise por correo si no responde.
 
 Los límites `--max-detalles` del crontab cuidan el límite diario de consultas del ticket de Mercado Público.
 Ajústalos cuando veamos el volumen real.

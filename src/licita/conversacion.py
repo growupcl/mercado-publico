@@ -19,10 +19,11 @@ import anthropic
 from .analisis import DocumentoInvalido, LimiteAlcanzado, ServicioAnalisis, detectar_codigo, textos_analisis
 from .db import AnalisisBases, Calce, Empresa, Licitacion, MensajeWhatsApp, ahora
 from .ia import ErrorIA
-from .planes import PLANES, PLANES_CON_PRECIOS
+from .planes import PLANES, PLANES_CON_COMPRA_AGIL, PLANES_CON_PRECIOS
+from .publico import REGIONES_PUBLICAS, buscar, cargar_abiertas
 from .precios import informe_precios, texto_precios
 from .notificaciones import VENTANA, registrar
-from .suscripciones import generar_token
+from .suscripciones import generar_token, suscripcion_de
 from .resumen import texto_detalle, texto_resumen, ultimo_resumen
 from .whatsapp import ClienteWhatsApp, ErrorWhatsApp, normalizar_telefono
 
@@ -42,6 +43,58 @@ TEXTO_AYUDA = (
     "• Escribe *CUENTA* para ver tu plan o pagar.\n"
     "• Escribe *BAJA* si ya no quieres recibir mensajes."
 )
+
+
+SALUDOS = ("hola", "ola", "buenas", "buenos", "buen dia", "buen día", "hello", "hi", "saludos", "alo", "aló")
+EJEMPLOS_BIENVENIDA = 3
+
+
+def es_saludo(comando: str) -> bool:
+    return len(comando) <= 40 and comando.strip("!¡.,👋 ").startswith(SALUDOS)
+
+
+def _abiertas_para(session: Session, empresa: Empresa, cantidad: int) -> list:
+    """Licitaciones abiertas hoy que calzan con las palabras clave y regiones de la empresa (sin IA, al instante)."""
+    if not empresa.palabras_clave:
+        return []
+    regiones = [r for r in REGIONES_PUBLICAS if r.nombre in (empresa.regiones or [])]
+    resultado = []
+    for ficha, _ in buscar(cargar_abiertas(session), ", ".join(empresa.palabras_clave), limite=200):
+        if ficha.es_compra_agil and empresa.plan not in PLANES_CON_COMPRA_AGIL:
+            continue
+        if regiones and ficha.region and not any(r.contiene(ficha) for r in regiones):
+            continue
+        resultado.append(ficha)
+        if len(resultado) == cantidad:
+            break
+    return resultado
+
+
+def bienvenida(session: Session, empresa: Empresa, *, url_publica: str = "", momento: datetime | None = None) -> str:
+    """Respuesta al primer saludo, antes del primer resumen: qué viene y, al tiro, lo que hay abierto hoy para ella."""
+    suscripcion = suscripcion_de(session, empresa)
+    lineas = [f"¡Hola, {empresa.nombre}! 👋 Soy el asistente de Calza y ya tengo tu número."]
+    if suscripcion is not None and suscripcion.estado == "pendiente":
+        lineas += ["", "Te falta un paso para empezar tu prueba gratis: registrar tu tarjeta en Mercado Pago (hoy no se "
+                   "cobra nada). Hazlo desde el enlace de tu cuenta que te mostramos al registrarte, o escribe *CUENTA* "
+                   "y te lo envío."]
+    else:
+        lineas += ["", "Cada día hábil a las 8:00 te llega aquí el resumen con las licitaciones nuevas que calzan con "
+                   "tu empresa. El primero, el próximo día hábil."]
+    ejemplos = _abiertas_para(session, empresa, EJEMPLOS_BIENVENIDA)
+    if ejemplos:
+        lineas += ["", "Mientras, esto está abierto hoy y podría servirte:"]
+        for i, f in enumerate(ejemplos, 1):
+            dias = f.dias_para_cierre(momento)
+            cierre = "" if dias is None else " · cierra hoy" if dias <= 0 else " · cierra mañana" if dias == 1 else f" · cierra en {dias} días"
+            lineas.append(f"{i}. *{'⚡ Compra Ágil: ' if f.es_compra_agil else ''}{f.nombre.strip()}*")
+            lineas.append(f"   {f.organismo}{cierre}" + (f"\n   {url_publica}/licitacion/{f.codigo}" if url_publica else ""))
+    lineas += ["", "Para sacarle el jugo:",
+               "• Responde con el *número* de una licitación del resumen para ver qué piden, plazos y requisitos.",
+               "• Marca 👍 o 👎 en cada una: así afino lo que te mando.",
+               "• Envíame el *PDF de las bases* y te las explico en simple.",
+               "• Escribe *PERFIL* para cambiar qué vendes o tus regiones, y *AYUDA* para ver todo lo que puedo hacer."]
+    return "\n".join(lineas)
 
 
 def mensajes_entrantes(payload: dict[str, Any], phone_number_id: str = "") -> Iterator[dict[str, Any]]:
@@ -220,6 +273,9 @@ def responder(
 
     if comando in ("precios", "precio"):
         return [_precios(session, empresa, momento)]
+
+    if tipo == "texto" and es_saludo(comando) and not ultimo_resumen(session, empresa):
+        return [bienvenida(session, empresa, url_publica=url_publica, momento=momento)]
 
     if comando.isdigit():
         filas = ultimo_resumen(session, empresa)

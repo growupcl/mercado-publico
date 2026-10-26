@@ -38,6 +38,12 @@ DISPERSION_MAXIMA = 5.0
 SEGMENTO_SERVICIOS = 70
 MINIMO_PARECIDAS = 5
 PALABRAS_EN_COMUN = 2
+# Si el presupuesto por unidad está a más del doble de lo habitual del código (sobre p75 o bajo p25), o el código mezcla
+# tamaños muy distintos, se compara solo con compras entre 1/4 y 4 veces el presupuesto: un proyecto de $138 millones
+# no se compara con licencias de $1 millón.
+LEJOS_DE_LO_HABITUAL = 2.0
+RANGO_TAMANO = 4.0
+MAS_GRANDES = 3
 
 
 # --- Carga de precios desde lo sincronizado ---
@@ -151,6 +157,17 @@ class ReferenciaPrecio:
     proveedores_frecuentes: list[tuple[str, int]]
     por_similitud: bool  # True si se usaron productos parecidos y no el mismo código
     parecidas_a: list[str] = field(default_factory=list)  # palabras de la licitación con que se filtró (servicios)
+    # Comparación por tamaño (cuando el presupuesto está lejos de lo habitual del código):
+    presupuesto: float | None = None  # presupuesto por unidad de la licitación
+    por_tamano: bool = False  # True: solo compras de tamaño parecido al presupuesto
+    total_codigo: int = 0  # compras del código antes de filtrar por tamaño
+    fuera_de_escala: bool = False  # True: ninguna compra del código se acerca al presupuesto
+    mas_grandes: list[Precio] = field(default_factory=list)
+
+    @property
+    def comparable(self) -> bool:
+        """Sirve para calcular cuánto costaría la licitación: no está dispersa ni filtrada por el propio presupuesto."""
+        return not (self.dispersa or self.por_tamano or self.fuera_de_escala)
 
     @property
     def dispersa(self) -> bool:
@@ -197,7 +214,7 @@ class InformePrecios:
     @property
     def total_mediano(self) -> float | None:
         """Costo de la licitación a precio mediano, si todos los ítems tienen referencia y cantidad."""
-        if not self.referencias or any(r is None or not r.cantidad or r.dispersa for _, r in self.referencias):
+        if not self.referencias or any(r is None or not r.cantidad or not r.comparable for _, r in self.referencias):
             return None
         return sum(r.mediana * r.cantidad for _, r in self.referencias)
 
@@ -280,11 +297,28 @@ def _parecidas_a_la_licitacion(obs: list[Precio], item: dict, contexto: str) -> 
     return parecidas, [propias[r] for r, _ in usadas.most_common()]
 
 
+def _por_tamano(obs: list[Precio], presupuesto: float) -> tuple[list[Precio], bool, list[Precio]]:
+    """(compras a usar, si se filtró por tamaño, las más grandes si ninguna se acerca al presupuesto)."""
+    valores = sorted(_sin_atipicos([p.precio_unitario for p in obs]))
+    p25, _, p75 = _cuartiles(valores)
+    lejos = not p25 / LEJOS_DE_LO_HABITUAL <= presupuesto <= p75 * LEJOS_DE_LO_HABITUAL
+    dispersa = p25 > 0 and p75 / p25 > DISPERSION_MAXIMA
+    if not (lejos or dispersa):
+        return obs, False, []
+    cerca = [p for p in obs if presupuesto / RANGO_TAMANO <= p.precio_unitario <= presupuesto * RANGO_TAMANO]
+    if len(cerca) >= MINIMO_OBSERVACIONES:
+        return cerca, True, []
+    if lejos:
+        return obs, False, sorted(obs, key=lambda p: -p.precio_unitario)[:MAS_GRANDES]
+    return obs, False, []
+
+
 def referencia_item(
     session: Session, item: dict, *, region: str = "", contexto: str = "", momento: datetime | None = None,
-    meses: int = MESES_HISTORIA,
+    meses: int = MESES_HISTORIA, presupuesto: float | None = None,
 ) -> ReferenciaPrecio | None:
-    """`contexto`: nombre de la licitación; en servicios sirve para comparar solo con compras parecidas."""
+    """`contexto`: nombre de la licitación; en servicios sirve para comparar solo con compras parecidas.
+    `presupuesto`: lo que la licitación estima pagar por unidad de este ítem (solo se sabe si tiene un ítem)."""
     momento = momento or ahora()
     obs, por_similitud = _observaciones(session, item, momento - timedelta(days=30 * meses))
     if len(obs) < MINIMO_OBSERVACIONES:
@@ -294,6 +328,9 @@ def referencia_item(
         parecidas, palabras = _parecidas_a_la_licitacion(obs, item, contexto)
         if len(parecidas) >= MINIMO_PARECIDAS:
             obs, parecidas_a = parecidas, palabras
+    total_codigo, por_tamano, mas_grandes = len(obs), False, []
+    if presupuesto:
+        obs, por_tamano, mas_grandes = _por_tamano(obs, presupuesto)
     valores = sorted(_sin_atipicos([p.precio_unitario for p in obs]))
     p25, mediana, p75 = _cuartiles(valores)
     proveedores = Counter(p.proveedor_nombre for p in obs if p.proveedor_nombre and valores[0] <= p.precio_unitario <= valores[-1])
@@ -307,6 +344,8 @@ def referencia_item(
         proveedores_frecuentes=proveedores.most_common(3),
         por_similitud=por_similitud,
         parecidas_a=parecidas_a,
+        presupuesto=presupuesto, por_tamano=por_tamano, total_codigo=total_codigo,
+        fuera_de_escala=bool(mas_grandes), mas_grandes=mas_grandes,
     )
 
 
@@ -334,10 +373,25 @@ def referencia_cotizaciones(
 
 def informe_precios(session: Session, lic: Licitacion, *, momento: datetime | None = None) -> InformePrecios:
     informe = InformePrecios(codigo=lic.codigo, nombre=lic.nombre, monto_estimado=lic.monto_estimado)
+    presupuesto = None
+    if len(lic.items) == 1 and lic.monto_estimado:  # con un solo ítem, el presupuesto es de ese ítem
+        presupuesto = lic.monto_estimado / (_cantidad(lic.items[0].get("cantidad")) or 1)
     for item in lic.items:
-        informe.referencias.append((item, referencia_item(session, item, region=lic.region, contexto=lic.nombre, momento=momento)))
+        informe.referencias.append((item, referencia_item(session, item, region=lic.region, contexto=lic.nombre,
+                                                          momento=momento, presupuesto=presupuesto)))
         informe.cotizaciones.append(referencia_cotizaciones(session, item, momento=momento))
     return informe
+
+
+MESES_CORTOS = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
+
+
+def _quien(p: Precio) -> str:
+    """Quién compró y cuándo, para mostrar una compra puntual: "SLEP Litoral, mar 2026"."""
+    partes = [(p.organismo or "").strip()[:60]]
+    if p.fecha:
+        partes.append(f"{MESES_CORTOS[p.fecha.month - 1]} {p.fecha.year}")
+    return ", ".join(x for x in partes if x)
 
 
 def texto_precios(informe: InformePrecios, *, maximo_items: int = 8) -> str:
@@ -357,7 +411,17 @@ def texto_precios(informe: InformePrecios, *, maximo_items: int = 8) -> str:
         cantidad = _cantidad(item.get("cantidad"))
         producto = item.get("producto") or item.get("categoria") or ""
         lineas.append(f"{mostrados}. *{producto}*" + (f" × {cantidad:g}" if cantidad else ""))
-        if ref and ref.dispersa:
+        if ref and ref.fuera_de_escala:
+            grandes = ", ".join(
+                formato_pesos(p.precio_unitario) + (f" ({_quien(p)})" if _quien(p) else "") for p in ref.mas_grandes)
+            lineas += [
+                f"   ⚠️ No hay compras comparables: este código se usa para compras mucho más chicas que esta licitación "
+                f"({formato_pesos(ref.presupuesto)}). Lo habitual fue {formato_pesos(ref.p25)} – {formato_pesos(ref.p75)} "
+                f"({ref.observaciones} compras) y las más grandes, {grandes}.",
+                "   Probablemente esta licitación incluye más cosas (implementación, varios meses de servicio, soporte): "
+                "guíate por el presupuesto y lo que piden las bases.",
+            ]
+        elif ref and ref.dispersa:
             lineas += [
                 f"   ⚠️ Rango muy amplio: {formato_pesos(ref.p25)} – {formato_pesos(ref.p75)} ({ref.observaciones} compras).",
                 "   Este código agrupa " + ("servicios" if es_servicio(item) else "compras") + " de tamaños muy distintos: "
@@ -369,6 +433,9 @@ def texto_precios(informe: InformePrecios, *, maximo_items: int = 8) -> str:
                 f"   Mediana: {formato_pesos(ref.mediana)} c/u · habitual {formato_pesos(ref.p25)} – {formato_pesos(ref.p75)} ({ref.observaciones} compras)",
                 f"   👉 Precio competitivo: {formato_pesos(bajo)} – {formato_pesos(alto)}",
             ]
+            if ref.por_tamano:
+                lineas.append(f"   (Solo compras de tamaño parecido al presupuesto: {ref.observaciones} de las "
+                              f"{ref.total_codigo} con este código)")
             if ref.parecidas_a:
                 lineas.append(f"   (Comparado con compras parecidas a esta: {', '.join(ref.parecidas_a[:4])})")
             if ref.proveedores_frecuentes:

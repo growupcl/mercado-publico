@@ -117,21 +117,26 @@ MINIMO_COMPRAS_PUBLICO = 5  # en una página pública, un rango con 3 o 4 compra
 
 
 def precios_publicos(session, f: Ficha) -> list[dict]:
-    """Rango habitual de precio de los primeros ítems con referencia confiable (no dispersa)."""
+    """Rango habitual de precio de los primeros ítems con referencia confiable (no dispersa ni de compras mucho más chicas
+    o más grandes que la licitación)."""
     from .precios import referencia_item
 
     filas = []
+    presupuesto = None
+    if len(f.items) == 1 and f.monto_estimado:  # con un solo ítem, el presupuesto es de ese ítem
+        cantidad = f.items[0].get("cantidad")
+        presupuesto = f.monto_estimado / (cantidad if isinstance(cantidad, (int, float)) and cantidad > 0 else 1)
     for item in f.items:
         if len(filas) >= ITEMS_CON_PRECIO:
             break
         if not item.get("codigo_producto"):
             continue
-        ref = referencia_item(session, item, region=f.region, contexto=f.nombre)
-        if ref is None or ref.dispersa or ref.observaciones < MINIMO_COMPRAS_PUBLICO:
+        ref = referencia_item(session, item, region=f.region, contexto=f.nombre, presupuesto=presupuesto)
+        if ref is None or ref.dispersa or ref.fuera_de_escala or ref.observaciones < MINIMO_COMPRAS_PUBLICO:
             continue
         filas.append({"producto": item.get("producto") or item.get("categoria") or "", "unidad": item.get("unidad") or "",
                       "p25": ref.p25, "p75": ref.p75, "observaciones": ref.observaciones,
-                      "parecidos": ref.por_similitud or bool(ref.parecidas_a)})
+                      "parecidos": ref.por_similitud or bool(ref.parecidas_a) or ref.por_tamano})
     return filas
 
 

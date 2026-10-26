@@ -205,3 +205,77 @@ def test_servicio_se_compara_con_compras_parecidas_a_la_licitacion(s):
     assert "Mediana: $20.000.000 c/u" in texto
     assert "(Comparado con compras parecidas a esta: " in texto and "juventud" in texto
     assert "Total a precio mediano: $20.000.000" in texto
+
+
+SOFTWARE_RRHH = "43231505"
+
+
+def _licitacion_rrhh(s):
+    lic = Licitacion(codigo="1456835-4-LP26", nombre="SISTEMA DE GESTIÓN DE PERSONAS Y REMUNERACIONES",
+                     monto_estimado=138_000_000, region="Región de Valparaíso",
+                     items=[{"codigo_producto": SOFTWARE_RRHH, "producto": "Software de gestión de recursos humanos",
+                             "descripcion": "Contratación de un software para el sistema de gestión", "cantidad": 1}])
+    s.add(lic)
+    return lic
+
+
+def _licencias(s, valores):
+    for i, valor in enumerate(valores):
+        _precio(s, f"OC-lic-{i}", valor, codigo=SOFTWARE_RRHH, producto="Licencia software RRHH", cantidad=1)
+    s.add(Precio(fuente="orden_de_compra", referencia="OC-grande", posicion=0, codigo_producto=SOFTWARE_RRHH,
+                 producto="Licencia software RRHH", precio_unitario=9_800_000, cantidad=1,
+                 organismo="Municipalidad de Viña del Mar", fecha=datetime(2026, 3, 10)))
+
+
+def test_proyecto_mucho_mayor_que_lo_habitual_del_codigo_no_se_compara(s):
+    lic = _licitacion_rrhh(s)
+    _licencias(s, [336_000, 500_000, 800_000, 1_200_000, 2_000_000, 3_600_000])
+    s.commit()
+    informe = informe_precios(s, lic, momento=MOMENTO)
+    [(_, ref)] = informe.referencias
+    assert ref.fuera_de_escala and ref.presupuesto == 138_000_000 and ref.mas_grandes[0].precio_unitario == 9_800_000
+    assert informe.total_mediano is None
+    texto = texto_precios(informe)
+    assert "⚠️ No hay compras comparables" in texto and "($138.000.000)" in texto
+    assert "$9.800.000 (Municipalidad de Viña del Mar, mar 2026)" in texto
+    assert "Precio competitivo" not in texto and "Rango muy amplio" not in texto
+
+
+def test_con_compras_de_tamano_parecido_compara_solo_con_esas(s):
+    lic = _licitacion_rrhh(s)
+    _licencias(s, [336_000, 500_000, 800_000, 1_200_000, 2_000_000, 3_600_000])
+    for i, valor in enumerate([95_000_000, 120_000_000, 150_000_000]):
+        _precio(s, f"OC-proy-{i}", valor, codigo=SOFTWARE_RRHH, producto="Implementación sistema de remuneraciones",
+                cantidad=1, proveedor="Sistemas Andes SpA")
+    s.commit()
+    informe = informe_precios(s, lic, momento=MOMENTO)
+    [(_, ref)] = informe.referencias
+    assert ref.por_tamano and ref.observaciones == 3 and ref.total_codigo == 10 and ref.mediana == 120_000_000
+    assert informe.total_mediano is None  # filtrado por el propio presupuesto: no se usa para juzgarlo
+    texto = texto_precios(informe)
+    assert "Mediana: $120.000.000 c/u" in texto
+    assert "(Solo compras de tamaño parecido al presupuesto: 3 de las 10 con este código)" in texto
+    assert "Suelen ganar: Sistemas Andes SpA (3)" in texto and "está cerca del precio de mercado" not in texto
+
+
+def test_presupuesto_dentro_de_lo_habitual_no_filtra(s):
+    lic = _licitacion_rrhh(s)
+    lic.monto_estimado = 1_500_000
+    _licencias(s, [336_000, 500_000, 800_000, 1_200_000, 2_000_000, 3_600_000])
+    s.commit()
+    [(_, ref)] = informe_precios(s, lic, momento=MOMENTO).referencias
+    assert not ref.por_tamano and not ref.fuera_de_escala and ref.observaciones == 7
+
+
+def test_ficha_publica_no_muestra_precios_de_compras_mucho_mas_chicas(s):
+    from licita.publico import Ficha
+    from licita.sitio import precios_publicos
+
+    lic = _licitacion_rrhh(s)
+    # Código no disperso (todas cerca de $1 millón), pero la licitación es de $138 millones.
+    for i, valor in enumerate([800_000, 900_000, 1_000_000, 1_100_000, 1_200_000, 1_300_000]):
+        _precio(s, f"OC-lic-{i}", valor, codigo=SOFTWARE_RRHH, producto="Licencia software RRHH", cantidad=1)
+    s.commit()
+    assert precios_publicos(s, Ficha.de(lic)) == []
+    lic.monto_estimado = 1_000_000
+    assert [f["observaciones"] for f in precios_publicos(s, Ficha.de(lic))] == [6]

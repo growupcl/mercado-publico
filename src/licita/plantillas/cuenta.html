@@ -21,7 +21,11 @@
       <span class="chip">Plan actual: {{ plan_actual }}</span>
       {% if suscripcion.precio_fundador %}<span class="chip oro">Precio fundador</span>{% endif %}
     </div>
-    {% if suscripcion.estado == "pendiente" %}
+    {% if suscripcion.estado == "pendiente" and suscripcion.pendiente_de == "whatsapp" %}
+      <p><strong>Tu prueba gratis aún no está activa.</strong> Escríbenos "Hola" por WhatsApp desde el número que registraste
+      y empiezan tus {{ dias_prueba }} días gratis con todo lo del plan Pro, sin tarjeta.</p>
+      {% if wa_link %}<div><a class="boton" href="{{ wa_link }}" target="_blank" rel="noopener">Escribir "Hola" por WhatsApp</a></div>{% endif %}
+    {% elif suscripcion.estado == "pendiente" %}
       <p><strong>Tu prueba gratis aún no está activa.</strong> Elige tu plan aquí abajo y registra tu tarjeta en Mercado Pago:
       empiezan tus {{ dias_prueba }} días gratis con todo lo del plan Pro, y el primer cobro es al terminarlos. Si cancelas antes, no se cobra nada.</p>
     {% elif suscripcion.prueba_repetida and suscripcion.estado == "vencida" %}
@@ -74,7 +78,7 @@
 
   <h2>{% if mandato %}Cambiar de plan{% else %}Elige tu plan{% endif %}</h2>
   <p class="muted">Suscripción con cobro automático mensual o anual, con tarjeta de crédito o débito a través de Mercado Pago. Puedes cancelar cuando quieras.
-  {% if suscripcion.estado == "pendiente" %}Los primeros {{ dias_prueba }} días son gratis: el primer cobro es al terminarlos.{% elif suscripcion.estado != "vencida" %}No te cobramos nada hasta el {{ vigente_hasta }}.{% endif %} Precios con IVA.</p>
+  {% if suscripcion.estado == "pendiente" and suscripcion.pendiente_de == "whatsapp" %}Si te suscribes ahora, igual tienes tus {{ dias_prueba }} días gratis: el primer cobro es al terminarlos.{% elif suscripcion.estado == "pendiente" %}Los primeros {{ dias_prueba }} días son gratis: el primer cobro es al terminarlos.{% elif suscripcion.estado != "vencida" %}No te cobramos nada hasta el {{ vigente_hasta }}.{% endif %} Precios con IVA.</p>
   {% if not pagos_activos %}<p class="aviso">Los pagos en línea todavía no están habilitados. Escríbenos a hola@calza.cl.</p>{% endif %}
   <form method="post" action="/cuenta/{{ token }}/suscribir" class="pila">
   <div style="max-width:520px">

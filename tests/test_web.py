@@ -95,10 +95,18 @@ def web(Sesion):
     return TestClient(app), Sesion, mp
 
 
-def _registrar(cliente):
+def _registrar(cliente, *, activar=True):
+    """Registra Aseo Sur. Con `activar`, empieza la prueba como si ya hubiera escrito desde su WhatsApp."""
     r = cliente.post("/registro", data=FORM)
     assert r.status_code == 200, r.text
     token = r.text.split("https://calza.cl/cuenta/")[1].split('"')[0]
+    if activar:
+        from licita.suscripciones import activar_prueba_por_whatsapp
+
+        with cliente.app.state.Sesion() as s:
+            empresa = empresa_por_token(s, token)
+            activar_prueba_por_whatsapp(s, empresa)
+            s.commit()
     return r, token
 
 
@@ -426,8 +434,37 @@ def test_registro_listo_dice_el_plan_que_sigue_despues_de_la_prueba(web):
     cliente, _, _ = web
     r = cliente.post("/registro", data={**FORM, "plan": "pyme"})
     assert r.status_code == 200
-    assert "todo lo del plan Pro" in r.text and "Pyme mensual, $19.990" in r.text
-    assert "Abrir WhatsApp" in r.text  # el fixture tiene número público
+    assert "Todo lo del plan Pro" in r.text and "Pyme mensual, $19.990" in r.text
+
+
+def test_sin_tarjeta_la_prueba_se_activa_escribiendo_por_whatsapp(web):
+    """El fixture tiene número público de Calza y no pide tarjeta: el único paso es escribir desde su WhatsApp."""
+    cliente, Sesion, _ = web
+    r = cliente.post("/registro", data=FORM)
+    assert "Falta un solo paso" in r.text and 'Escribir "Hola" por WhatsApp' in r.text
+    assert "https://wa.me/56900000000?text=Hola%20Calza" in r.text
+    assert "+56 9 8929 9524" in r.text and "+56 9 0000 0000" in r.text  # su número y el de Calza
+    assert "Sin tarjeta" in r.text and "Registrar tarjeta" not in r.text
+    token = r.text.split("https://calza.cl/cuenta/")[1].split('"')[0]
+    with Sesion() as s:
+        sus = s.query(Suscripcion).one()
+        assert (sus.estado, sus.pendiente_de, empresa_por_token(s, token).plan) == ("pendiente", "whatsapp", "gratis")
+    cuenta = cliente.get(f"/cuenta/{token}").text
+    assert 'Escríbenos "Hola" por WhatsApp desde el número que registraste' in cuenta
+    assert "sin tarjeta" in cliente.get("/registro").text
+    inicio = cliente.get("/").text
+    assert "Sin tarjeta de crédito" in inicio and "Cancela antes y no pagas nada" not in inicio
+    assert "sin registrar tarjeta" in cliente.get("/terminos").text
+
+
+def test_limita_registros_desde_una_misma_conexion(web):
+    cliente, _, _ = web
+    for i in range(5):
+        rut = f"{10_000_000 + i}-" + rutlib.digito_verificador(str(10_000_000 + i))
+        assert cliente.post("/registro", data={**FORM, "rut": rut, "whatsapp": f"+56 9 7000 000{i}"}).status_code == 200
+    r = cliente.post("/registro", data={**FORM, "rut": "20000000-" + rutlib.digito_verificador("20000000"),
+                                        "whatsapp": "+56 9 7000 0099"})
+    assert r.status_code == 429 and "demasiadas cuentas desde esta conexión" in r.text
 
 
 def test_registro_listo_sin_whatsapp_no_pide_saludar(Sesion):

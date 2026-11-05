@@ -57,6 +57,7 @@ def crear_app(
     router_web: APIRouter | None = None,
 ) -> FastAPI:
     app = FastAPI(title="Calza")
+    app.state.Sesion = Sesion
     app.add_middleware(HeadComoGet)
     if router_web is not None:
         app.include_router(router_web)

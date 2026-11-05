@@ -150,6 +150,8 @@ def con_correo(Sesion):
                               wa=wa, correo=correo)
     cliente = TestClient(crear_app(Sesion, router_web=router))
     _, token = _registrar(cliente)
+    assert "Tu cuenta de Calza está lista" in correo.enviados[0][1]  # bienvenida al registrarse
+    correo.enviados.clear()
     _suscribir(cliente, token, "pyme", "mensual")
     mp.estados["PRE1"] = "authorized"
     _aviso(cliente, "subscription_preapproval", "PRE1")

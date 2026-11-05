@@ -56,3 +56,67 @@ def test_despues_del_primer_resumen_el_saludo_muestra_la_ayuda(Sesion):
         s.commit()
         [texto] = responder(s, e, "texto", "hola")
     assert "Soy el asistente de Calza 🤖" in texto
+
+
+def _registrada_sin_activar(Sesion):
+    from licita.suscripciones import DatosRegistro, registrar_empresa
+
+    datos = DatosRegistro(nombre="Aseo Sur", rut="76.123.456-0", razon_social="Aseo Sur SpA", giro="Venta de aseo",
+                          direccion="Av. Prat 123", comuna="Chillán", email="hola@aseosur.cl", whatsapp="+56 9 8929 9524",
+                          descripcion="Vendemos artículos de aseo a municipios y hospitales.", regiones=["Ñuble"],
+                          plan="pro", periodicidad="mensual", acepta_whatsapp=True, acepta_terminos=True)
+    with Sesion() as s:
+        s.add(Licitacion(codigo="1-1-LE26", nombre="Artículos de aseo para CESFAM", estado_codigo=5,
+                         organismo="Municipalidad de Chillán", region="Región del Ñuble",
+                         fecha_cierre=hora_chile(ahora()).replace(tzinfo=None) + timedelta(days=4)))
+        s.commit()
+        empresa, _ = registrar_empresa(s, datos, confirmar_whatsapp=True)
+        return empresa.id
+
+
+class WAFalso:
+    def __init__(self):
+        self.enviados = []
+
+    def enviar_texto(self, telefono, texto):
+        self.enviados.append(texto)
+        return f"wamid.{len(self.enviados)}"
+
+
+def _mensaje(texto, wamid):
+    return {"entry": [{"changes": [{"value": {"messages": [
+        {"from": "56989299524", "id": wamid, "type": "text", "text": {"body": texto}}]}}]}]}
+
+
+def test_la_prueba_empieza_al_escribir_desde_su_whatsapp(Sesion):
+    from licita.conversacion import procesar_webhook
+    from licita.notificaciones import enviar_resumenes
+    from licita.suscripciones import suscripcion_de
+
+    empresa_id = _registrada_sin_activar(Sesion)
+    with Sesion() as s:
+        e = s.get(Empresa, empresa_id)
+        sus = suscripcion_de(s, e)
+        assert (sus.estado, sus.pendiente_de, e.plan) == ("pendiente", "whatsapp", "gratis")
+        assert enviar_resumenes(s, None).plantillas == 0  # sin activar no recibe nada ni gasta IA
+
+        wa = WAFalso()
+        procesar_webhook(s, wa, _mensaje("ok gracias", "w1"), url_publica="https://calza.cl")  # cualquier mensaje activa
+        sus = suscripcion_de(s, e)
+        assert (sus.estado, sus.pendiente_de, e.plan) == ("prueba", "", "pro")
+        assert timedelta(days=6, hours=23) < sus.vigente_hasta - ahora() <= timedelta(days=7)
+        [texto] = wa.enviados
+        assert "✅ *Empezó tu prueba gratis.*" in texto and "sin tarjeta" in texto and "CESFAM" in texto
+
+        procesar_webhook(s, wa, _mensaje("hola", "w2"))  # el segundo mensaje ya no reactiva ni repite el aviso
+        assert "Empezó tu prueba" not in wa.enviados[-1]
+
+
+def test_plan_gratis_no_analiza_bases(Sesion):
+    from licita.conversacion import procesar_documento
+
+    with Sesion() as s:
+        e = _base(s, plan="gratis", estado="vencida")
+        enviados = []
+        procesar_documento(s, None, e, {"document": {}}, analisis=object(), momento=ahora(), enviar=enviados.append)
+    assert "planes Pyme y Pro" in enviados[0] and "*CUENTA*" in enviados[0]

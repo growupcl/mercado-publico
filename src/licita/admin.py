@@ -31,6 +31,8 @@ from .publico import REGION_POR_SLUG, REGIONES_PUBLICAS, Ficha, Region, buscar, 
 from .whatsapp import normalizar_telefono
 
 USUARIO = "admin"
+# Más cuentas nuevas que esto en 24 horas: el panel avisa, por si alguien está creando cuentas para encadenar pruebas.
+ALERTA_REGISTROS_24H = 10
 COOKIE = "calza_admin"
 DIAS_SESION = 7
 INTENTOS_MAXIMOS = 5
@@ -82,16 +84,17 @@ class Indicadores:
     no_utiles: int = 0
     invitadas: int = 0  # invitaciones enviadas desde el panel
     invitadas_registradas: int = 0  # de esas, las que ya se registraron
-    con_tarjeta: int = 0  # registraron la tarjeta (activaron la prueba)
-    sin_tarjeta: int = 0  # se registraron y aún no la registran
+    activaron: int = 0  # empezaron la prueba (escribieron por WhatsApp o registraron la tarjeta)
+    sin_activar: int = 0  # se registraron y aún no la empiezan
+    registros_24h: int = 0  # cuentas creadas en las últimas 24 horas
     reciben_resumen: int = 0  # en prueba o activas que ya recibieron al menos un resumen
     usan: int = 0  # de esas, las que respondieron algo más que el saludo o valoraron una licitación
 
     @property
     def activacion(self) -> int | None:
-        """Porcentaje de las que registraron la tarjeta, entre las que se registraron con la prueba con tarjeta."""
-        total = self.con_tarjeta + self.sin_tarjeta
-        return round(100 * self.con_tarjeta / total) if total else None
+        """Porcentaje de las que empezaron la prueba, entre las que se registraron con un paso de activación."""
+        total = self.activaron + self.sin_activar
+        return round(100 * self.activaron / total) if total else None
 
     @property
     def uso(self) -> int | None:
@@ -155,7 +158,7 @@ def enlace_whatsapp(telefono: str, texto: str) -> str:
     return f"https://wa.me/{telefono}?text={quote(texto)}"
 
 
-FILTROS = (("todas", "Todas"), ("contactar", "Por contactar"), ("pendiente", "Sin tarjeta"), ("prueba", "En prueba"),
+FILTROS = (("todas", "Todas"), ("contactar", "Por contactar"), ("pendiente", "Sin activar"), ("prueba", "En prueba"),
            ("activa", "Activas"), ("vencida", "Vencidas"))
 
 
@@ -239,7 +242,7 @@ def _cierre(ficha: Ficha) -> str:
 
 
 def texto_invitacion(*, nombre: str, empresa: str, remitente: str, total: int, ejemplo: Ficha | None,
-                     region: Region | None) -> str:
+                     region: Region | None, con_tarjeta: bool = False) -> str:
     """Invitación al piloto (docs/piloto.md) con un ejemplo real de lo que hay abierto hoy para esa empresa."""
     nombre, empresa, remitente = nombre.strip() or "[Nombre]", empresa.strip() or "tu empresa", remitente.strip() or "[tu nombre]"
     lineas = [f"Hola {nombre}, soy {remitente}."]
@@ -258,8 +261,10 @@ def texto_invitacion(*, nombre: str, empresa: str, remitente: str, total: int, e
         f"Estamos lanzando *Calza*, un servicio que cada día hábil a las 8:00 te manda por WhatsApp las licitaciones y "
         f"Compras Ágiles de Mercado Público que calzan con lo que vende {empresa}.",
         "",
-        f"Te invito a ser parte del piloto: son {DIAS_PRUEBA} días gratis. Registras tu tarjeta, pero no se cobra nada si "
-        "cancelas antes de que terminen. Solo te pido que me cuentes qué te sirvió y qué no.",
+        f"Te invito a ser parte del piloto: son {DIAS_PRUEBA} días gratis. "
+        + ("Registras tu tarjeta, pero no se cobra nada si cancelas antes de que terminen. " if con_tarjeta
+           else "No pide tarjeta: al terminar eliges si sigues. ")
+        + "Solo te pido que me cuentes qué te sirvió y qué no.",
         "",
         "Te registras en 2 minutos aquí: https://calza.cl/registro",
         "",
@@ -314,7 +319,8 @@ def datos_panel(session, momento: datetime | None = None) -> tuple[Indicadores, 
         if sus and sus.estado == "prueba" and mandato is None and dias is not None and dias < DIAS_POR_VENCER:
             motivos.append(("Prueba termina sin suscripción", "critico"))
         if sus and sus.estado == "pendiente" and momento - empresa.creada_en > timedelta(hours=24):
-            motivos.append(("No activó la prueba (falta tarjeta)", "atencion"))
+            motivos.append(("No activó la prueba (no ha escrito por WhatsApp)" if sus.pendiente_de == "whatsapp"
+                            else "No activó la prueba (falta tarjeta)", "atencion"))
         if sus and sus.prueba_repetida and sus.estado == "vencida":
             motivos.append(("Prueba repetida: su cuenta de Mercado Pago ya la usó", "info"))
         elif sus and sus.estado == "vencida" and dias is not None and dias > -7:
@@ -356,9 +362,11 @@ def datos_panel(session, momento: datetime | None = None) -> tuple[Indicadores, 
         pagaron=sum(f.pagado > 0 for f in filas),
         terminaron_prueba=sum(f.estado in ("activa", "vencida") and not f.suscripcion.prueba_repetida for f in filas),
         utiles=sum(f.utiles for f in filas), no_utiles=sum(f.no_utiles for f in filas),
-        con_tarjeta=sum(f.empresa.id in autorizaron and not f.suscripcion.prueba_repetida
-                        for f in filas if f.suscripcion),
-        sin_tarjeta=sum(f.estado == "pendiente" for f in filas),
+        # Activaron: autorizaron un cobro (prueba con tarjeta) o escribieron desde su WhatsApp (prueba sin tarjeta).
+        activaron=sum((f.empresa.id in autorizaron or f.empresa.ultimo_mensaje_entrante is not None)
+                      and f.estado != "pendiente" and not f.suscripcion.prueba_repetida for f in filas if f.suscripcion),
+        sin_activar=sum(f.estado == "pendiente" for f in filas),
+        registros_24h=sum(momento - f.empresa.creada_en < timedelta(hours=24) for f in filas),
         reciben_resumen=len(reciben := [f for f in filas if f.estado in ("prueba", "activa") and f.resumenes]),
         usan=sum(f.mensajes_recibidos >= 2 or f.utiles + f.no_utiles > 0 for f in reciben),
     )
@@ -368,7 +376,7 @@ def datos_panel(session, momento: datetime | None = None) -> tuple[Indicadores, 
     return indicadores, filas
 
 
-def crear_router_admin(Sesion: sessionmaker, *, plantillas: Jinja2Templates, clave: str) -> APIRouter:
+def crear_router_admin(Sesion: sessionmaker, *, plantillas: Jinja2Templates, clave: str, con_tarjeta: bool = False) -> APIRouter:
     router = APIRouter()
     intentos = Intentos()
     sin_cache = {"Cache-Control": "no-store", "X-Robots-Tag": "noindex"}
@@ -422,7 +430,8 @@ def crear_router_admin(Sesion: sessionmaker, *, plantillas: Jinja2Templates, cla
             with Sesion() as s:
                 resultados = buscar(cargar_abiertas(s), vende, reg, limite=500)
         texto = texto_invitacion(nombre=nombre, empresa=empresa, remitente=remitente, total=len(resultados),
-                                 ejemplo=resultados[0][0] if resultados else None, region=reg) if vende else ""
+                                 ejemplo=resultados[0][0] if resultados else None, region=reg,
+                                 con_tarjeta=con_tarjeta) if vende else ""
         numero = normalizar_telefono(telefono) if telefono.strip() else ""
         texto_seg = ""
         with Sesion() as s:
@@ -513,6 +522,7 @@ def crear_router_admin(Sesion: sessionmaker, *, plantillas: Jinja2Templates, cla
             return plantillas.TemplateResponse(request, "admin.html", {
                 "ind": indicadores, "filas": visibles, "nombres": nombres, "momento": momento, "chile": hora_chile,
                 "filtros": FILTROS, "filtro": filtro, "cuentas": cuentas, "hace": hace, "dias_prueba": DIAS_PRUEBA,
+                "alerta_registros": indicadores.registros_24h >= ALERTA_REGISTROS_24H,
                 "contactar": [f for f in filas if f.motivos],
             }, headers=sin_cache)
 

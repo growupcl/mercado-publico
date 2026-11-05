@@ -104,7 +104,7 @@
           <span class="muted">{{ inv.vende or "—" }}{% if inv.telefono %} · +{{ inv.telefono }}{% endif %}</span></td>
         <td>{{ hace(inv.enviada_en, momento) }}</td>
         <td>
-          {% if fi.empresa %}<span class="chip ok">Se registró</span>{% if fi.estado == "pendiente" %} <span class="chip oro">Sin tarjeta</span>{% elif fi.estado == "prueba" %} <span class="chip">En prueba</span>{% elif fi.estado == "activa" %} <span class="chip ok">Pagando</span>{% endif %}
+          {% if fi.empresa %}<span class="chip ok">Se registró</span>{% if fi.estado == "pendiente" %} <span class="chip oro">Sin activar</span>{% elif fi.estado == "prueba" %} <span class="chip">En prueba</span>{% elif fi.estado == "activa" %} <span class="chip ok">Pagando</span>{% endif %}
           {% elif fi.toca_seguimiento %}<span class="chip oro">Toca seguimiento</span>
           {% elif inv.seguimiento_en %}<span class="chip">Seguimiento {{ hace(inv.seguimiento_en, momento) }}</span><br><span class="ayuda">No insistas más</span>
           {% else %}<span class="chip">Esperando</span><br><span class="ayuda">Seguimiento a los {{ dias_seguimiento }} días si no se registra</span>{% endif %}

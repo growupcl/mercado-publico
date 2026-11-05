@@ -62,7 +62,7 @@ def avisar_indexnow(url_publica: str, urls: list[str], *, http: httpx.Client | N
     return len(urls)
 
 
-def faq() -> list[tuple[str, str]]:
+def faq(con_tarjeta: bool = False) -> list[tuple[str, str]]:
     pyme, pro = PLANES["pyme"], PLANES["pro"]
     return [
         ("¿Qué es Calza?",
@@ -75,8 +75,9 @@ def faq() -> list[tuple[str, str]]:
         ("¿Cuánto cuesta?",
          f"El plan Pyme cuesta {formato_pesos(pyme.mensual)} al mes y el Pro {formato_pesos(pro.mensual)} "
          f"(los primeros clientes Pro pagan {formato_pesos(PRECIO_FUNDADOR_PRO)} de por vida). Pagando un año se "
-         f"ahorra un 10%. Precios con IVA. Los primeros {DIAS_PRUEBA} días son gratis, con todo lo del plan Pro: registras tu tarjeta para activarlos, "
-         "el primer cobro es al terminar y si cancelas antes no pagas nada."),
+         f"ahorra un 10%. Precios con IVA. Los primeros {DIAS_PRUEBA} días son gratis, con todo lo del plan Pro"
+         + (": registras tu tarjeta para activarlos, el primer cobro es al terminar y si cancelas antes no pagas nada."
+            if con_tarjeta else ", sin tarjeta: al terminar te avisamos y eliges si te suscribes.")),
         ("¿Cómo sabe Calza qué licitaciones me sirven?",
          "Describes en tus palabras lo que vendes, tus regiones y el monto que te interesa. Calza compara cada licitación "
          "nueva con tu perfil y le asigna un porcentaje de calce; solo te llegan las que superan el umbral."),
@@ -142,7 +143,7 @@ def precios_publicos(session, f: Ficha) -> list[dict]:
 
 def crear_router_publico(
     Sesion: sessionmaker, *, plantillas: Jinja2Templates, url_publica: str, fundador_disponible,
-    cache: Cache | None = None,
+    cache: Cache | None = None, con_tarjeta: bool = False,
 ) -> APIRouter:
     router = APIRouter()
     cache = cache or Cache(segundos=300)
@@ -202,8 +203,8 @@ def crear_router_publico(
             "fundador": fundador(), "precio_fundador": PRECIO_FUNDADOR_PRO, "dias_prueba": DIAS_PRUEBA,
             "stats": estadisticas(fichas), "ejemplos": cache.obtener("ejemplos", lambda: ejemplo_resumen(fichas)),
             "ultimas": [f for f in fichas if not f.es_compra_agil][:6],
-            "regiones": REGIONES_PUBLICAS, "rubros": RUBROS, "faq": faq(),
-            "faq_ld": [{"@type": "Question", "name": p, "acceptedAnswer": {"@type": "Answer", "text": r}} for p, r in faq()],
+            "regiones": REGIONES_PUBLICAS, "rubros": RUBROS, "faq": faq(con_tarjeta),
+            "faq_ld": [{"@type": "Question", "name": p, "acceptedAnswer": {"@type": "Answer", "text": r}} for p, r in faq(con_tarjeta)],
             "ofertas_ld": ofertas_ld(),
         })
 

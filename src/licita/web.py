@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import quote
@@ -16,10 +17,11 @@ from sqlalchemy.orm import sessionmaker
 
 from . import legal
 from . import rut as rutlib
-from .correo import ClienteCorreo
+from .correo import ClienteCorreo, ErrorCorreo
 from .db import Empresa, MandatoPago, Pago, Suscripcion, ahora
 from .mercadopago import ClienteMercadoPago, ErrorMercadoPago, verificar_firma
 from .whatsapp import ClienteWhatsApp
+from .notificaciones import correo_bienvenida
 from .admin import crear_router_admin
 from .ia import AsistenteIA
 from .planes import DIAS_PRUEBA, PLANES, PRECIO_FUNDADOR_PRO, formato_pesos
@@ -48,6 +50,36 @@ def _fecha(dt: datetime) -> str:
     return f"{dt.day} de {MESES[dt.month - 1]} de {dt.year}"
 
 
+def _telefono_legible(telefono: str) -> str:
+    """56989299524 → +56 9 8929 9524."""
+    if len(telefono) == 11 and telefono.startswith("569"):
+        return f"+56 9 {telefono[3:7]} {telefono[7:]}"
+    return f"+{telefono}" if telefono else ""
+
+
+class LimiteRegistros:
+    """Cuentas creadas por IP en las últimas 24 h (en memoria): frena a quien cree cuentas en serie para encadenar
+    pruebas gratis. Cada registro además gasta una llamada a la IA para extraer el perfil."""
+
+    MAXIMO = 5
+
+    def __init__(self) -> None:
+        self._por_ip: dict[str, list[float]] = {}
+
+    def _recientes(self, ip: str) -> list[float]:
+        ahora_ts = time.time()
+        recientes = [t for t in self._por_ip.get(ip, []) if ahora_ts - t < 86400]
+        self._por_ip[ip] = recientes
+        return recientes
+
+    def excedido(self, ip: str) -> bool:
+        return bool(ip) and len(self._recientes(ip)) >= self.MAXIMO
+
+    def anotar(self, ip: str) -> None:
+        if ip:
+            self._por_ip[ip] = self._recientes(ip) + [time.time()]
+
+
 def crear_router_web(
     Sesion: sessionmaker,
     *,
@@ -71,11 +103,16 @@ def crear_router_web(
     url_publica = url_publica.rstrip("/")
     plantillas.env.globals["sitio"] = url_publica  # para URL canónicas y Open Graph
     plantillas.env.globals["prestador"] = prestador  # Meta exige ver la relación entre la marca Calza y la empresa
+    con_tarjeta = prueba_con_tarjeta and mp is not None
+    # Sin tarjeta, la prueba empieza cuando escribe desde su WhatsApp (sin número de Calza publicado, al registrarse).
+    confirmar_whatsapp = not con_tarjeta and bool(whatsapp_publico)
+    plantillas.env.globals["con_tarjeta"] = con_tarjeta
     router.include_router(crear_router_publico(
         Sesion, plantillas=plantillas, url_publica=url_publica, fundador_disponible=fundador_disponible,
-        cache=cache_publico,
+        cache=cache_publico, con_tarjeta=con_tarjeta,
     ))
-    router.include_router(crear_router_admin(Sesion, plantillas=plantillas, clave=admin_clave))
+    router.include_router(crear_router_admin(Sesion, plantillas=plantillas, clave=admin_clave, con_tarjeta=con_tarjeta))
+    registros = LimiteRegistros()
     wa_link = f"https://wa.me/{whatsapp_publico}?text={quote('Hola Calza')}" if whatsapp_publico else ""
 
     def mensaje(request: Request, titulo: str, texto: str, *, chip: str = "", chip_clase: str = "", estado: int = 200):
@@ -101,6 +138,7 @@ def crear_router_web(
     @router.post("/registro", response_class=HTMLResponse)
     def registrar(
         request: Request,
+        tareas: BackgroundTasks,
         nombre: str = Form(""), rut: str = Form(""), razon_social: str = Form(""), giro: str = Form(""),
         direccion: str = Form(""), comuna: str = Form(""),
         email: str = Form(""), whatsapp: str = Form(""), descripcion: str = Form(""),
@@ -117,13 +155,22 @@ def crear_router_web(
             descripcion=descripcion, regiones=regiones, monto_max=tope, plan=plan, periodicidad=periodicidad,
             acepta_whatsapp=bool(acepta_whatsapp), acepta_terminos=bool(acepta_terminos),
         )
+        ip = request.client.host if request.client else ""
+        if registros.excedido(ip):
+            return _form(request, datos, {"general": "Se crearon demasiadas cuentas desde esta conexión hoy. Si necesitas "
+                                                    "registrar otra empresa, escríbenos a hola@calza.cl."}, estado=429)
         with Sesion() as s:
             try:
-                empresa, token = registrar_empresa(s, datos, ia=ia, requiere_tarjeta=prueba_con_tarjeta and mp is not None)
+                empresa, token = registrar_empresa(s, datos, ia=ia, requiere_tarjeta=con_tarjeta,
+                                                   confirmar_whatsapp=confirmar_whatsapp)
             except ErrorRegistro as e:
                 return _form(request, datos, e.errores, estado=422)
+            registros.anotar(ip)
             suscripcion = suscripcion_de(s, empresa)
             valor, _ = cotizar(s, suscripcion, suscripcion.plan, suscripcion.periodicidad)
+            if correo is not None and empresa.email:
+                tareas.add_task(_correo_bienvenida, empresa.nombre, empresa.email, f"{url_publica}/cuenta/{token}",
+                                suscripcion.pendiente_de, empresa.whatsapp)
             return plantillas.TemplateResponse(request, "registro_listo.html", {
                 "empresa": empresa, "vigente_hasta": _fecha(suscripcion.vigente_hasta), "suscripcion": suscripcion,
                 "token": token, "dias_prueba": DIAS_PRUEBA,
@@ -131,7 +178,17 @@ def crear_router_web(
                 "plan_elegido": PLANES[suscripcion.plan].nombre, "periodicidad": suscripcion.periodicidad,
                 "precio_plan": valor,
                 "enlace_cuenta": f"{url_publica}/cuenta/{token}", "wa_link": wa_link,
+                "numero_registrado": _telefono_legible(empresa.whatsapp),
+                "numero_calza": _telefono_legible(whatsapp_publico), "correo_enviado": correo is not None and bool(empresa.email),
             })
+
+    def _correo_bienvenida(nombre: str, email: str, enlace_cuenta: str, pendiente_de: str, telefono: str) -> None:
+        asunto, texto, cuerpo = correo_bienvenida(nombre, enlace_cuenta, pendiente_de=pendiente_de,
+                                                  numero=_telefono_legible(telefono), wa_link=wa_link)
+        try:
+            correo.enviar(email, asunto, texto, cuerpo)
+        except ErrorCorreo as e:
+            log.warning("No se pudo enviar el correo de bienvenida a %s: %s", email, e)
 
     def _pagina_cuenta(request: Request, s, empresa, token: str, *, perfil: dict | None = None,
                        errores_perfil: dict | None = None, perfil_guardado: bool = False, estado: int = 200):
@@ -160,7 +217,7 @@ def crear_router_web(
             "rechazo": rechazo, "regiones": REGIONES, "errores_perfil": errores_perfil or {},
             "perfil": perfil or {"descripcion": empresa.descripcion, "regiones": empresa.regiones or [],
                                  "monto_max": empresa.monto_max},
-            "perfil_guardado": perfil_guardado, "dias_prueba": DIAS_PRUEBA,
+            "perfil_guardado": perfil_guardado, "dias_prueba": DIAS_PRUEBA, "wa_link": wa_link,
         }, status_code=estado)
 
     @router.get("/cuenta/{token}", response_class=HTMLResponse)
@@ -343,7 +400,7 @@ def crear_router_web(
 
     @router.get("/terminos", response_class=HTMLResponse)
     def terminos(request: Request):
-        return plantillas.TemplateResponse(request, "legal.html", {"titulo": "Términos del servicio", "fecha": legal.FECHA, "secciones": legal.terminos(prestador)})
+        return plantillas.TemplateResponse(request, "legal.html", {"titulo": "Términos del servicio", "fecha": legal.FECHA, "secciones": legal.terminos(prestador, con_tarjeta=con_tarjeta)})
 
     @router.get("/privacidad", response_class=HTMLResponse)
     def privacidad(request: Request):

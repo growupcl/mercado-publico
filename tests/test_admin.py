@@ -200,13 +200,13 @@ def test_activacion_uso_y_prueba_repetida(Sesion, cliente_mp):
                               tipo="texto", contenido="Hola"))
         s.commit()
         ind, filas = datos_panel(s)
-    assert (ind.con_tarjeta, ind.sin_tarjeta, ind.activacion) == (2, 1, 67)  # la repetida no cuenta
+    assert (ind.activaron, ind.sin_activar, ind.activacion) == (2, 1, 67)  # la repetida no cuenta
     assert (ind.usan, ind.reciben_resumen, ind.uso) == (1, 2, 50)
     assert ind.terminaron_prueba == 0  # la repetida nunca tuvo prueba
     [fila] = [f for f in filas if f.empresa.id == repetida.id]
     assert fila.motivos == [("Prueba repetida: su cuenta de Mercado Pago ya la usó", "info")]
     r = cliente.get("/admin", auth=("admin", CLAVE))
-    assert "2 de 3 registraron la tarjeta" in r.text and "1 de 2 que reciben el resumen" in r.text
+    assert "2 de 3 empezaron la prueba" in r.text and "1 de 2 que reciben el resumen" in r.text
 
 
 def test_invitar_arma_el_mensaje_con_un_ejemplo_real(Sesion):

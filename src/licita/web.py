@@ -144,6 +144,7 @@ def crear_router_web(
         email: str = Form(""), whatsapp: str = Form(""), descripcion: str = Form(""),
         regiones: list[str] = Form([]), monto_max: str = Form(""), plan: str = Form("pyme"),
         periodicidad: str = Form("mensual"), acepta_whatsapp: str = Form(""), acepta_terminos: str = Form(""),
+        origen: str = Form(""),
     ):
         try:
             tope = float(monto_max) if monto_max.strip() else None
@@ -162,7 +163,7 @@ def crear_router_web(
         with Sesion() as s:
             try:
                 empresa, token = registrar_empresa(s, datos, ia=ia, requiere_tarjeta=con_tarjeta,
-                                                   confirmar_whatsapp=confirmar_whatsapp)
+                                                   confirmar_whatsapp=confirmar_whatsapp, origen=origen[:300])
             except ErrorRegistro as e:
                 return _form(request, datos, e.errores, estado=422)
             registros.anotar(ip)

@@ -116,6 +116,8 @@ class Empresa(Base):
     licitacion_activa: Mapped[str | None] = mapped_column(String(40))
     analisis_activo_id: Mapped[int | None] = mapped_column(Integer)
     contexto_actualizado_en: Mapped[datetime | None] = mapped_column(DateTime)
+    # Por dónde llegó al registrarse: "sitio|primera página" (p. ej. "google.com|/licitacion/5180-41-LE26").
+    origen: Mapped[str] = mapped_column(String(200), default="", server_default="")
     creada_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
 
 

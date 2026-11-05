@@ -136,9 +136,19 @@ def extraer_palabras_clave(descripcion: str, ia: AsistenteIA | None) -> list[str
     return sorted(tokens(descripcion))
 
 
+def limpiar_origen(origen: str) -> str:
+    """"sitio|página" que manda el navegador, acotado: solo texto visible y sin datos que no sirven para saber el origen."""
+    sitio, _, pagina = (origen or "").strip().partition("|")
+    sitio = re.sub(r"[^a-z0-9.\-]", "", sitio.lower())[:60]
+    pagina = re.sub(r"[^\w/?=&%.\-]", "", pagina)[:130]
+    if not pagina.startswith("/"):
+        pagina = ""
+    return f"{sitio}|{pagina}" if sitio else ""
+
+
 def registrar_empresa(
     session: Session, datos: DatosRegistro, *, ia: AsistenteIA | None = None, momento: datetime | None = None,
-    requiere_tarjeta: bool = False, confirmar_whatsapp: bool = False,
+    requiere_tarjeta: bool = False, confirmar_whatsapp: bool = False, origen: str = "",
 ) -> tuple[Empresa, str]:
     """Crea la empresa con la prueba del plan Pro. Devuelve (empresa, token de acceso).
 
@@ -163,7 +173,7 @@ def registrar_empresa(
         plan="gratis" if pendiente_de else "pro",  # durante la prueba tiene todo
         rut=rut, razon_social=datos.razon_social.strip(), giro=datos.giro.strip(), email=datos.email.strip().lower(),
         direccion=datos.direccion.strip(), comuna=datos.comuna.strip(),
-        consentimiento_whatsapp_en=momento,
+        consentimiento_whatsapp_en=momento, origen=limpiar_origen(origen),
     )
     session.add(empresa)
     session.flush()

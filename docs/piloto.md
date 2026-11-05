@@ -152,3 +152,5 @@ Al terminar cada semana del piloto, revisa en el panel:
 - **Uso:** cuántas empresas pidieron detalle, PRECIOS o enviaron bases. Quien no interactúa en la primera semana
   probablemente cancela.
 - **Conversión:** de las pruebas que terminaron, cuántas se suscribieron.
+- **Cómo llegan:** buscador, invitación, WhatsApp, redes o directo, y en cada empresa la primera página que vio. Si
+  muchas llegan por buscador a fichas de un mismo tipo de organismo o rubro, ahí conviene reforzar el contenido.

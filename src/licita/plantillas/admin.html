@@ -140,6 +140,11 @@ main{padding-block:28px 56px}
         <span class="su">{% if ind.activaron + ind.sin_activar %}{{ ind.activaron }} de {{ ind.activaron + ind.sin_activar }} empezaron la prueba{% else %}Aún no hay registros{% endif %}</span>
       </div>
       <div class="kpi">
+        <span class="et">Cómo llegan</span>
+        <span class="va">{% if ind.canales %}{{ ind.canales[0][0] }}{% else %}—{% endif %}</span>
+        <span class="su">{% if ind.canales %}{% for canal, n in ind.canales %}{{ canal }} {{ n }}{% if not loop.last %} · {% endif %}{% endfor %}{% else %}Se registra desde los nuevos registros{% endif %}</span>
+      </div>
+      <div class="kpi">
         <span class="et">Usan Calza</span>
         <span class="va">{% if ind.uso is not none %}{{ ind.uso }}%{% else %}—{% endif %}</span>
         <span class="su">{% if ind.reciben_resumen %}{{ ind.usan }} de {{ ind.reciben_resumen }} que reciben el resumen respondieron o valoraron{% else %}Aún nadie recibe el resumen{% endif %}</span>
@@ -186,6 +191,7 @@ main{padding-block:28px 56px}
             <td data-et="Empresa">
               <div class="nombre">{{ e.nombre }} <span class="sec">#{{ e.id }}</span></div>
               <div class="sec">Registro {{ hace(e.creada_en, momento) }} · {{ chile(e.creada_en).strftime("%d-%m-%Y") }}</div>
+              {% if f.origen and f.origen.canal != "Sin dato" %}<div class="sec">Llegó por: {{ f.origen.canal }}{% if f.origen.sitio and f.origen.canal not in ("Invitación",) %} ({{ f.origen.sitio }}){% endif %}{% if f.origen.pagina %} · <a href="{{ f.origen.pagina }}" target="_blank" rel="noopener">{{ f.origen.pagina_legible }}</a>{% endif %}</div>{% endif %}
               {% if f.motivos %}<div class="motivos" style="margin-top:6px">{% for texto, nivel in f.motivos %}{{ motivo(texto, nivel) }}{% endfor %}</div>{% endif %}
             </td>
             <td data-et="Estado">

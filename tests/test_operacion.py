@@ -69,3 +69,32 @@ def test_salud_revisa_la_base_de_datos(Sesion):
     caida = sessionmaker(create_engine("postgresql+psycopg://x:y@127.0.0.1:1/z", connect_args={"connect_timeout": 1}))
     r = TestClient(crear_app(caida)).get("/salud")
     assert r.status_code == 503 and r.json() == {"ok": False}
+
+
+def test_correo_de_bienvenida_explica_el_paso_que_falta():
+    from licita.notificaciones import correo_bienvenida
+
+    asunto, texto, html = correo_bienvenida("Aseo Sur", "https://calza.cl/cuenta/abc", pendiente_de="whatsapp",
+                                            numero="+56 9 8929 9524", wa_link="https://wa.me/569000?text=Hola")
+    assert asunto == 'Activa tu prueba de Calza: escríbenos "Hola" por WhatsApp'
+    assert "desde el número que registraste (+56 9 8929 9524)" in texto and "sin tarjeta" in texto
+    assert "https://calza.cl/cuenta/abc" in texto and "https://wa.me/569000?text=Hola" in html
+    asunto, _, _ = correo_bienvenida("Aseo Sur", "https://calza.cl/cuenta/abc", pendiente_de="tarjeta")
+    assert asunto == "Activa tu prueba de Calza: registra tu tarjeta"
+
+
+def test_panel_avisa_si_hay_muchos_registros(Sesion):
+    from fastapi.testclient import TestClient
+
+    from licita.admin import ALERTA_REGISTROS_24H
+    from licita.db import Empresa
+    from licita.servidor import crear_app
+    from licita.web import crear_router_web
+
+    with Sesion() as s:
+        s.add_all([Empresa(nombre=f"E{i}", descripcion="", whatsapp=f"5690000{i:04d}") for i in range(ALERTA_REGISTROS_24H)])
+        s.commit()
+    cliente = TestClient(crear_app(Sesion, router_web=crear_router_web(Sesion, mp=None, ia=None, url_publica="https://calza.cl",
+                                                                        admin_clave="x")))
+    r = cliente.get("/admin", auth=("admin", "x"))
+    assert f"Ojo: {ALERTA_REGISTROS_24H} cuentas nuevas en las últimas 24 horas" in r.text

@@ -244,6 +244,8 @@ class Suscripcion(Base):
     aviso_vencida_en: Mapped[datetime | None] = mapped_column(DateTime)
     # Registró una tarjeta cuya cuenta de Mercado Pago ya tuvo la prueba en otra empresa: no recibe otra.
     prueba_repetida: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Con estado "pendiente", qué falta para empezar la prueba: "whatsapp" (que escriba desde su número) o "tarjeta".
+    pendiente_de: Mapped[str] = mapped_column(String(10), default="", server_default="")
     creada_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
 
 

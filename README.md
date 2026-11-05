@@ -33,7 +33,7 @@ Sitio: [calza.cl](https://calza.cl) · El nombre interno del proyecto y del coma
    datos abiertos de ChileCompra (`licita historico-oc`, ver [docs/historico-oc.md](docs/historico-oc.md)); no usa IA,
    así que no tiene costo variable.
 9. **Sitio web, registro y pagos** (`licita servidor`): página de inicio con los planes, registro con 7 días de prueba
-   del plan Pro (se activa registrando la tarjeta en Mercado Pago; primer cobro al terminar), cuenta con enlace privado (sin contraseñas; por WhatsApp se pide con *CUENTA*) y
+   del plan Pro (sin tarjeta: empieza cuando la empresa escribe por WhatsApp desde el número que registró), cuenta con enlace privado (sin contraseñas; por WhatsApp se pide con *CUENTA*) y
    **suscripción con Mercado Pago** (tarjeta de crédito o débito) que cobra sola cada mes o cada año. Si el cliente se
    suscribe durante la prueba, el primer cobro es al terminar la prueba. Puede cambiar de plan o cancelar la
    renovación desde su cuenta. Precio fundador del plan Pro para los primeros 100 clientes, congelado de por vida.

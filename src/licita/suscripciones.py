@@ -1,7 +1,8 @@
 """Registro de empresas, prueba gratuita, suscripciones con Mercado Pago y vencimientos.
 
-Prueba: 7 días con el plan Pro. En producción (PRUEBA_CON_TARJETA) empieza al registrar la tarjeta en Mercado Pago;
-antes de eso la cuenta queda "pendiente" con el plan gratis.
+Prueba: 7 días con el plan Pro. Empieza cuando la empresa escribe por primera vez desde el WhatsApp que registró (así
+cada prueba queda amarrada a un número real), o, con PRUEBA_CON_TARJETA, al registrar la tarjeta en Mercado Pago.
+Antes de eso la cuenta queda "pendiente" con el plan gratis: sin resumen ni gasto de IA.
 
 Modelo de cobro: suscripción de Mercado Pago (tarjeta de crédito o débito) que cobra sola cada
 mes o cada año. Si el cliente se suscribe durante la prueba, el primer cobro es al terminar la
@@ -137,12 +138,12 @@ def extraer_palabras_clave(descripcion: str, ia: AsistenteIA | None) -> list[str
 
 def registrar_empresa(
     session: Session, datos: DatosRegistro, *, ia: AsistenteIA | None = None, momento: datetime | None = None,
-    requiere_tarjeta: bool = False,
+    requiere_tarjeta: bool = False, confirmar_whatsapp: bool = False,
 ) -> tuple[Empresa, str]:
     """Crea la empresa con la prueba del plan Pro. Devuelve (empresa, token de acceso).
 
-    Con `requiere_tarjeta`, la cuenta queda "pendiente" (plan gratis: sin resumen ni gasto de IA) hasta que registra
-    su tarjeta en Mercado Pago; ahí empiezan los días de prueba y el primer cobro es al terminarlos."""
+    Con `confirmar_whatsapp` o `requiere_tarjeta`, la cuenta queda "pendiente" (plan gratis: sin resumen ni gasto de IA)
+    hasta que escribe desde su WhatsApp o registra su tarjeta en Mercado Pago; ahí empiezan los días de prueba."""
     momento = momento or ahora()
     errores = validar(datos)
     rut = rutlib.limpiar(datos.rut)
@@ -154,11 +155,12 @@ def registrar_empresa(
     if errores:
         raise ErrorRegistro(errores)
 
+    pendiente_de = "tarjeta" if requiere_tarjeta else "whatsapp" if confirmar_whatsapp else ""
     palabras_clave = extraer_palabras_clave(datos.descripcion, ia)
     empresa = Empresa(
         nombre=datos.nombre.strip(), descripcion=datos.descripcion.strip(), regiones=datos.regiones,
         monto_max=datos.monto_max, palabras_clave=palabras_clave, whatsapp=telefono,
-        plan="gratis" if requiere_tarjeta else "pro",  # durante la prueba tiene todo
+        plan="gratis" if pendiente_de else "pro",  # durante la prueba tiene todo
         rut=rut, razon_social=datos.razon_social.strip(), giro=datos.giro.strip(), email=datos.email.strip().lower(),
         direccion=datos.direccion.strip(), comuna=datos.comuna.strip(),
         consentimiento_whatsapp_en=momento,
@@ -168,11 +170,23 @@ def registrar_empresa(
     token = generar_token(empresa)
     session.add(Suscripcion(
         empresa_id=empresa.id, plan=datos.plan, periodicidad=datos.periodicidad,
-        estado="pendiente" if requiere_tarjeta else "prueba",
-        vigente_hasta=momento if requiere_tarjeta else momento + timedelta(days=DIAS_PRUEBA),
+        estado="pendiente" if pendiente_de else "prueba", pendiente_de=pendiente_de,
+        vigente_hasta=momento if pendiente_de else momento + timedelta(days=DIAS_PRUEBA),
     ))
     session.commit()
     return empresa, token
+
+
+def activar_prueba_por_whatsapp(session: Session, empresa: Empresa, momento: datetime | None = None) -> Suscripcion | None:
+    """Si la cuenta esperaba que escribiera desde su WhatsApp, empieza su prueba. Devuelve la suscripción si la activó."""
+    suscripcion = suscripcion_de(session, empresa)
+    if suscripcion is None or suscripcion.estado != "pendiente" or suscripcion.pendiente_de != "whatsapp":
+        return None
+    momento = momento or ahora()
+    suscripcion.estado, suscripcion.pendiente_de = "prueba", ""
+    suscripcion.vigente_hasta = momento + timedelta(days=DIAS_PRUEBA)
+    empresa.plan = "pro"
+    return suscripcion
 
 
 # --- Pagos ---
@@ -265,7 +279,7 @@ def actualizar_mandato(session: Session, mp: ClienteMercadoPago, mp_id: str) -> 
                     mandato.payer_id, mandato.empresa_id)
         mp.cancelar_suscripcion(mandato.mp_id)
         mandato.estado = "cancelled"
-        suscripcion.estado, suscripcion.prueba_repetida = "vencida", True
+        suscripcion.estado, suscripcion.prueba_repetida, suscripcion.pendiente_de = "vencida", True, ""
         suscripcion.aviso_vencida_en = ahora()  # no corresponde el aviso de "tu prueba terminó"
         session.commit()
         return mandato
@@ -273,6 +287,7 @@ def actualizar_mandato(session: Session, mp: ClienteMercadoPago, mp_id: str) -> 
         # Registró su tarjeta: empieza la prueba con todo lo del plan Pro.
         empresa = session.get(Empresa, mandato.empresa_id)
         suscripcion.estado, suscripcion.vigente_hasta = "prueba", ahora() + timedelta(days=DIAS_PRUEBA)
+        suscripcion.pendiente_de = ""
         empresa.plan = "pro"
     if remota.estado == "authorized" and suscripcion.mandato_activo_id != mandato.id:
         anterior = session.get(MandatoPago, suscripcion.mandato_activo_id) if suscripcion.mandato_activo_id else None
@@ -317,6 +332,7 @@ def registrar_cobro(session: Session, mp: ClienteMercadoPago, cobro_id: str, *, 
         inicio = max(momento, suscripcion.vigente_hasta)
         suscripcion.vigente_hasta = sumar_meses(inicio, PERIODICIDADES[mandato.periodicidad])
         suscripcion.plan, suscripcion.periodicidad, suscripcion.estado = mandato.plan, mandato.periodicidad, "activa"
+        suscripcion.pendiente_de = ""
         suscripcion.aviso_vencida_en = None  # si vuelve a vencer, se avisa de nuevo
         empresa.plan = mandato.plan
         pago.estado, pago.pagado_en = "pagado", momento

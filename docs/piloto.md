@@ -1,7 +1,7 @@
 # Mensajes del piloto
 
 Borradores para invitar pymes al piloto de Calza y acompañar a quienes ya están en la prueba.
-Usan solo las condiciones vigentes en el sitio: 7 días gratis con funciones Pro (se activan registrando la tarjeta en Mercado Pago; el primer cobro es al terminar y se puede cancelar antes sin costo);
+Usan solo las condiciones vigentes en el sitio: 7 días gratis con funciones Pro, sin tarjeta (la prueba empieza cuando la empresa escribe "Hola" por WhatsApp desde el número que registró);
 precio fundador Pro de $39.990 al mes de por vida para los primeros 100 clientes; plan Pyme a $19.990 al mes;
 10 % de descuento anual. Si cambian (`src/licita/planes.py`), actualiza también estos textos.
 
@@ -26,7 +26,7 @@ Reemplaza lo que está entre corchetes antes de enviar.
 
 > Hola [Nombre], soy [tu nombre]. Estamos lanzando **Calza**, un servicio que cada día hábil a las 8:00 te manda por WhatsApp las licitaciones y Compras Ágiles de Mercado Público que calzan con lo que vende [Empresa].
 >
-> Te invito a ser parte del piloto: son 7 días gratis: registras tu tarjeta, pero no se cobra nada si cancelas antes de que terminen. Solo te pido que me cuentes qué te sirvió y qué no.
+> Te invito a ser parte del piloto: son 7 días gratis y no pide tarjeta; al terminar eliges si sigues. Solo te pido que me cuentes qué te sirvió y qué no.
 >
 > Te registras en 2 minutos aquí: https://calza.cl/registro
 >
@@ -43,7 +43,7 @@ Reemplaza lo que está entre corchetes antes de enviar.
 > Por eso armamos **Calza**. Le dices qué vendes, en qué regiones trabajas y qué montos te interesan, y cada día hábil a las 8:00 te llega por WhatsApp solo lo nuevo que calza contigo. Si algo te interesa, respondes con su número y te enviamos el detalle: qué piden, los requisitos a los que hay que poner ojo, plazos, precios de referencia de compras anteriores y el link a la ficha oficial.
 >
 > Te invito a probarlo como parte de nuestro piloto:
-> - **7 días gratis** con todas las funciones. Registras tu tarjeta en Mercado Pago, pero el primer cobro es al terminar la prueba y si cancelas antes no pagas nada.
+> - **7 días gratis** con todas las funciones, sin tarjeta. Al terminar te avisamos y eliges si te suscribes.
 > - Si después decides seguir, los primeros 100 clientes del plan Pro quedan con **precio fundador de $39.990 al mes, de por vida**. El plan Pyme cuesta $19.990 al mes.
 > - A cambio, te pido 10 minutos de conversación al final de la prueba para saber qué te sirvió y qué mejorarías.
 >
@@ -63,14 +63,15 @@ Para [N] usa el número de licitaciones abiertas que muestra la portada de calza
 
 ## Durante la prueba
 
-La prueba dura 7 días y empieza cuando la empresa registra su tarjeta en Mercado Pago. Algunos avisos ya salen solos
-(`licita avisos-prueba`, todos los días a las 10:05, por WhatsApp y por correo): 2 días antes del primer cobro, a quienes
-registraron su tarjeta, y el día en que una cuenta pasa al plan gratis. Los mensajes de abajo los escribes tú, en persona,
-además de esos avisos.
+La prueba dura 7 días, no pide tarjeta y empieza cuando la empresa escribe por primera vez desde el WhatsApp que
+registró: al registrarse, la página y un correo le piden escribir "Hola", y Calza le responde al tiro con la prueba
+activa y licitaciones abiertas para ella. Algunos avisos ya salen solos (`licita avisos-prueba`, todos los días a las
+10:05, por WhatsApp y por correo): 2 días antes de que termine la prueba, con el enlace para suscribirse, y el día en que
+la cuenta pasa al plan gratis. Los mensajes de abajo los escribes tú, en persona, además de esos avisos.
 
 Para ver en qué está cada empresa, abre el panel del piloto en https://calza.cl/admin (usuario `admin`, la clave es
-`ADMIN_CLAVE` del `.env` del servidor). El filtro **Sin tarjeta** muestra a quienes se registraron pero no activaron la
-prueba. Para ver qué pruebas terminan pronto, ejecuta en el servidor (como usuario `calza`, en `/opt/calza`):
+`ADMIN_CLAVE` del `.env` del servidor). El filtro **Sin activar** muestra a quienes se registraron pero no han escrito por
+WhatsApp, así que su prueba no empieza. Para ver qué pruebas terminan pronto, ejecuta en el servidor (como usuario `calza`, en `/opt/calza`):
 
 ```
 docker compose exec -T app licita suscripciones --dias 3
@@ -80,23 +81,23 @@ Calendario de la prueba:
 
 | Día | Qué pasa | Qué haces tú |
 |---|---|---|
-| 0 | Se registra en calza.cl | Si no registra la tarjeta ese mismo día, mensaje 0 al día siguiente |
-| 1 | Registra la tarjeta: empieza la prueba | Mensaje 1 (bienvenida) |
+| 0 | Se registra en calza.cl y escribe "Hola": empieza la prueba | Si no escribe ese mismo día, mensaje 0 al día siguiente |
+| 1 | | Mensaje 1 (bienvenida) |
 | 2 | Primer resumen a las 8:00 (días hábiles) | Nada: deja que lo use |
 | 3 o 4 | | Mensaje 2 (revisión) y ajustas rubros si hace falta |
-| 5 | Le llega solo el aviso de primer cobro | Mensaje 3 (conversación de cierre) |
-| 8 | Primer cobro, o pasa al plan gratis si canceló | Si canceló, mensaje 4 |
+| 5 | Le llega solo el aviso de que la prueba termina | Mensaje 3 (conversación de cierre) |
+| 8 | Sigue si se suscribió; si no, pasa al plan gratis | Si no se suscribió, mensaje 4 |
 
 ### 0. Se registró pero no activó la prueba (día siguiente)
 
-> Hola [Nombre], soy [tu nombre], de Calza. Vi que creaste tu cuenta, ¡gracias! Te falta un paso para que empiecen a llegarte las licitaciones: registrar tu tarjeta en Mercado Pago. Hoy no se cobra nada: tienes 7 días gratis y, si cancelas antes, no pagas.
+> Hola [Nombre], soy [tu nombre], de Calza. Vi que creaste tu cuenta, ¡gracias! Te falta un solo paso para que empiecen a llegarte las licitaciones: escribir "Hola" al WhatsApp de Calza ([número de Calza]) desde el número que registraste. Apenas lo hagas empiezan tus 7 días gratis, sin tarjeta.
 >
-> Lo haces desde el enlace de tu cuenta (te llegó al registrarte; si no lo tienes, escribe **CUENTA** al WhatsApp de Calza). ¿Te quedó alguna duda o te complicó algo?
+> ¿Te quedó alguna duda o te complicó algo?
 
-Si la respuesta es que no quieren dejar la tarjeta, anótalo: es la información más importante para decidir si se
-mantiene la prueba con tarjeta.
+Si te cuentan que se registraron con otro número (por ejemplo, el de la empresa y no su celular), corrígelo en la base
+o pídeles que escriban desde ese número: la prueba solo empieza con un mensaje del número registrado.
 
-### 1. Bienvenida (día 1, después de que registra la tarjeta)
+### 1. Bienvenida (día 1, después de que escribe por WhatsApp)
 
 > Hola [Nombre], soy [tu nombre], de Calza. ¡Gracias por sumarte al piloto! 🙌
 >
@@ -120,21 +121,21 @@ Antes de escribir, mira en el panel sus 👍 y 👎: si marcó varios 👎, preg
 Anota cada respuesta: son la mejor información del piloto. Si varias empresas reciben licitaciones que no les sirven,
 eso apunta a mejorar el calce. Para ajustar rubros, la empresa puede escribir **PERFIL** a Calza o editarlo en su cuenta.
 
-### 3. Antes del primer cobro (día 5)
+### 3. Antes de que termine (día 5)
 
-Ese mismo día le llega el aviso automático de que en 2 días se hace el primer cobro. Este mensaje es para conversar,
-no para cobrar:
+Ese mismo día le llega el aviso automático de que en 2 días termina la prueba, con el enlace para suscribirse. Este
+mensaje es para conversar:
 
 > Hola [Nombre], tu prueba de Calza termina el [fecha]. Antes de eso, ¿me regalas 10 minutos para contarme qué te sirvió y qué mejorarías? ¿Te acomoda [día] a las [hora]?
 >
-> Si te ha servido, no tienes que hacer nada: sigues con tu plan y el precio fundador de $39.990 al mes queda fijo de por vida (solo para los primeros 100 en el plan Pro). Si no, puedes cancelar desde tu cuenta antes del [fecha] y no se cobra nada.
+> Si te ha servido, escribe **CUENTA** a Calza y te llega el enlace para suscribirte: el precio fundador de $39.990 al mes queda fijo de por vida (solo para los primeros 100 en el plan Pro). Si te suscribes antes del [fecha], no pierdes días de prueba: el primer cobro es al terminarla.
 
 En la conversación pregunta, en este orden: qué licitaciones le sirvieron, cuáles sobraban, si postuló o piensa
 postular a alguna, y si el precio le parece razonable para lo que recibe.
 
-### 4. Si canceló (1 o 2 días después de que termina)
+### 4. Si no se suscribió (1 o 2 días después de que termina)
 
-> Hola [Nombre], vi que cancelaste Calza. Sin problema, y gracias por probarlo. Me ayudaría mucho saber por qué: ¿te llegaban licitaciones que no te servían, eran pocas o fue el precio? Con una línea basta.
+> Hola [Nombre], tu prueba de Calza terminó y dejamos de enviarte el resumen. Gracias por probarlo. Me ayudaría mucho saber por qué: ¿te llegaban licitaciones que no te servían, eran pocas o fue el precio? Con una línea basta.
 >
 > Si más adelante quieres volver, entra a tu cuenta y te suscribes de nuevo. El precio fundador sigue disponible mientras queden cupos.
 
@@ -144,10 +145,10 @@ No insistas después de este mensaje.
 
 Al terminar cada semana del piloto, revisa en el panel:
 
-- **Activación:** de los que se registraron, cuántos registraron la tarjeta. Si es menos de la mitad, la tarjeta al
-  inicio está frenando el piloto.
+- **Activación:** de los que se registraron, cuántos escribieron por WhatsApp y empezaron la prueba. Si es menos de la
+  mitad, revisa con el mensaje 0 qué los frenó.
 - **Calce:** porcentaje de 👍 sobre el total de 👍 y 👎. Con menos de 60 %, hay que mejorar el calce antes de sumar más
   empresas.
 - **Uso:** cuántas empresas pidieron detalle, PRECIOS o enviaron bases. Quien no interactúa en la primera semana
   probablemente cancela.
-- **Conversión:** de las pruebas que terminaron, cuántas pasaron al primer cobro.
+- **Conversión:** de las pruebas que terminaron, cuántas se suscribieron.

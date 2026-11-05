@@ -96,6 +96,9 @@ main{padding-block:28px 56px}
     <p>Actualizado {{ chile(momento).strftime("%d-%m-%Y, %H:%M") }} (hora de Chile)</p>
   </div>
 
+  {% if alerta_registros %}
+  <p class="aviso" role="alert"><strong>Ojo: {{ ind.registros_24h }} cuentas nuevas en las últimas 24 horas.</strong> Si no esperabas tantas, revisa en "Sin activar" si hay RUT o correos raros: alguien podría estar creando cuentas para encadenar pruebas gratis.</p>
+  {% endif %}
   <section aria-labelledby="t-contactar">
     <h2 id="t-contactar">Para contactar · {{ contactar|length }}</h2>
     {% if contactar %}
@@ -134,7 +137,7 @@ main{padding-block:28px 56px}
       <div class="kpi">
         <span class="et">Activación</span>
         <span class="va">{% if ind.activacion is not none %}{{ ind.activacion }}%{% else %}—{% endif %}</span>
-        <span class="su">{% if ind.con_tarjeta + ind.sin_tarjeta %}{{ ind.con_tarjeta }} de {{ ind.con_tarjeta + ind.sin_tarjeta }} registraron la tarjeta{% else %}Nadie se ha registrado con tarjeta{% endif %}</span>
+        <span class="su">{% if ind.activaron + ind.sin_activar %}{{ ind.activaron }} de {{ ind.activaron + ind.sin_activar }} empezaron la prueba{% else %}Aún no hay registros{% endif %}</span>
       </div>
       <div class="kpi">
         <span class="et">Usan Calza</span>
@@ -192,7 +195,7 @@ main{padding-block:28px 56px}
                   <div class="meter{% if f.dias_restantes is not none and f.dias_restantes < 3 %} critico{% endif %}" role="img" aria-label="Día {{ f.dias_prueba_usados }} de {{ dias_prueba }}"><i style="width:{{ (100 * f.dias_prueba_usados / dias_prueba)|round|int }}%"></i></div>
                   <div class="sec">Día {{ f.dias_prueba_usados }} de {{ dias_prueba }} · termina el {{ chile(f.suscripcion.vigente_hasta).strftime("%d-%m") }}</div>
                 {% elif f.estado == "pendiente" %}
-                  <div class="sec" style="margin-top:4px">Se registró {{ hace(e.creada_en, momento) }}; la prueba parte al registrar la tarjeta</div>
+                  <div class="sec" style="margin-top:4px">Se registró {{ hace(e.creada_en, momento) }}; la prueba parte {% if f.suscripcion.pendiente_de == "whatsapp" %}cuando escriba por WhatsApp{% else %}al registrar la tarjeta{% endif %}</div>
                 {% elif f.estado == "vencida" %}
                   <div class="sec" style="margin-top:4px">Venció {{ hace(f.suscripcion.vigente_hasta, momento) }}</div>
                 {% else %}

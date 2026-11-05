@@ -25,7 +25,8 @@ from .db import ahora
 from .planes import DIAS_PRUEBA, PLANES, PRECIO_FUNDADOR_PRO, formato_pesos, monto
 from .publico import (
     POR_PAGINA, REGION_POR_SLUG, REGIONES_PUBLICAS, RUBRO_POR_SLUG, RUBROS, Cache, Ficha, adjudicadas_recientes, buscar, cargar_abiertas,
-    cargar_ficha, ejemplo_resumen, estadisticas, pagina,
+    a_organismo, cargar_ficha, ejemplo_resumen, estadisticas, nombre_organismo, organismos_recientes, pagina, recientes_de_organismo,
+    slug_organismo,
 )
 
 log = logging.getLogger(__name__)
@@ -62,7 +63,7 @@ def avisar_indexnow(url_publica: str, urls: list[str], *, http: httpx.Client | N
     return len(urls)
 
 
-def faq() -> list[tuple[str, str]]:
+def faq(con_tarjeta: bool = False) -> list[tuple[str, str]]:
     pyme, pro = PLANES["pyme"], PLANES["pro"]
     return [
         ("¿Qué es Calza?",
@@ -75,8 +76,9 @@ def faq() -> list[tuple[str, str]]:
         ("¿Cuánto cuesta?",
          f"El plan Pyme cuesta {formato_pesos(pyme.mensual)} al mes y el Pro {formato_pesos(pro.mensual)} "
          f"(los primeros clientes Pro pagan {formato_pesos(PRECIO_FUNDADOR_PRO)} de por vida). Pagando un año se "
-         f"ahorra un 10%. Precios con IVA. Los primeros {DIAS_PRUEBA} días son gratis, con todo lo del plan Pro: registras tu tarjeta para activarlos, "
-         "el primer cobro es al terminar y si cancelas antes no pagas nada."),
+         f"ahorra un 10%. Precios con IVA. Los primeros {DIAS_PRUEBA} días son gratis, con todo lo del plan Pro"
+         + (": registras tu tarjeta para activarlos, el primer cobro es al terminar y si cancelas antes no pagas nada."
+            if con_tarjeta else ", sin tarjeta: al terminar te avisamos y eliges si te suscribes.")),
         ("¿Cómo sabe Calza qué licitaciones me sirven?",
          "Describes en tus palabras lo que vendes, tus regiones y el monto que te interesa. Calza compara cada licitación "
          "nueva con tu perfil y le asigna un porcentaje de calce; solo te llegan las que superan el umbral."),
@@ -140,14 +142,32 @@ def precios_publicos(session, f: Ficha) -> list[dict]:
     return filas
 
 
+def faq_organismo(nombre: str, con_tarjeta: bool = False) -> list[tuple[str, str]]:
+    return [
+        (f"¿Cómo le vendo {a_organismo(nombre)}?",
+         f"{nombre} compra a través de Mercado Público. Para ofertar necesitas una cuenta de proveedor en "
+         "mercadopublico.cl; cada licitación tiene sus bases, plazos y requisitos, y la oferta se presenta en la ficha "
+         "oficial antes del cierre. Las compras más pequeñas suelen hacerse por Compra Ágil, con plazos de uno a tres días."),
+        (f"¿Cómo me entero de las licitaciones nuevas de {nombre}?",
+         "Puedes revisar Mercado Público todos los días o dejar que Calza lo haga por ti: le dices qué vendes y en qué "
+         "regiones trabajas, y cada día hábil a las 8:00 te llegan por WhatsApp las licitaciones nuevas que calzan con tu "
+         f"empresa, de este y otros organismos. Los primeros {DIAS_PRUEBA} días son gratis"
+         + (", sin tarjeta." if not con_tarjeta else ".")),
+        ("¿Qué incluye el aviso de Calza?",
+         "Qué piden, el monto estimado, cuándo cierra y los requisitos a revisar. Si envías las bases en PDF, Calza te "
+         "las resume en palabras simples, y en el plan Pro te muestra a qué precio se ha comprado antes lo mismo."),
+    ]
+
+
 def crear_router_publico(
     Sesion: sessionmaker, *, plantillas: Jinja2Templates, url_publica: str, fundador_disponible,
-    cache: Cache | None = None,
+    cache: Cache | None = None, con_tarjeta: bool = False,
 ) -> APIRouter:
     router = APIRouter()
     cache = cache or Cache(segundos=300)
     indexnow = clave_indexnow(url_publica)
     plantillas.env.filters["miles"] = lambda n: f"{n:,}".replace(",", ".")
+    plantillas.env.filters["a_organismo"] = a_organismo
     plantillas.env.globals["item_list_ld"] = lambda fichas, desde=0: [
         {"@type": "ListItem", "position": desde + i, "url": f"{url_publica}/licitacion/{f.codigo}", "name": f.nombre}
         for i, f in enumerate(fichas, 1)
@@ -202,8 +222,8 @@ def crear_router_publico(
             "fundador": fundador(), "precio_fundador": PRECIO_FUNDADOR_PRO, "dias_prueba": DIAS_PRUEBA,
             "stats": estadisticas(fichas), "ejemplos": cache.obtener("ejemplos", lambda: ejemplo_resumen(fichas)),
             "ultimas": [f for f in fichas if not f.es_compra_agil][:6],
-            "regiones": REGIONES_PUBLICAS, "rubros": RUBROS, "faq": faq(),
-            "faq_ld": [{"@type": "Question", "name": p, "acceptedAnswer": {"@type": "Answer", "text": r}} for p, r in faq()],
+            "regiones": REGIONES_PUBLICAS, "rubros": RUBROS, "faq": faq(con_tarjeta),
+            "faq_ld": [{"@type": "Question", "name": p, "acceptedAnswer": {"@type": "Answer", "text": r}} for p, r in faq(con_tarjeta)],
             "ofertas_ld": ofertas_ld(),
         })
 
@@ -264,6 +284,36 @@ def crear_router_publico(
             rubro=rubro,
         )
 
+    organismos_cache = Cache(segundos=3600)
+
+    def organismos() -> dict[str, str]:
+        """slug → nombre de los organismos con página: los que publicaron en el último año y los con abiertas hoy."""
+        def calcular():
+            with Sesion() as s:
+                conocidos = organismos_recientes(s)
+            conocidos.update({slug_organismo(f.organismo): f.organismo for f in abiertas() if f.organismo})
+            return conocidos
+        return organismos_cache.obtener("organismos", calcular)
+
+    @router.get("/licitaciones/organismo/{org_slug}", response_class=HTMLResponse)
+    def por_organismo(request: Request, org_slug: str):
+        organismo = organismos().get(org_slug) if len(org_slug) <= 90 else None
+        if organismo is None:
+            raise HTTPException(status_code=404)
+        nombre = nombre_organismo(organismo)
+        propias = [f for f in abiertas() if f.organismo == organismo]
+        with Sesion() as s:
+            recientes = recientes_de_organismo(s, organismo, excluir={f.codigo for f in propias})
+        region = next((r for r in REGIONES_PUBLICAS if any(r.contiene(f) for f in propias + recientes)), None)
+        faq = faq_organismo(nombre, con_tarjeta)
+        return html(request, "organismo.html", {
+            "nombre": nombre, "abiertas": propias, "recientes": recientes, "region": region,
+            "canonical": f"{url_publica}/licitaciones/organismo/{org_slug}",
+            "migas": [("Licitaciones", "/licitaciones"), (nombre, f"/licitaciones/organismo/{org_slug}")],
+            "indexable": bool(propias) or len(recientes) >= 3, "dias_prueba": DIAS_PRUEBA, "faq": faq,
+            "faq_ld": [{"@type": "Question", "name": p, "acceptedAnswer": {"@type": "Answer", "text": r}} for p, r in faq],
+        })
+
     @router.get("/licitacion/{codigo}", response_class=HTMLResponse)
     def ficha(request: Request, codigo: str):
         if len(codigo) > 40:
@@ -292,7 +342,9 @@ def crear_router_publico(
             "f": f, "abierta": abierta, "dias": f.dias_para_cierre(), "rubro": rubro, "region": region,
             "similares": similares[:6], "migas": migas, "canonical": f"{url_publica}/licitacion/{f.codigo}",
             "precios": precios_de(f) if abierta else [], "indexable": f.indexable,
-            "dias_prueba": DIAS_PRUEBA,
+            "dias_prueba": DIAS_PRUEBA, "organismo": nombre_organismo(f.organismo),
+            "organismo_url": (f"/licitaciones/organismo/{slug_organismo(f.organismo)}"
+                              if f.organismo and slug_organismo(f.organismo) in organismos() else ""),
         }, encabezados=CACHE_PUBLICO if f.indexable else {**CACHE_PUBLICO, **NO_INDEXAR})
 
     @router.get("/buscar", response_class=HTMLResponse)
@@ -330,6 +382,8 @@ def crear_router_publico(
                     (f"{url_publica}/registro", None, "0.6")]
             urls += [(f"{url_publica}/licitaciones/region/{r.slug}", hoy, "0.8") for r in REGIONES_PUBLICAS]
             urls += [(f"{url_publica}/licitaciones/rubro/{r.slug}", hoy, "0.8") for r in RUBROS]
+            urls += [(f"{url_publica}/licitaciones/organismo/{s}", hoy, "0.6")
+                     for s in sorted({slug_organismo(f.organismo) for f in fichas if f.organismo} - {""})]
             urls += [(f"{url_publica}/licitacion/{f.codigo}", _fecha_iso(f.actualizada_en), "0.5") for f in fichas]
             with Sesion() as s:
                 urls += [(f"{url_publica}/licitacion/{codigo}", _fecha_iso(fecha), "0.4")

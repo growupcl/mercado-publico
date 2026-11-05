@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% from "_macros.html" import tarjeta_lic, migas as migas_nav %}
 {% set con_resultado = f.adjudicada and f.resultado %}
-{% block titulo %}{% if con_resultado %}Resultado {{ f.codigo }}: {{ f.nombre | truncate(60) }} · Calza{% else %}{{ f.nombre | truncate(70) }} · {{ f.codigo }} · Calza{% endif %}{% endblock %}
-{% block descripcion %}{% if con_resultado %}Licitación {{ f.codigo }} de {{ f.organismo or "un organismo público" }} adjudicada a {{ f.ganadores[0][0] }}{% if f.ganadores|length > 1 %} y {{ f.ganadores|length - 1 }} proveedor{{ "es" if f.ganadores|length > 2 else "" }} más{% endif %}{% if f.total_adjudicado %} por {{ fmt(f.total_adjudicado) }}{% endif %}. Precios adjudicados por ítem y licitaciones parecidas abiertas hoy.{% else %}{% if f.es_compra_agil %}Compra Ágil{% else %}Licitación{% endif %} {{ f.codigo }} de {{ f.organismo or "un organismo público" }}{% if f.region %} ({{ f.region }}){% endif %}{% if f.monto_estimado %}, monto estimado {{ fmt(f.monto_estimado) }}{% endif %}. {{ f.descripcion_corta(110) }}{% endif %}{% endblock %}
+{% block titulo %}{% if con_resultado %}Resultado {{ f.codigo }}: {{ f.nombre | truncate(60) }} · Calza{% else %}{{ f.nombre | truncate(60) }}{% if organismo %} · {{ organismo | truncate(40) }}{% endif %} · {{ f.codigo }}{% endif %}{% endblock %}
+{% block descripcion %}{% if con_resultado %}Licitación {{ f.codigo }} de {{ f.organismo or "un organismo público" }} adjudicada a {{ f.ganadores[0][0] }}{% if f.ganadores|length > 1 %} y {{ f.ganadores|length - 1 }} proveedor{{ "es" if f.ganadores|length > 2 else "" }} más{% endif %}{% if f.total_adjudicado %} por {{ fmt(f.total_adjudicado) }}{% endif %}. Precios adjudicados por ítem y licitaciones parecidas abiertas hoy.{% else %}{% if organismo %}¿Le vendes {{ organismo | a_organismo }}? {% endif %}{% if f.es_compra_agil %}Compra Ágil{% else %}Licitación{% endif %} {{ f.codigo }}{% if f.region %} ({{ f.region }}){% endif %}{% if f.monto_estimado %}, monto estimado {{ fmt(f.monto_estimado) }}{% endif %}{% if abierta and f.fecha_cierre %}, cierra el {{ f.fecha_cierre.strftime("%d-%m-%Y") }}{% endif %}. Recibe licitaciones como esta en tu WhatsApp, {{ dias_prueba }} días gratis.{% endif %}{% endblock %}
 {% block robots %}{% if indexable %}index, follow, max-image-preview:large, max-snippet:-1{% else %}noindex, follow{% endif %}{% endblock %}
 {% block og_tipo %}article{% endblock %}
 {% block jsonld %}
@@ -33,11 +33,16 @@
   <h1 style="font-size:clamp(26px,4vw,38px)">{{ f.nombre }}</h1>
   {% if f.resumen %}<p class="lead">{{ f.resumen }}</p>{% endif %}
 
+  <div class="tarjeta gancho" style="background:var(--brand-soft);border-color:transparent;padding:16px 20px;display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;justify-content:space-between">
+    <p style="margin:0;flex:1 1 320px">{% if abierta %}🔔 <strong>¿Le vendes {{ organismo | a_organismo if organismo else "a este organismo" }}?</strong> Calza te avisa por WhatsApp cada vez que publica licitaciones como esta, y te explica las bases en simple.{% else %}🔔 <strong>Esta licitación ya cerró.</strong> ¿Te avisamos por WhatsApp la próxima{% if organismo %} de {{ organismo }}{% endif %}, o cualquier otra que calce con lo que vendes?{% endif %}</p>
+    <a class="boton" href="/registro">Avísame gratis</a>
+  </div>
+
   <div class="tarjeta">
     <table>
       <tbody>
         <tr><th scope="row">Código</th><td>{{ f.codigo }}</td></tr>
-        {% if f.organismo %}<tr><th scope="row">Organismo</th><td>{{ f.organismo }}</td></tr>{% endif %}
+        {% if f.organismo %}<tr><th scope="row">Organismo</th><td>{% if organismo_url %}<a href="{{ organismo_url }}">{{ organismo }}</a>{% else %}{{ organismo }}{% endif %}</td></tr>{% endif %}
         {% if f.region %}<tr><th scope="row">Región</th><td>{% if region %}<a href="/licitaciones/region/{{ region.slug }}">{{ f.region }}</a>{% else %}{{ f.region }}{% endif %}{% if f.comuna %} · {{ f.comuna }}{% endif %}</td></tr>{% endif %}
         <tr><th scope="row">Monto estimado</th><td>{% if f.monto_estimado %}{{ fmt(f.monto_estimado) }}{% if f.moneda and f.moneda != "CLP" %} {{ f.moneda }}{% endif %}{% else %}No informado{% endif %}</td></tr>
         {% if f.fecha_publicacion %}<tr><th scope="row">Publicación</th><td><time datetime="{{ f.fecha_publicacion.isoformat() }}">{{ f.fecha_publicacion.strftime("%d-%m-%Y %H:%M") }}</time></td></tr>{% endif %}
@@ -129,6 +134,10 @@
     <p>Con Calza recibes por WhatsApp las licitaciones que calzan con tu negocio y, si nos envías las bases, te resumimos requisitos, garantías, plazos y cómo se evalúa{% if not f.es_compra_agil %}, además de a qué precio se ha comprado antes{% endif %}.</p>
     <div><a class="boton" href="/registro">Probar {{ dias_prueba }} días gratis</a></div>
   </section>
+
+  {% if organismo_url %}
+  <p><a href="{{ organismo_url }}">Ver todas las licitaciones de {{ organismo }} →</a></p>
+  {% endif %}
 
   {% if similares %}
   <section class="pila">

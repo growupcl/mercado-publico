@@ -268,4 +268,4 @@ def test_el_limite_depende_del_plan(base, tmp_path):
     e.plan = "pro"
     assert srv.limite(e) == 50
     e.plan = "gratis"
-    assert srv.limite(e) == 15
+    assert srv.limite(e) == 0  # sin plan pagado ni prueba no hay análisis de bases

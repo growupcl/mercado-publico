@@ -4,7 +4,9 @@
 {% block contenido %}
 <div style="max-width:720px" class="pila">
   <h1>Crea tu cuenta</h1>
-  <p class="lead">{{ dias_prueba }} días gratis con todo lo del plan Pro. Al final registras tu tarjeta en Mercado Pago: hoy no se cobra nada y si cancelas antes de que termine la prueba, no pagas.</p>
+  {% if con_tarjeta %}<p class="lead">{{ dias_prueba }} días gratis con todo lo del plan Pro. Al final registras tu tarjeta en Mercado Pago: hoy no se cobra nada y si cancelas antes de que termine la prueba, no pagas.</p>
+  {% else %}<p class="lead">{{ dias_prueba }} días gratis con todo lo del plan Pro, <strong>sin tarjeta</strong>. Completa tus datos, escríbenos "Hola" por WhatsApp y empieza tu prueba.</p>{% endif %}
+  {% if errores.get("general") %}<p class="aviso" role="alert">{{ errores["general"] }}</p>{% endif %}
   {% if errores %}<p class="aviso" role="alert">Revisa los campos marcados.</p>{% endif %}
   <form method="post" action="/registro" class="tarjeta pila" novalidate>
     <h3>Tu empresa</h3>

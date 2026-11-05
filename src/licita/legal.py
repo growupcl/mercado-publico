@@ -4,9 +4,22 @@ BORRADOR: deben ser revisados por un abogado antes del lanzamiento (Ley 19.628 y
 de protección de datos personales, Ley 19.496 del consumidor en lo aplicable).
 """
 
-FECHA = "21 de octubre de 2026"
+FECHA = "5 de noviembre de 2026"
 
-def terminos(prestador: str) -> list:
+def _prueba(con_tarjeta: bool) -> str:
+    if con_tarjeta:
+        return ("Tienes 7 días de prueba gratuita con las funciones del plan Pro. La prueba empieza cuando registras tu tarjeta en "
+                "Mercado Pago al elegir tu plan: ese día no se cobra nada, el primer cobro es al terminar la prueba y, si cancelas "
+                "la renovación antes, no se cobra. La prueba es una sola por empresa, por número de WhatsApp y por cuenta de "
+                "Mercado Pago: si la tarjeta se registra con una cuenta de Mercado Pago que ya tuvo la prueba, anulamos esa "
+                "suscripción sin cobrar y, para usar Calza, el primer cobro es al suscribirte.")
+    return ("Tienes 7 días de prueba gratuita con las funciones del plan Pro, sin registrar tarjeta. La prueba empieza "
+            "cuando nos escribes por WhatsApp desde el número que registraste. Al terminar, si no te has suscrito, tu "
+            "cuenta pasa al plan gratis: deja de recibir el resumen diario y no incluye el análisis de bases. La prueba "
+            "es una sola por empresa (RUT) y por número de WhatsApp.")
+
+
+def terminos(prestador: str, *, con_tarjeta: bool = False) -> list:
     return [
     ("Quién presta el servicio", [
         f"Durante el período piloto, el servicio Calza es prestado y facturado por {prestador}.",
@@ -26,11 +39,7 @@ def terminos(prestador: str) -> list:
         "Ante cualquier diferencia, prevalece lo publicado en www.mercadopublico.cl.",
     ]),
     ("Prueba, planes y pagos", [
-        "Tienes 7 días de prueba gratuita con las funciones del plan Pro. La prueba empieza cuando registras tu tarjeta en "
-        "Mercado Pago al elegir tu plan: ese día no se cobra nada, el primer cobro es al terminar la prueba y, si cancelas "
-        "la renovación antes, no se cobra. La prueba es una sola por empresa, por número de WhatsApp y por cuenta de "
-        "Mercado Pago: si la tarjeta se registra con una cuenta de Mercado Pago que ya tuvo la prueba, anulamos esa "
-        "suscripción sin cobrar y, para usar Calza, el primer cobro es al suscribirte.",
+        _prueba(con_tarjeta),
         "Los planes se pagan con una suscripción de Mercado Pago (tarjeta de crédito o débito) que se renueva "
         "automáticamente cada mes o cada año. Si te suscribes durante la prueba, el primer cobro es al terminar la prueba. "
         "Los precios publicados incluyen IVA.",

@@ -196,6 +196,8 @@ class ServicioAnalisis:
     def limite(self, empresa: Empresa) -> int:
         if self.limite_mensual is not None:
             return self.limite_mensual
+        if empresa.plan == "gratis":
+            return 0  # es lo que más cuesta en IA: solo en la prueba y en los planes pagados
         return PLANES.get(empresa.plan, PLANES["pyme"]).analisis_mes
 
     def usados_en_el_mes(self, session: Session, empresa: Empresa, momento: datetime) -> int:

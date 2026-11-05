@@ -17,14 +17,14 @@ from sqlalchemy.orm import Session
 import anthropic
 
 from .analisis import DocumentoInvalido, LimiteAlcanzado, ServicioAnalisis, detectar_codigo, textos_analisis
-from .db import AnalisisBases, Calce, Empresa, Licitacion, MensajeWhatsApp, ahora
+from .db import AnalisisBases, Calce, Empresa, Licitacion, MensajeWhatsApp, ahora, hora_chile
 from .ia import ErrorIA
 from .planes import PLANES, PLANES_CON_COMPRA_AGIL, PLANES_CON_PRECIOS
 from .publico import REGIONES_PUBLICAS, buscar, cargar_abiertas
 from .precios import informe_precios, texto_precios
 from .notificaciones import VENTANA, registrar
-from .suscripciones import generar_token, suscripcion_de
-from .resumen import texto_detalle, texto_resumen, ultimo_resumen
+from .suscripciones import activar_prueba_por_whatsapp, generar_token, suscripcion_de
+from .resumen import MESES, texto_detalle, texto_resumen, ultimo_resumen
 from .whatsapp import ClienteWhatsApp, ErrorWhatsApp, normalizar_telefono
 
 log = logging.getLogger(__name__)
@@ -70,11 +70,20 @@ def _abiertas_para(session: Session, empresa: Empresa, cantidad: int) -> list:
     return resultado
 
 
-def bienvenida(session: Session, empresa: Empresa, *, url_publica: str = "", momento: datetime | None = None) -> str:
-    """Respuesta al primer saludo, antes del primer resumen: qué viene y, al tiro, lo que hay abierto hoy para ella."""
+def bienvenida(session: Session, empresa: Empresa, *, url_publica: str = "", momento: datetime | None = None,
+               activada: bool = False) -> str:
+    """Respuesta al primer saludo, antes del primer resumen: qué viene y, al tiro, lo que hay abierto hoy para ella.
+    `activada`: este mensaje acaba de empezar su prueba (confirmó su WhatsApp)."""
     suscripcion = suscripcion_de(session, empresa)
     lineas = [f"¡Hola, {empresa.nombre}! 👋 Soy el asistente de Calza y ya tengo tu número."]
-    if suscripcion is not None and suscripcion.estado == "pendiente":
+    if activada and suscripcion is not None:
+        termina = hora_chile(suscripcion.vigente_hasta)
+        lineas += ["", f"✅ *Empezó tu prueba gratis.* Tienes todo lo del plan Pro hasta el {termina.day} de "
+                   f"{MESES[termina.month - 1]}, sin tarjeta y sin compromiso. Antes de que termine te aviso para que "
+                   "elijas si sigues.",
+                   "", "Cada día hábil a las 8:00 te llega aquí el resumen con las licitaciones nuevas que calzan con "
+                   "tu empresa. El primero, el próximo día hábil."]
+    elif suscripcion is not None and suscripcion.estado == "pendiente":
         lineas += ["", "Te falta un paso para empezar tu prueba gratis: registrar tu tarjeta en Mercado Pago (hoy no se "
                    "cobra nada). Hazlo desde el enlace de tu cuenta que te mostramos al registrarte, o escribe *CUENTA* "
                    "y te lo envío."]
@@ -311,6 +320,15 @@ def procesar_documento(
     if analisis is None:
         enviar("Por ahora no puedo analizar documentos. Inténtalo más tarde.")
         return
+    if empresa.plan == "gratis":
+        suscripcion = suscripcion_de(session, empresa)
+        if suscripcion is not None and suscripcion.estado == "pendiente" and suscripcion.pendiente_de == "tarjeta":
+            enviar("Para analizar bases primero activa tu prueba gratis registrando tu tarjeta (hoy no se cobra nada). "
+                   "Escribe *CUENTA* y te envío el enlace.")
+        else:
+            enviar("El análisis de bases es parte de los planes Pyme y Pro. Escribe *CUENTA* y te envío el enlace "
+                   "para elegir tu plan.")
+        return
     documento = msg.get("document", {})
     tipo = tipo_de_archivo(documento.get("mime_type", ""), documento.get("filename", ""))
     if tipo == "doc":
@@ -413,6 +431,15 @@ def procesar_webhook(
             enviar(respuesta)
         else:
             empresa.ultimo_mensaje_entrante = momento
+            if activar_prueba_por_whatsapp(session, empresa, momento) is not None:
+                # Primer mensaje desde su número: empieza la prueba y le contamos qué viene, sea cual sea el mensaje.
+                session.commit()
+                enviar(bienvenida(session, empresa, url_publica=url_publica, momento=momento, activada=True))
+                if tipo != "documento":
+                    if enviados:
+                        respondidos += 1
+                    session.commit()
+                    continue
             if tipo == "documento":
                 procesar_documento(session, wa, empresa, msg, analisis=analisis, momento=momento, enviar=enviar)
             else:

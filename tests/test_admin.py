@@ -289,3 +289,36 @@ def test_invitaciones_requieren_sesion(Sesion):
     cliente = _cliente(Sesion)
     assert cliente.post("/admin/invitaciones", data={"texto": "x"}, follow_redirects=False).status_code == 303
     assert cliente.post("/admin/invitaciones/1/seguimiento", follow_redirects=False).headers["location"] == "/admin/entrar"
+
+
+def test_origen_del_registro_se_guarda_y_se_muestra(Sesion):
+    from licita.admin import origen_de
+
+    cliente = _cliente(Sesion)
+    datos = {**FORM, "origen": "google.com|/licitacion/5180-41-LE26"}
+    assert cliente.post("/registro", data=datos).status_code == 200
+    otra = {**FORM, "rut": "11.111.111-1", "whatsapp": "+56 9 1111 2222", "nombre": "Jardines Norte",
+            "origen": "directo|/registro?desde=invitacion"}
+    assert cliente.post("/registro", data=otra).status_code == 200
+    with Sesion() as s:
+        aseo = s.query(Empresa).filter_by(nombre="Aseo Sur").one()
+        assert aseo.origen == "google.com|/licitacion/5180-41-LE26"
+        o = origen_de(aseo)
+        assert (o.canal, o.sitio, o.pagina_legible) == ("Buscador", "google.com", "ficha 5180-41-LE26")
+        ind, _ = datos_panel(s)
+    assert dict(ind.canales) == {"Buscador": 1, "Invitación": 1}
+    r = cliente.get("/admin", auth=("admin", CLAVE))
+    assert "Llegó por: Buscador (google.com)" in r.text and 'href="/licitacion/5180-41-LE26"' in r.text
+    assert "Cómo llegan" in r.text
+
+
+def test_origen_se_limpia_y_clasifica():
+    from licita.admin import origen_de
+    from licita.suscripciones import limpiar_origen
+
+    assert limpiar_origen('evil.com"><script>|javascript:alert(1)') == "evil.comscript|"
+    assert limpiar_origen("") == "" and limpiar_origen("|/x") == ""
+    canal = lambda o: origen_de(Empresa(nombre="x", descripcion="", origen=o)).canal  # noqa: E731
+    assert canal("l.wl.co|/") == "WhatsApp" and canal("m.facebook.com|/") == "Redes sociales"
+    assert canal("bing.com|/licitaciones/organismo/universidad-de-tarapaca") == "Buscador"
+    assert canal("directo|/") == "Directo" and canal("blog.ejemplo.cl|/") == "Otro sitio" and canal("") == "Sin dato"

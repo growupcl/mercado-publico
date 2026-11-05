@@ -152,5 +152,15 @@ footer.sitio strong{color:var(--ink)}
   <span>Calza es un servicio de {{ prestador }}, independiente y no afiliado a ChileCompra ni a Mercado Público. Datos de licitaciones: <a href="https://www.mercadopublico.cl" rel="noopener">Mercado Público</a> (ChileCompra).</span>
   <span><a href="/terminos">Términos</a> · <a href="/privacidad">Privacidad</a> · <a href="mailto:hola@calza.cl">hola@calza.cl</a></span>
 </div></footer>
+<script>
+/* Origen de la visita (solo en este navegador, hasta que se registra): desde qué sitio llegó y la primera página que vio. */
+try {
+  if (!localStorage.getItem("calza_origen")) {
+    var sitio = "directo";
+    try { var r = document.referrer && new URL(document.referrer); if (r && r.hostname !== location.hostname) sitio = r.hostname.replace(/^www\./, ""); } catch (e) {}
+    localStorage.setItem("calza_origen", sitio + "|" + (location.pathname + location.search).slice(0, 150));
+  }
+} catch (e) {}
+</script>
 </body>
 </html>

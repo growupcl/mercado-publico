@@ -64,6 +64,9 @@ def privacidad(prestador: str) -> list:
         "Datos de tu empresa (nombre, RUT, razón social, giro, dirección y comuna), datos de contacto (correo y WhatsApp), "
         "la descripción de tu negocio y tus preferencias, los documentos que nos envías (por ejemplo, bases de licitación en PDF o Word), "
         "los mensajes que intercambias con Calza y el historial de pagos de tu suscripción (no los datos de tu tarjeta).",
+        "Al registrarte guardamos también por dónde llegaste a calza.cl (el sitio que te trajo, por ejemplo un buscador, "
+        "y la primera página que viste), para saber qué páginas ayudan a las empresas a encontrarnos. Hasta que te "
+        "registras, ese dato queda solo en tu navegador.",
     ]),
     ("Para qué los usamos", [
         "Para seleccionar las licitaciones que te calzan, enviarte el resumen diario, responder tus consultas, emitir tu factura y administrar tu cuenta.",

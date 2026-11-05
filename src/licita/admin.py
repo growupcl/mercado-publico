@@ -15,7 +15,8 @@ import hmac
 import math
 import secrets
 import time
-from dataclasses import dataclass
+from collections import Counter
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from urllib.parse import quote
 
@@ -55,6 +56,7 @@ class FilaEmpresa:
     mensajes_recibidos: int
     pagado: int
     motivos: list[tuple[str, str]]  # (texto, nivel: "critico" | "atencion" | "info"); vacío = nada urgente
+    origen: Origen | None = None
     utiles: int = 0  # licitaciones que marcó con 👍
     no_utiles: int = 0  # y con 👎
     dias_prueba_usados: int | None = None  # para la barra de avance de la prueba
@@ -87,6 +89,7 @@ class Indicadores:
     activaron: int = 0  # empezaron la prueba (escribieron por WhatsApp o registraron la tarjeta)
     sin_activar: int = 0  # se registraron y aún no la empiezan
     registros_24h: int = 0  # cuentas creadas en las últimas 24 horas
+    canales: list[tuple[str, int]] = field(default_factory=list)  # cómo llegaron, del canal más común al menos
     reciben_resumen: int = 0  # en prueba o activas que ya recibieron al menos un resumen
     usan: int = 0  # de esas, las que respondieron algo más que el saludo o valoraron una licitación
 
@@ -151,11 +154,55 @@ def texto_seguimiento(inv: Invitacion, total: int) -> str:
            else f"Hoy hay una licitación abierta en Mercado Público que podría calzar con {empresa}" if total == 1
            else f"Cada día se publican licitaciones nuevas en Mercado Público que podrían calzar con {empresa}")
     return (f"Hola {nombre}, te escribo de nuevo por Calza. {hoy}. Si quieres, te muestro cuáles en 2 minutos o te "
-            f"registras directo en https://calza.cl/registro ({DIAS_PRUEBA} días gratis).")
+            f"registras directo en https://calza.cl/registro?desde=invitacion ({DIAS_PRUEBA} días gratis).")
 
 
 def enlace_whatsapp(telefono: str, texto: str) -> str:
     return f"https://wa.me/{telefono}?text={quote(texto)}"
+
+
+BUSCADORES = ("google.", "bing.com", "duckduckgo.com", "yahoo.", "ecosia.org", "search.brave.com")
+WHATSAPP = ("l.wl.co", "wa.me", "whatsapp.com")
+REDES = ("facebook.com", "instagram.com", "linkedin.com", "lnkd.in", "t.co", "x.com", "twitter.com", "tiktok.com")
+
+
+@dataclass
+class Origen:
+    canal: str  # "Buscador", "Invitación", "WhatsApp", "Redes sociales", "Directo", "Otro sitio" o "Sin dato"
+    sitio: str  # dominio que lo trajo ("google.com"), vacío si no hay
+    pagina: str  # primera página que vio en calza.cl
+    pagina_legible: str  # "ficha 5180-41-LE26", "organismo universidad-de-tarapaca", "portada"…
+
+
+def origen_de(empresa: Empresa) -> Origen:
+    sitio, _, pagina = (empresa.origen or "").partition("|")
+    ruta = pagina.split("?")[0]
+    if ruta.startswith("/licitacion/"):
+        legible = "ficha " + ruta.removeprefix("/licitacion/")
+    elif ruta.startswith("/licitaciones/organismo/"):
+        legible = "organismo " + ruta.removeprefix("/licitaciones/organismo/")
+    elif ruta.startswith("/licitaciones/region/"):
+        legible = "región " + ruta.removeprefix("/licitaciones/region/")
+    elif ruta.startswith("/licitaciones/rubro/"):
+        legible = "rubro " + ruta.removeprefix("/licitaciones/rubro/")
+    else:
+        legible = {"/": "portada", "/registro": "registro", "/licitaciones": "licitaciones abiertas",
+                   "/buscar": "buscador de la portada"}.get(ruta, ruta)
+    if not sitio:
+        canal = "Sin dato"
+    elif "desde=invitacion" in pagina:
+        canal = "Invitación"
+    elif any(b in sitio for b in BUSCADORES):
+        canal = "Buscador"
+    elif any(sitio == w or sitio.endswith("." + w) for w in WHATSAPP):
+        canal = "WhatsApp"
+    elif any(sitio == r or sitio.endswith("." + r) for r in REDES):
+        canal = "Redes sociales"
+    elif sitio == "directo":
+        canal = "Directo"
+    else:
+        canal = "Otro sitio"
+    return Origen(canal, "" if sitio == "directo" else sitio, pagina, legible)
 
 
 FILTROS = (("todas", "Todas"), ("contactar", "Por contactar"), ("pendiente", "Sin activar"), ("prueba", "En prueba"),
@@ -266,7 +313,7 @@ def texto_invitacion(*, nombre: str, empresa: str, remitente: str, total: int, e
            else "No pide tarjeta: al terminar eliges si sigues. ")
         + "Solo te pido que me cuentes qué te sirvió y qué no.",
         "",
-        "Te registras en 2 minutos aquí: https://calza.cl/registro",
+        "Te registras en 2 minutos aquí: https://calza.cl/registro?desde=invitacion",
         "",
         "¿Te animas?",
     ]
@@ -336,6 +383,7 @@ def datos_panel(session, momento: datetime | None = None) -> tuple[Indicadores, 
         dias_resumen, ultimo_resumen = resumenes.get(empresa.id, (0, None))
         filas.append(FilaEmpresa(
             empresa=empresa, suscripcion=sus, mandato=mandato, dias_restantes=dias, resumenes=dias_resumen,
+            origen=origen_de(empresa),
             ultimo_resumen=ultimo_resumen, mensajes_recibidos=recibidos.get(empresa.id, 0),
             pagado=int(pagado.get(empresa.id) or 0), motivos=motivos,
             utiles=valoraciones.get(empresa.id, {}).get(1, 0), no_utiles=valoraciones.get(empresa.id, {}).get(-1, 0),
@@ -367,6 +415,7 @@ def datos_panel(session, momento: datetime | None = None) -> tuple[Indicadores, 
                       and f.estado != "pendiente" and not f.suscripcion.prueba_repetida for f in filas if f.suscripcion),
         sin_activar=sum(f.estado == "pendiente" for f in filas),
         registros_24h=sum(momento - f.empresa.creada_en < timedelta(hours=24) for f in filas),
+        canales=Counter(f.origen.canal for f in filas if f.origen.canal != "Sin dato").most_common(),
         reciben_resumen=len(reciben := [f for f in filas if f.estado in ("prueba", "activa") and f.resumenes]),
         usan=sum(f.mensajes_recibidos >= 2 or f.utiles + f.no_utiles > 0 for f in reciben),
     )

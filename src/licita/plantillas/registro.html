@@ -69,6 +69,8 @@
         <span>Acepto los <a href="/terminos" target="_blank">términos del servicio</a> y la <a href="/privacidad" target="_blank">política de privacidad</a>.</span></label>{{ err("acepta_terminos") }}
     </div>
     <div><button class="boton" type="submit">Crear mi cuenta</button></div>
+    <input type="hidden" name="origen" id="origen" value="">
   </form>
+  <script>try { document.getElementById("origen").value = localStorage.getItem("calza_origen") || ""; } catch (e) {}</script>
 </div>
 {% endblock %}

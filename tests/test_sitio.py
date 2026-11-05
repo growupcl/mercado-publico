@@ -277,3 +277,45 @@ def test_ficha_adjudicada_muestra_el_resultado_y_se_indexa(Sesion):
     sitemap = cliente.get("/sitemap.xml").text
     assert "<loc>https://calza.cl/licitacion/9999-1-LE26</loc>" in sitemap
     assert "9998-1-LE26" not in sitemap
+
+
+def test_nombre_y_slug_de_organismos():
+    from licita.publico import nombre_organismo, slug_organismo
+
+    assert nombre_organismo("UNIVERSIDAD DE TARAPACA") == "Universidad de Tarapaca"
+    assert nombre_organismo("SERVICIO DE SALUD METROPOLITANO SUR ORIENTE (SSMSO)") == "Servicio de Salud Metropolitano Sur Oriente (SSMSO)"
+    assert nombre_organismo("Hospital de San Carlos") == "Hospital de San Carlos"  # ya viene bien escrito
+    assert slug_organismo("UNIVERSIDAD DE TARAPACÁ") == "universidad-de-tarapaca"
+
+
+def test_pagina_del_organismo(sitio):
+    r = sitio.get("/licitaciones/organismo/municipalidad-de-concepcion")
+    assert r.status_code == 200
+    assert "<h1>Licitaciones de Municipalidad de Concepción</h1>" in r.text
+    assert "¿Le vendes a la Municipalidad de Concepción?" in r.text and "Sin tarjeta de crédito" in r.text
+    assert "1234-5-LE26" in r.text and "4444-COT26" in r.text  # abiertas
+    assert "Sus últimas licitaciones" in r.text and "6666-1-LE26" in r.text  # cerrada, en recientes
+    assert "<title>Licitaciones de Municipalidad de Concepción abiertas hoy" in r.text
+    assert 'content="index, follow' in r.text
+    tipos = [b.get("@type") for b in _jsonld(r.text)]
+    assert "CollectionPage" in tipos and "FAQPage" in tipos
+    assert sitio.get("/licitaciones/organismo/no-existe").status_code == 404
+    assert "/licitaciones/organismo/municipalidad-de-concepcion" in sitio.get("/sitemap.xml").text
+
+
+def test_ficha_engancha_con_una_pregunta_y_enlaza_al_organismo(sitio):
+    r = sitio.get("/licitacion/1234-5-LE26")
+    assert "🔔 <strong>¿Le vendes a la Municipalidad de Concepción?</strong>" in r.text
+    assert '<meta name="description" content="¿Le vendes a la Municipalidad de Concepción? Licitación 1234-5-LE26' in r.text
+    assert "· Municipalidad de Concepción · 1234-5-LE26</title>" in r.text
+    assert 'href="/licitaciones/organismo/municipalidad-de-concepcion"' in r.text
+    r = sitio.get("/licitacion/6666-1-LE26")  # cerrada
+    assert "Esta licitación ya cerró." in r.text and "la próxima de Municipalidad de Concepción" in r.text
+
+
+def test_articulo_del_organismo():
+    from licita.publico import a_organismo
+
+    assert a_organismo("Universidad de Tarapaca") == "a la Universidad de Tarapaca"
+    assert a_organismo("Hospital de San Carlos") == "al Hospital de San Carlos"
+    assert a_organismo("JUNAEB") == "a JUNAEB"

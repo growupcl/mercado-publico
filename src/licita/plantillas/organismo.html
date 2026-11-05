@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% from "_macros.html" import tarjeta_lic, migas as migas_nav %}
+{% block titulo %}Licitaciones de {{ nombre | truncate(60) }}{% if abiertas %} abiertas hoy ({{ abiertas|length }}){% endif %} · Calza{% endblock %}
+{% block descripcion %}¿Le vendes {{ nombre | a_organismo }}? {% if abiertas %}Tiene {{ abiertas|length }} {{ "licitación abierta" if abiertas|length == 1 else "licitaciones abiertas" }} hoy en Mercado Público.{% else %}Revisa sus últimas licitaciones en Mercado Público.{% endif %} Calza te avisa por WhatsApp las nuevas que calzan con tu empresa: {{ dias_prueba }} días gratis.{% endblock %}
+{% block robots %}{% if indexable %}index, follow, max-snippet:-1{% else %}noindex, follow{% endif %}{% endblock %}
+{% block jsonld %}
+<script type="application/ld+json">{{ {
+  "@context": "https://schema.org", "@type": "CollectionPage", "name": "Licitaciones de " ~ nombre, "url": canonical,
+  "inLanguage": "es-CL", "isPartOf": {"@id": sitio ~ "/#sitio"},
+  "about": {"@type": "GovernmentOrganization", "name": nombre},
+  "mainEntity": {"@type": "ItemList", "numberOfItems": abiertas|length, "itemListElement": item_list_ld(abiertas)}
+} | tojson }}</script>
+<script type="application/ld+json">{{ {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": faq_ld} | tojson }}</script>
+{% endblock %}
+{% block contenido %}
+{{ migas_nav(migas) }}
+<section class="pila" style="max-width:820px;margin-bottom:28px">
+  <h1>Licitaciones de {{ nombre }}</h1>
+  <p class="lead">{% if abiertas %}Hoy tiene <strong>{{ abiertas|length }} {{ "licitación abierta" if abiertas|length == 1 else "licitaciones abiertas" }}</strong> en Mercado Público{% if region %}, en la {{ region.titulo }}{% endif %}.{% else %}Hoy no tiene licitaciones abiertas en Mercado Público, pero publica nuevas seguido.{% endif %}</p>
+  <div class="tarjeta pila" style="background:var(--brand-soft);border-color:transparent">
+    <p style="margin:0;font-size:18px"><strong>¿Le vendes {{ nombre | a_organismo }}?</strong> Calza te avisa por WhatsApp cada vez que publica una licitación que calza con lo que vendes, y te explica las bases en simple.</p>
+    <div><a class="boton" href="/registro">Avísame gratis por {{ dias_prueba }} días</a></div>
+    <p class="ayuda" style="margin:0">{% if con_tarjeta %}Sin compromiso: cancela antes y no pagas.{% else %}Sin tarjeta de crédito.{% endif %}</p>
+  </div>
+</section>
+
+{% if abiertas %}
+<section class="pila" style="margin-bottom:32px" aria-labelledby="t-abiertas">
+  <h2 id="t-abiertas">Abiertas hoy</h2>
+  <ul class="lista-lic">{% for f in abiertas %}{{ tarjeta_lic(f) }}{% endfor %}</ul>
+</section>
+{% endif %}
+
+{% if recientes %}
+<section class="pila" style="margin-bottom:32px" aria-labelledby="t-recientes">
+  <h2 id="t-recientes">Sus últimas licitaciones</h2>
+  <p class="muted" style="margin:0">Ya cerradas o adjudicadas: sirven para ver qué compra y cada cuánto.</p>
+  <ul class="lista-lic">{% for f in recientes %}{{ tarjeta_lic(f) }}{% endfor %}</ul>
+</section>
+{% endif %}
+
+<section class="pila" style="max-width:820px" aria-labelledby="t-faq">
+  <h2 id="t-faq">Preguntas frecuentes</h2>
+  {% for pregunta, respuesta in faq %}
+  <details class="faq"{% if loop.first %} open{% endif %}><summary>{{ pregunta }}</summary><p>{{ respuesta }}</p></details>
+  {% endfor %}
+</section>
+{% endblock %}

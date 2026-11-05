@@ -236,6 +236,85 @@ def adjudicadas_recientes(session: Session, momento: datetime | None = None, dia
             if any((it.get("adjudicacion") or {}).get("precio_unitario") for it in lic.items or ())]
 
 
+# --- Organismos ---
+
+MINUSCULAS_ORGANISMO = {"de", "del", "la", "las", "el", "los", "y", "e", "en", "a", "para", "por", "con"}
+SIGLAS_ORGANISMO = {"slep", "sss", "ssmso", "ssms", "ssmn", "ssmc", "ssmoc", "ssmor", "junaeb", "junji", "indap",
+                    "sag", "serviu", "seremi", "cesfam", "daem", "dem", "corfo", "sence", "fosis", "conaf", "senama",
+                    "sernameg", "minvu", "mop", "inja", "inia", "ine", "ist", "achs", "enap", "codelco", "jjvv"}
+MESES_ORGANISMO = 12  # licitaciones de un organismo que se muestran como recientes (cerradas o adjudicadas)
+DIAS_ORGANISMOS = 365  # organismos con página: los que publicaron en el último año
+
+
+def nombre_organismo(nombre: str) -> str:
+    """"UNIVERSIDAD DE TARAPACA" → "Universidad de Tarapaca". Respeta los nombres que ya vienen en mayúsculas y
+    minúsculas, y deja las siglas conocidas en mayúsculas."""
+    nombre = " ".join((nombre or "").split())
+    if not nombre or not nombre.isupper():
+        return nombre
+    palabras = []
+    for i, p in enumerate(nombre.lower().split(" ")):
+        base = p.strip(".,()")
+        if base in SIGLAS_ORGANISMO or (len(base) <= 3 and base.isalpha() and base not in MINUSCULAS_ORGANISMO and i > 0
+                                        and not any(c in "aeiouáéíóú" for c in base)):
+            palabras.append(p.upper())
+        elif i > 0 and base in MINUSCULAS_ORGANISMO:
+            palabras.append(p)
+        else:
+            palabras.append(p[:1].upper() + p[1:])
+    return " ".join(palabras)
+
+
+FEMENINOS_ORGANISMO = ("universidad", "municipalidad", "ilustre", "i.", "dirección", "direccion", "subsecretaría",
+                       "subsecretaria", "junta", "corporación", "corporacion", "superintendencia", "secretaría",
+                       "secretaria", "gobernación", "gobernacion", "delegación", "delegacion", "fiscalía", "fiscalia",
+                       "defensoría", "defensoria", "tesorería", "tesoreria", "contraloría", "contraloria", "cámara",
+                       "camara", "armada", "fuerza", "policía", "policia", "comisión", "comision", "agencia",
+                       "escuela", "biblioteca", "academia", "intendencia", "empresa", "oficina", "unidad")
+MASCULINOS_ORGANISMO = ("servicio", "hospital", "ministerio", "gobierno", "instituto", "consejo", "centro", "fondo",
+                        "ejército", "ejercito", "senado", "poder", "registro", "departamento", "complejo", "cuerpo",
+                        "liceo", "colegio", "jardín", "jardin", "parque", "museo", "archivo", "tribunal", "banco")
+
+
+def a_organismo(nombre: str) -> str:
+    """"Universidad de Tarapacá" → "a la Universidad de Tarapacá"; "Hospital de San Carlos" → "al Hospital de San
+    Carlos"; las siglas y lo desconocido van sin artículo ("a JUNAEB")."""
+    primera = (nombre.split() or [""])[0].lower()
+    if primera in FEMENINOS_ORGANISMO:
+        return f"a la {nombre}"
+    if primera in MASCULINOS_ORGANISMO:
+        return f"al {nombre}"
+    return f"a {nombre}"
+
+
+def slug_organismo(nombre: str) -> str:
+    return slug(nombre)[:90].strip("-")
+
+
+def organismos_recientes(session: Session, momento: datetime | None = None, dias: int = DIAS_ORGANISMOS) -> dict[str, str]:
+    """slug → nombre tal como viene, de los organismos que publicaron en el último año (para sus páginas)."""
+    desde = hora_chile(momento) - timedelta(days=dias)
+    nombres = session.scalars(
+        select(Licitacion.organismo).where(Licitacion.organismo != "", Licitacion.fecha_publicacion >= desde).distinct()
+    )
+    return {slug_organismo(n): n for n in nombres if n and slug_organismo(n)}
+
+
+def recientes_de_organismo(session: Session, organismo: str, *, excluir: set[str] = frozenset(),
+                           limite: int = MESES_ORGANISMO) -> list[Ficha]:
+    """Últimas licitaciones del organismo que ya no están abiertas (cerradas o adjudicadas)."""
+    consulta = (
+        select(Licitacion).options(load_only(*[getattr(Licitacion, c) for c in (
+            "codigo", "nombre", "descripcion", "tipo", "estado_codigo", "organismo", "region", "comuna",
+            "monto_estimado", "moneda", "fecha_publicacion", "fecha_cierre", "items", "clasificacion",
+            "actualizada_en", "fecha_adjudicacion")]))
+        .where(Licitacion.organismo == organismo)
+        .order_by(Licitacion.fecha_publicacion.desc().nulls_last())
+        .limit(limite + len(excluir))
+    )
+    return [Ficha.de(lic) for lic in session.scalars(consulta) if lic.codigo not in excluir][:limite]
+
+
 def cargar_ficha(session: Session, codigo: str) -> Ficha | None:
     lic = session.get(Licitacion, codigo)
     return Ficha.de(lic) if lic is not None else None

@@ -322,3 +322,32 @@ def test_origen_se_limpia_y_clasifica():
     assert canal("l.wl.co|/") == "WhatsApp" and canal("m.facebook.com|/") == "Redes sociales"
     assert canal("bing.com|/licitaciones/organismo/universidad-de-tarapaca") == "Buscador"
     assert canal("directo|/") == "Directo" and canal("blog.ejemplo.cl|/") == "Otro sitio" and canal("") == "Sin dato"
+
+
+def test_pagina_de_datos_del_piloto(Sesion, cliente_mp):
+    from datetime import date
+
+    from licita.db import Calce, MensajeWhatsApp
+    from licita.sync import sincronizar_licitaciones
+
+    cliente = _cliente(Sesion)
+    assert cliente.get("/admin/datos", follow_redirects=False).status_code == 303  # sin sesión
+    cliente.post("/registro", data={**FORM, "origen": "google.com|/licitacion/1234-56-LE26"})
+    with Sesion() as s:
+        sincronizar_licitaciones(s, cliente_mp, date(2026, 10, 6))
+        e = s.query(Empresa).one()
+        s.add_all([Calce(empresa_id=e.id, licitacion_codigo="1234-56-LE26", puntaje=90, valoracion=1),
+                   Calce(empresa_id=e.id, licitacion_codigo="2345-12-L126", puntaje=70, valoracion=-1,
+                         motivo_valoracion="rubro", razon="Vende insumos de aseo", valorado_en=ahora())])
+        s.add_all([MensajeWhatsApp(empresa_id=e.id, telefono=e.whatsapp, direccion="entrante", tipo=t, contenido=c)
+                   for t, c in (("texto", "Hola"), ("texto", "2"), ("texto", "precios"), ("documento", "bases.pdf"))])
+        s.commit()
+    cliente.post("/admin/entrar", data={"usuario": "admin", "clave": CLAVE})
+    r = cliente.get("/admin/datos")
+    assert r.status_code == 200 and r.headers["cache-control"] == "no-store"
+    assert "Sin activar (no ha escrito por WhatsApp)" in r.text or "En prueba" in r.text
+    assert "Buscador" in r.text and "ficha 1234-56-LE26" in r.text
+    assert "50% útil" in r.text and "No es mi rubro" in r.text and "Vende insumos de aseo" in r.text
+    for uso in ("Pidió el detalle de una licitación (número)", "PRECIOS", "Envió bases (PDF o Word)"):
+        assert uso in r.text
+    assert 'href="/admin/datos"' in cliente.get("/admin").text

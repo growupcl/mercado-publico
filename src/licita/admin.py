@@ -26,7 +26,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 from sqlalchemy.orm import sessionmaker
 
-from .db import Calce, Empresa, Invitacion, MandatoPago, MensajeWhatsApp, Pago, Suscripcion, ahora, hora_chile
+from .db import Calce, Empresa, Invitacion, Licitacion, MandatoPago, MensajeWhatsApp, Pago, Suscripcion, ahora, hora_chile
 from .planes import DIAS_PRUEBA, PERIODICIDADES, PLANES, formato_pesos
 from .publico import REGION_POR_SLUG, REGIONES_PUBLICAS, Ficha, Region, buscar, cargar_abiertas
 from .whatsapp import normalizar_telefono
@@ -203,6 +203,80 @@ def origen_de(empresa: Empresa) -> Origen:
     else:
         canal = "Otro sitio"
     return Origen(canal, "" if sitio == "directo" else sitio, pagina, legible)
+
+
+DIAS_USO = 10
+NOMBRES_ESTADO = {"pendiente:whatsapp": "Sin activar (no ha escrito por WhatsApp)", "pendiente:tarjeta": "Sin activar (falta tarjeta)",
+                  "prueba": "En prueba", "activa": "Pagando", "vencida": "Vencida o sin suscribirse"}
+NOMBRES_MOTIVO = {"rubro": "No es mi rubro", "tamano": "Monto o plazo", "otro": "Otra razón", "": "Sin motivo"}
+
+
+def _tipo_de_mensaje(tipo: str, contenido: str) -> str:
+    texto = (contenido or "").strip().lower()
+    if tipo == "documento":
+        return "Envió bases (PDF o Word)"
+    if tipo == "boton":
+        if contenido.startswith(("VALOR:", "MOTIVO:")):
+            return "Valoró una licitación (👍/👎)"
+        return "Tocó un botón (detalle, ver todas…)"
+    if texto.isdigit():
+        return "Pidió el detalle de una licitación (número)"
+    if texto.startswith("precio"):
+        return "PRECIOS"
+    if texto in ("cuenta", "mi cuenta", "pagar", "plan"):
+        return "CUENTA"
+    if texto in ("perfil", "mi perfil", "rubro", "rubros"):
+        return "PERFIL"
+    if texto in ("todas",):
+        return "TODAS"
+    return "Otro texto (saludos, preguntas)"
+
+
+def datos_piloto(session, momento: datetime | None = None) -> dict:
+    """Resumen para decidir qué mejorar: estado de las cuentas, cómo llegan, calidad del calce y uso por WhatsApp."""
+    momento = momento or ahora()
+    estados = Counter(
+        f"{estado}:{pendiente}" if estado == "pendiente" else estado
+        for estado, pendiente in session.execute(select(Suscripcion.estado, Suscripcion.pendiente_de))
+    )
+    empresas = list(session.scalars(select(Empresa)))
+    origenes = [origen_de(e) for e in empresas]
+    con_origen = [o for o in origenes if o.canal != "Sin dato"]
+    valoraciones = Counter(
+        (valor, motivo or "") for valor, motivo in session.execute(
+            select(Calce.valoracion, Calce.motivo_valoracion).where(Calce.valoracion.is_not(None)))
+    )
+    utiles = sum(n for (v, _), n in valoraciones.items() if v == 1)
+    no_utiles = sum(n for (v, _), n in valoraciones.items() if v == -1)
+    nombres = {e.id: e.nombre for e in empresas}
+    ultimos_no = [
+        {"empresa": nombres.get(c.empresa_id, "?"), "licitacion": lic.nombre, "codigo": lic.codigo, "puntaje": c.puntaje,
+         "motivo": NOMBRES_MOTIVO.get(c.motivo_valoracion or "", c.motivo_valoracion), "razon": c.razon,
+         "cuando": c.valorado_en}
+        for c, lic in session.execute(
+            select(Calce, Licitacion).join(Licitacion, Licitacion.codigo == Calce.licitacion_codigo)
+            .where(Calce.valoracion == -1).order_by(Calce.valorado_en.desc().nulls_last()).limit(20))
+    ]
+    desde = momento - timedelta(days=DIAS_USO)
+    mensajes = session.execute(
+        select(MensajeWhatsApp.empresa_id, MensajeWhatsApp.tipo, MensajeWhatsApp.contenido)
+        .where(MensajeWhatsApp.direccion == "entrante", MensajeWhatsApp.creado_en >= desde)
+    ).all()
+    uso = Counter(_tipo_de_mensaje(tipo, contenido) for _, tipo, contenido in mensajes)
+    return {
+        "estados": [(NOMBRES_ESTADO.get(k, k), n) for k, n in estados.most_common()],
+        "total_empresas": len(empresas),
+        "canales": Counter(o.canal for o in con_origen).most_common(),
+        "sitios": Counter(o.sitio or "directo" for o in con_origen).most_common(10),
+        "paginas": Counter(o.pagina_legible for o in con_origen if o.pagina_legible).most_common(10),
+        "sin_origen": len(origenes) - len(con_origen),
+        "utiles": utiles, "no_utiles": no_utiles,
+        "calce_util": round(100 * utiles / (utiles + no_utiles)) if utiles + no_utiles else None,
+        "motivos": [(NOMBRES_MOTIVO.get(m, m), n) for (v, m), n in valoraciones.most_common() if v == -1],
+        "ultimos_no": ultimos_no,
+        "uso": uso.most_common(), "mensajes": len(mensajes),
+        "empresas_que_escribieron": len({e for e, _, _ in mensajes if e}), "dias_uso": DIAS_USO,
+    }
 
 
 FILTROS = (("todas", "Todas"), ("contactar", "Por contactar"), ("pendiente", "Sin activar"), ("prueba", "En prueba"),
@@ -551,6 +625,15 @@ def crear_router_admin(Sesion: sessionmaker, *, plantillas: Jinja2Templates, cla
                 s.delete(inv)
                 s.commit()
         return RedirectResponse("/admin/invitar#invitaciones", status_code=303)
+
+    @router.get("/admin/datos", response_class=HTMLResponse)
+    def datos(request: Request):
+        if (r := _bloqueado(request)) is not None:
+            return r
+        with Sesion() as s:
+            d = datos_piloto(s)
+        return plantillas.TemplateResponse(request, "admin_datos.html", {"d": d, "hace": hace, "momento": ahora()},
+                                           headers=sin_cache)
 
     @router.get("/admin", response_class=HTMLResponse)
     def panel(request: Request, estado: str = "todas"):

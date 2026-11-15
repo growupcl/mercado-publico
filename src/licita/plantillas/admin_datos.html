@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block titulo %}Datos del piloto · Calza{% endblock %}
+{% block robots %}noindex, nofollow{% endblock %}
+{% block accion %}<a class="enlace" href="/admin">← Panel</a><form method="post" action="/admin/salir" style="display:inline"><button class="boton secundario" type="submit">Cerrar sesión</button></form>{% endblock %}
+{% block pie_nav %}{% endblock %}
+{% block estilos %}
+<style>
+.datos{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:20px}
+.datos table{width:100%;border-collapse:collapse;font-size:15px}
+.datos td{padding:8px 0;border-bottom:1px solid var(--line)}
+.datos td.n{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
+.datos tr:last-child td{border-bottom:0}
+.datos h2{font-size:20px;margin:0}
+.no-utiles td{padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:top;font-size:14px}
+</style>
+{% endblock %}
+{% macro tabla(filas, vacio) %}{% if filas %}<table>{% for nombre, n in filas %}<tr><td>{{ nombre }}</td><td class="n">{{ n }}</td></tr>{% endfor %}</table>{% else %}<p class="muted" style="margin:0">{{ vacio }}</p>{% endif %}{% endmacro %}
+{% block contenido %}
+<div class="pila" style="gap:24px">
+  <div>
+    <h1 style="font-size:32px">Datos del piloto</h1>
+    <p class="muted" style="margin:6px 0 0">Para decidir qué mejorar: si activan, si el calce les sirve y si usan Calza.</p>
+  </div>
+  <div class="datos">
+    <section class="tarjeta pila">
+      <h2>1. Cuentas ({{ d.total_empresas }})</h2>
+      {{ tabla(d.estados, "Aún no hay empresas registradas.") }}
+      <p class="ayuda" style="margin:0">Muchas "Sin activar" = el paso de escribir por WhatsApp está frenando.</p>
+    </section>
+    <section class="tarjeta pila">
+      <h2>2. Cómo llegan</h2>
+      {{ tabla(d.canales, "Aún no hay registros con origen (se mide desde la versión 0011).") }}
+      {% if d.paginas %}<h3 style="font-size:16px;margin:8px 0 0">Primera página que vieron</h3>{{ tabla(d.paginas, "") }}{% endif %}
+      {% if d.sin_origen %}<p class="ayuda" style="margin:0">{{ d.sin_origen }} empresas se registraron antes de medir el origen.</p>{% endif %}
+    </section>
+    <section class="tarjeta pila">
+      <h2>3. ¿Les sirve el calce?</h2>
+      <p style="margin:0;font-size:28px;font-weight:600">{% if d.calce_util is not none %}{{ d.calce_util }}% útil{% else %}—{% endif %}</p>
+      <p class="muted" style="margin:0">👍 {{ d.utiles }} · 👎 {{ d.no_utiles }}</p>
+      {% if d.motivos %}<h3 style="font-size:16px;margin:8px 0 0">Por qué marcaron 👎</h3>{{ tabla(d.motivos, "") }}{% endif %}
+      <p class="ayuda" style="margin:0">Bajo 60% útil, conviene ajustar el calce antes de sumar más empresas.</p>
+    </section>
+    <section class="tarjeta pila">
+      <h2>4. Uso por WhatsApp (últimos {{ d.dias_uso }} días)</h2>
+      <p class="muted" style="margin:0">{{ d.mensajes }} mensajes de {{ d.empresas_que_escribieron }} {{ "empresa" if d.empresas_que_escribieron == 1 else "empresas" }}</p>
+      {{ tabla(d.uso, "Nadie ha escrito en estos días.") }}
+    </section>
+  </div>
+  <section class="tarjeta pila">
+    <h2 style="font-size:20px;margin:0">Últimas licitaciones marcadas 👎</h2>
+    {% if d.ultimos_no %}
+    <div style="overflow-x:auto"><table class="no-utiles" style="width:100%;border-collapse:collapse">
+      <tr><th style="text-align:left">Empresa</th><th style="text-align:left">Licitación</th><th>Calce</th><th style="text-align:left">Motivo</th><th style="text-align:left">Por qué la IA creyó que calzaba</th></tr>
+      {% for x in d.ultimos_no %}
+      <tr><td>{{ x.empresa }}<div class="ayuda">{{ hace(x.cuando, momento) }}</div></td>
+          <td><a href="/licitacion/{{ x.codigo }}" target="_blank" rel="noopener">{{ x.licitacion | truncate(80) }}</a></td>
+          <td style="text-align:center">{{ x.puntaje }}%</td><td>{{ x.motivo }}</td><td>{{ x.razon | truncate(160) }}</td></tr>
+      {% endfor %}
+    </table></div>
+    <p class="ayuda" style="margin:0">Si se repite un patrón (por ejemplo, "No es mi rubro" para palabras parecidas), revisa el perfil de esa empresa o avísame para ajustar el calce.</p>
+    {% else %}<p class="muted" style="margin:0">Aún nadie marca 👎.</p>{% endif %}
+  </section>
+</div>
+{% endblock %}

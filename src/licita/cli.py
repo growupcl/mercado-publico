@@ -324,6 +324,20 @@ def cmd_avisos_prueba(args, config: Config, Sesion) -> int:
     return 0
 
 
+def cmd_prueba_sin_tarjeta(args, config: Config, Sesion) -> int:
+    from .suscripciones import pasar_a_prueba_sin_tarjeta
+
+    if config.prueba_con_tarjeta:
+        print("PRUEBA_CON_TARJETA está activada: no se cambia nada.")
+        return 0
+    with Sesion() as s:
+        empresas = pasar_a_prueba_sin_tarjeta(s)
+        for e in empresas:
+            print(f"  #{e.id} {e.nombre} · +{e.whatsapp} · {e.email}")
+    print(f"{len(empresas)} cuentas que esperaban la tarjeta ahora empiezan su prueba al escribir \"Hola\" por WhatsApp.")
+    return 0
+
+
 def cmd_agenda(args, config: Config, Sesion) -> int:
     from .agenda import ejecutar_agenda
     from .mercadopublico import MercadoPublicoClient
@@ -598,6 +612,9 @@ def construir_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("avisos-prueba", help="Avisa a quienes terminan la prueba en 3 días y a quienes pasaron al plan gratis")
     s.set_defaults(fn=cmd_avisos_prueba)
+
+    s = sub.add_parser("prueba-sin-tarjeta", help="Pasa las cuentas que esperaban tarjeta a la prueba que se activa por WhatsApp")
+    s.set_defaults(fn=cmd_prueba_sin_tarjeta)
 
     s = sub.add_parser("agenda", help="Avisa los plazos y resultados de las licitaciones marcadas \"Voy a postular\"")
     s.set_defaults(fn=cmd_agenda)

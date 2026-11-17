@@ -120,3 +120,16 @@ def test_plan_gratis_no_analiza_bases(Sesion):
         enviados = []
         procesar_documento(s, None, e, {"document": {}}, analisis=object(), momento=ahora(), enviar=enviados.append)
     assert "planes Pyme y Pro" in enviados[0] and "*CUENTA*" in enviados[0]
+
+
+def test_cuentas_que_esperaban_tarjeta_pasan_a_activarse_por_whatsapp(Sesion):
+    from licita.suscripciones import pasar_a_prueba_sin_tarjeta
+
+    with Sesion() as s:
+        e = _base(s, plan="gratis", estado="pendiente")
+        sus = s.query(Suscripcion).one()
+        sus.pendiente_de = "tarjeta"
+        s.commit()
+        assert [x.id for x in pasar_a_prueba_sin_tarjeta(s)] == [e.id]
+        assert s.query(Suscripcion).one().pendiente_de == "whatsapp"
+        assert pasar_a_prueba_sin_tarjeta(s) == []  # ya no queda ninguna

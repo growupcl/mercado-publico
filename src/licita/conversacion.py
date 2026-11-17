@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 import anthropic
 
+from .agenda import marcar_postulacion, quitar_de_agenda, texto_agenda
 from .analisis import DocumentoInvalido, LimiteAlcanzado, ServicioAnalisis, detectar_codigo, textos_analisis
 from .db import AnalisisBases, Calce, Empresa, Licitacion, MensajeWhatsApp, ahora, hora_chile
 from .ia import ErrorIA
@@ -39,6 +40,7 @@ TEXTO_AYUDA = (
     "• Escribe *TODAS* para volver a ver el último resumen.\n"
     "• Escribe *PRECIOS* después de ver una licitación para saber cuánto ha pagado el Estado por lo mismo.\n"
     "• Envíame el *PDF de las bases* de una licitación y te digo qué piden, plazos, garantías y cómo se evalúa.\n"
+    "• Toca *📌 Voy a postular* en una licitación y te aviso de sus plazos hasta saber quién ganó. Escribe *AGENDA* para verlas.\n"
     "• Escribe *PERFIL* para cambiar qué vendes, tus regiones o tu monto máximo.\n"
     "• Escribe *CUENTA* para ver tu plan o pagar.\n"
     "• Escribe *BAJA* si ya no quieres recibir mensajes."
@@ -156,8 +158,10 @@ MOTIVOS_DESCARTE = {"rubro": "No es mi rubro", "tamano": "Monto o plazo", "otro"
 
 
 def pregunta_valoracion(calce: Calce) -> Botones:
-    return Botones("¿Te sirve esta licitación? Con tu respuesta afino las próximas que te envío.",
-                   [(f"VALOR:+:{calce.licitacion_codigo}", "👍 Me sirve"), (f"VALOR:-:{calce.licitacion_codigo}", "👎 No me sirve")])
+    return Botones("¿Te sirve esta licitación? Con tu respuesta afino las próximas que te envío. Si vas a postular, "
+                   "te aviso de cada plazo hasta saber quién ganó.",
+                   [(f"VALOR:+:{calce.licitacion_codigo}", "👍 Me sirve"), (f"VALOR:-:{calce.licitacion_codigo}", "👎 No me sirve"),
+                    (f"POSTULO:{calce.licitacion_codigo}", "📌 Voy a postular")])
 
 
 def _valorar(session: Session, empresa: Empresa, contenido: str, momento: datetime) -> list:
@@ -252,6 +256,23 @@ def responder(
 
     if tipo == "boton" and (texto.startswith("VALOR:") or texto.startswith("MOTIVO:")):
         return _valorar(session, empresa, texto, momento)
+
+    if (tipo == "boton" and texto.startswith("POSTULO:")) or comando in ("postulo", "postular", "voy a postular"):
+        codigo = texto.removeprefix("POSTULO:") if texto.startswith("POSTULO:") else (
+            empresa.licitacion_activa if empresa.licitacion_activa and _contexto_vigente(empresa, momento) else None)
+        lic = session.get(Licitacion, codigo) if codigo else None
+        if lic is None:
+            return ["Primero abre la licitación: responde con su número del resumen y después toca *📌 Voy a postular*."]
+        calce = session.scalar(select(Calce).where(Calce.empresa_id == empresa.id, Calce.licitacion_codigo == lic.codigo))
+        if calce is not None and calce.valoracion is None:
+            calce.valoracion, calce.valorado_en = 1, momento  # si va a postular, le sirve
+        return [marcar_postulacion(session, empresa, lic, momento)]
+
+    if comando in ("agenda", "mi agenda", "postulaciones", "mis postulaciones"):
+        return [texto_agenda(session, empresa, momento)]
+
+    if comando.startswith("quitar") and comando.removeprefix("quitar").strip().isdigit():
+        return [quitar_de_agenda(session, empresa, int(comando.removeprefix("quitar").strip()))]
 
     if texto == "VER_TODAS" or comando == "todas":
         filas = ultimo_resumen(session, empresa)

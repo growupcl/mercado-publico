@@ -44,6 +44,7 @@
       <h2>4. Uso por WhatsApp (últimos {{ d.dias_uso }} días)</h2>
       <p class="muted" style="margin:0">{{ d.mensajes }} mensajes de {{ d.empresas_que_escribieron }} {{ "empresa" if d.empresas_que_escribieron == 1 else "empresas" }}</p>
       {{ tabla(d.uso, "Nadie ha escrito en estos días.") }}
+      <p class="muted" style="margin:0">📌 Agenda: {{ d.postulaciones }} {{ "licitación marcada" if d.postulaciones == 1 else "licitaciones marcadas" }} "Voy a postular" por {{ d.empresas_postulando }} {{ "empresa" if d.empresas_postulando == 1 else "empresas" }} ({{ d.postulaciones_activas }} en curso).</p>
     </section>
   </div>
   <section class="tarjeta pila">

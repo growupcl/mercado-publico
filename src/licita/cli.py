@@ -324,6 +324,22 @@ def cmd_avisos_prueba(args, config: Config, Sesion) -> int:
     return 0
 
 
+def cmd_agenda(args, config: Config, Sesion) -> int:
+    from .agenda import ejecutar_agenda
+    from .mercadopublico import MercadoPublicoClient
+
+    wa, correo = (_whatsapp(config) if config.whatsapp_token else None), _correo(config)
+    cliente = MercadoPublicoClient(config.ticket) if config.ticket else None
+    with Sesion() as s:
+        r = ejecutar_agenda(s, wa=wa, correo=correo, cliente=cliente, url_publica=config.url_publica,
+                            idioma=config.whatsapp_idioma)
+    print(f"Agenda: {r.avisos} avisos de plazos · {r.resultados} resultados · {r.consultadas} consultas a Mercado Público"
+          f" · {r.sin_enviar} sin enviar · Errores: {len(r.errores)}")
+    for error in r.errores[:10]:
+        print(f"  {error}")
+    return 1 if r.sin_enviar else 0
+
+
 def cmd_mp_prueba(args, config: Config, Sesion) -> int:
     from .db import Empresa
     from .mercadopago import ClienteMercadoPago
@@ -582,6 +598,9 @@ def construir_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("avisos-prueba", help="Avisa a quienes terminan la prueba en 3 días y a quienes pasaron al plan gratis")
     s.set_defaults(fn=cmd_avisos_prueba)
+
+    s = sub.add_parser("agenda", help="Avisa los plazos y resultados de las licitaciones marcadas \"Voy a postular\"")
+    s.set_defaults(fn=cmd_agenda)
 
     s = sub.add_parser("facturas", help="Lista los pagos por facturar en el portal del SII o registra el folio emitido")
     s.add_argument("--csv", action="store_true", help="Exporta las pendientes en CSV (separado por punto y coma)")

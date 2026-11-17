@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 import anthropic
 
 from .agenda import marcar_postulacion, quitar_de_agenda, texto_agenda
+from .semaforo import texto_semaforo
 from .analisis import DocumentoInvalido, LimiteAlcanzado, ServicioAnalisis, detectar_codigo, textos_analisis
 from .db import AnalisisBases, Calce, Empresa, Licitacion, MensajeWhatsApp, ahora, hora_chile
 from .ia import ErrorIA
@@ -189,10 +190,16 @@ def _valorar(session: Session, empresa: Empresa, contenido: str, momento: dateti
     return ["Anotado, gracias. Si quieres cambiar qué licitaciones recibes, escribe *PERFIL*."]
 
 
-def _detalle(empresa: Empresa, calce: Calce, lic: Licitacion, momento: datetime) -> str:
+def _detalle(session: Session, empresa: Empresa, calce: Calce, lic: Licitacion, momento: datetime) -> str:
     empresa.licitacion_activa = lic.codigo
     empresa.contexto_actualizado_en = momento
-    return texto_detalle(calce, lic) + (invitacion_compra_agil(lic) if lic.tipo == "COT" else INVITACION_BASES)
+    semaforo = ""
+    try:
+        semaforo = texto_semaforo(session, lic, con_precios=empresa.plan in PLANES_CON_PRECIOS, momento=momento)
+    except Exception:  # el semáforo suma, pero nunca debe impedir mostrar el detalle
+        log.exception("No se pudo calcular el semáforo de %s", lic.codigo)
+    return (texto_detalle(calce, lic) + (f"\n\n{semaforo}" if semaforo else "")
+            + (invitacion_compra_agil(lic) if lic.tipo == "COT" else INVITACION_BASES))
 
 
 def invitacion_compra_agil(lic: Licitacion) -> str:
@@ -252,7 +259,7 @@ def responder(
         ).first()
         if not fila:
             return ["No encontré esa licitación. Escribe *TODAS* para ver tu último resumen."]
-        return [_detalle(empresa, *fila, momento), pregunta_valoracion(fila[0])]
+        return [_detalle(session, empresa, *fila, momento), pregunta_valoracion(fila[0])]
 
     if tipo == "boton" and (texto.startswith("VALOR:") or texto.startswith("MOTIVO:")):
         return _valorar(session, empresa, texto, momento)
@@ -311,7 +318,7 @@ def responder(
         filas = ultimo_resumen(session, empresa)
         n = int(comando)
         if 1 <= n <= len(filas):
-            return [_detalle(empresa, *filas[n - 1], momento), pregunta_valoracion(filas[n - 1][0])]
+            return [_detalle(session, empresa, *filas[n - 1], momento), pregunta_valoracion(filas[n - 1][0])]
         return [f"Tu último resumen tiene {len(filas)} licitaciones. Responde con un número entre 1 y {len(filas)}." if filas else TEXTO_AYUDA]
 
     # Texto libre con un análisis reciente: es una pregunta sobre esas bases.

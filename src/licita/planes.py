@@ -24,6 +24,7 @@ PLANES = {
         "Resumen cada día hábil a las 8:00 por WhatsApp con las licitaciones nuevas que calzan con tu empresa",
         "Copia del resumen en tu correo (la puedes desactivar)",
         "Detalle de cada licitación: qué piden, requisitos a revisar, plazos y por qué te calza",
+        "Semáforo \"¿Te conviene?\": tiempo para preparar, quién suele ganar y exigencias pesadas",
         "Afina lo que recibes con 👍 o 👎 y cambia tu perfil cuando quieras",
         "Agenda \"Voy a postular\": te avisamos cada plazo y, al final, quién ganó y a qué precio",
         "Análisis de bases en PDF o Word: hasta 15 al mes",
@@ -32,7 +33,7 @@ PLANES = {
         "Todo lo del plan Pyme",
         "Compras Ágiles que calzan contigo, en tu resumen diario",
         "Alertas urgentes por WhatsApp apenas se publica una Compra Ágil para ti",
-        "Precios de referencia: cuánto ha pagado el Estado por lo mismo y quién suele ganar",
+        "Precios de referencia: cuánto ha pagado el Estado por lo mismo y si el presupuesto deja margen",
         "Análisis de bases en PDF o Word: hasta 50 al mes",
     )),
 }

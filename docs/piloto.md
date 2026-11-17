@@ -103,6 +103,7 @@ o pídeles que escriban desde ese número: la prueba solo empieza con un mensaje
 >
 > Desde mañana, cada día hábil a las 8:00, te llega al WhatsApp el resumen con las licitaciones nuevas que calzan con [Empresa]. Para sacarle el jugo:
 > • Marca 👍 o 👎 en cada licitación: con eso afinamos lo que te mandamos.
+> • Si vas a postular a una, toca **📌 Voy a postular**: te aviso de cada plazo y, al final, quién ganó y a qué precio.
 > • Responde con el **número** de una licitación y te mando el detalle.
 > • Después escribe **PRECIOS** para ver cuánto ha pagado el Estado por lo mismo.
 > • Envíale el **PDF de las bases** y te resume qué piden, plazos, garantías y cómo se evalúa.

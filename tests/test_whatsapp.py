@@ -357,7 +357,9 @@ def test_tras_el_detalle_pregunta_si_sirve_y_guarda_la_valoracion(escenario):
     procesar_webhook(s, wa, mensaje_entrante(texto="1"), momento=MOMENTO)
     [(tel, texto, botones)] = wa.botones
     assert "¿Te sirve esta licitación?" in texto
-    assert botones == [("VALOR:+:1234-56-LE26", "👍 Me sirve"), ("VALOR:-:1234-56-LE26", "👎 No me sirve")]
+    assert botones == [("VALOR:+:1234-56-LE26", "👍 Me sirve"), ("VALOR:-:1234-56-LE26", "👎 No me sirve"),
+                       ("POSTULO:1234-56-LE26", "📌 Voy a postular")]
+    assert all(len(titulo) <= 20 for _, titulo in botones)  # límite de WhatsApp
 
     procesar_webhook(s, wa, mensaje_entrante(payload="VALOR:-:1234-56-LE26"), momento=MOMENTO)
     _, texto, botones = wa.botones[-1]

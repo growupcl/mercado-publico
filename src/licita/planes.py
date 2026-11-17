@@ -25,6 +25,7 @@ PLANES = {
         "Copia del resumen en tu correo (la puedes desactivar)",
         "Detalle de cada licitación: qué piden, requisitos a revisar, plazos y por qué te calza",
         "Afina lo que recibes con 👍 o 👎 y cambia tu perfil cuando quieras",
+        "Agenda \"Voy a postular\": te avisamos cada plazo y, al final, quién ganó y a qué precio",
         "Análisis de bases en PDF o Word: hasta 15 al mes",
     )),
     "pro": Plan("pro", "Pro", 59_990, 50, "Suma Compras Ágiles, alertas y precios de referencia", (

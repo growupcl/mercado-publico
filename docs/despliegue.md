@@ -178,6 +178,7 @@ crontab -l
 | Lunes 1:30 | Precios del histórico de órdenes de compra, mes actual y anterior ([historico-oc.md](historico-oc.md)) |
 | Domingo 4:00 | Limpieza de Compras Ágiles antiguas que no le sirvieron a ningún cliente |
 | 3:15 | Vencimiento de suscripciones impagas |
+| 8:40 | Agenda "Voy a postular": plazos de hoy y mañana, y resultados de las licitaciones que ya cerraron |
 | 2:45 | Respaldo de la base de datos (se guardan 14 días en `/var/backups/calza`) |
 
 El registro de cada tarea queda en `/opt/calza/logs/tareas.log`.

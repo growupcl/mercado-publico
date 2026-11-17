@@ -26,7 +26,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 from sqlalchemy.orm import sessionmaker
 
-from .db import Calce, Empresa, Invitacion, Licitacion, MandatoPago, MensajeWhatsApp, Pago, Suscripcion, ahora, hora_chile
+from .db import Calce, Empresa, Invitacion, Licitacion, MandatoPago, Postulacion, MensajeWhatsApp, Pago, Suscripcion, ahora, hora_chile
 from .planes import DIAS_PRUEBA, PERIODICIDADES, PLANES, formato_pesos
 from .publico import REGION_POR_SLUG, REGIONES_PUBLICAS, Ficha, Region, buscar, cargar_abiertas
 from .whatsapp import normalizar_telefono
@@ -215,6 +215,8 @@ def _tipo_de_mensaje(tipo: str, contenido: str) -> str:
     texto = (contenido or "").strip().lower()
     if tipo == "documento":
         return "Envió bases (PDF o Word)"
+    if tipo == "boton" and contenido.startswith("POSTULO:"):
+        return "Marcó 📌 Voy a postular"
     if tipo == "boton":
         if contenido.startswith(("VALOR:", "MOTIVO:")):
             return "Valoró una licitación (👍/👎)"
@@ -227,6 +229,8 @@ def _tipo_de_mensaje(tipo: str, contenido: str) -> str:
         return "CUENTA"
     if texto in ("perfil", "mi perfil", "rubro", "rubros"):
         return "PERFIL"
+    if texto in ("agenda", "mi agenda", "postulaciones", "mis postulaciones"):
+        return "AGENDA"
     if texto in ("todas",):
         return "TODAS"
     return "Otro texto (saludos, preguntas)"
@@ -276,6 +280,9 @@ def datos_piloto(session, momento: datetime | None = None) -> dict:
         "ultimos_no": ultimos_no,
         "uso": uso.most_common(), "mensajes": len(mensajes),
         "empresas_que_escribieron": len({e for e, _, _ in mensajes if e}), "dias_uso": DIAS_USO,
+        "postulaciones": session.scalar(select(func.count()).select_from(Postulacion)) or 0,
+        "postulaciones_activas": session.scalar(select(func.count()).select_from(Postulacion).where(Postulacion.activa.is_(True))) or 0,
+        "empresas_postulando": session.scalar(select(func.count(func.distinct(Postulacion.empresa_id)))) or 0,
     }
 
 

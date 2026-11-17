@@ -286,6 +286,21 @@ class Invitacion(Base):
     seguimiento_en: Mapped[datetime | None] = mapped_column(DateTime)
 
 
+class Postulacion(Base):
+    """Licitación que la empresa marcó "Voy a postular": Calza le avisa los plazos y, al final, quién ganó."""
+
+    __tablename__ = "postulaciones"
+    __table_args__ = (UniqueConstraint("empresa_id", "licitacion_codigo"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    empresa_id: Mapped[int] = mapped_column(ForeignKey("empresas.id"), index=True)
+    licitacion_codigo: Mapped[str] = mapped_column(String(40))
+    activa: Mapped[bool] = mapped_column(Boolean, default=True)  # False: la quitó de su agenda o ya terminó
+    avisos: Mapped[list[str]] = mapped_column(JSON, default=list)  # hitos ya avisados ("preguntas", "cierre_hoy"…)
+    creada_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
+    revisada_en: Mapped[datetime | None] = mapped_column(DateTime)  # última consulta del resultado a la API
+
+
 class Pago(Base):
     __tablename__ = "pagos"
 

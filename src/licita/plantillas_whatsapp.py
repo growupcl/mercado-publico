@@ -93,8 +93,18 @@ SUSCRIPCION_TERMINADA = Plantilla(
     uso="Aviso cuando termina la prueba o el plan sin pago y la cuenta pasa al plan gratis.",
 )
 
+RECORDATORIO_POSTULACION = Plantilla(
+    nombre="recordatorio_postulacion",
+    cuerpo=("Hola {{1}}, un recordatorio sobre la licitación a la que vas a postular, {{2}}: {{3}} "
+            "Toca el botón para ver el detalle."),
+    ejemplos=("Aseo Sur", "Adquisición de artículos de aseo para CESFAM",
+              "Quedan 2 días: cierra el 20-11 a las 15:00. ¿Ya tienes lista tu oferta?"),
+    botones=("Ver detalle",),
+    uso="Plazos (preguntas, visita, cierre) y resultado de las licitaciones que la empresa marcó \"Voy a postular\".",
+)
+
 PLANTILLAS = {p.nombre: p for p in (RESUMEN_DIARIO, RESUMEN_DIARIO_SIMPLE, COBRO_RECHAZADO, ALERTA_COMPRA_AGIL,
-                                    FIN_PRUEBA, SUSCRIPCION_TERMINADA)}
+                                    FIN_PRUEBA, SUSCRIPCION_TERMINADA, RECORDATORIO_POSTULACION)}
 
 # Qué responde Calza cuando el usuario toca cada botón (el payload se define al enviar).
 PAYLOADS_RESUMEN = {

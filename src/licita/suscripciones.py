@@ -187,6 +187,19 @@ def registrar_empresa(
     return empresa, token
 
 
+def pasar_a_prueba_sin_tarjeta(session: Session) -> list[Empresa]:
+    """Cuentas que quedaron esperando la tarjeta (antes de la prueba sin tarjeta): ahora se activan al escribir por
+    WhatsApp. Devuelve esas empresas, para avisarles."""
+    suscripciones = session.scalars(select(Suscripcion).where(Suscripcion.estado == "pendiente",
+                                                              Suscripcion.pendiente_de == "tarjeta")).all()
+    empresas = []
+    for suscripcion in suscripciones:
+        suscripcion.pendiente_de = "whatsapp"
+        empresas.append(session.get(Empresa, suscripcion.empresa_id))
+    session.commit()
+    return empresas
+
+
 def activar_prueba_por_whatsapp(session: Session, empresa: Empresa, momento: datetime | None = None) -> Suscripcion | None:
     """Si la cuenta esperaba que escribiera desde su WhatsApp, empieza su prueba. Devuelve la suscripción si la activó."""
     suscripcion = suscripcion_de(session, empresa)

@@ -447,8 +447,8 @@ def datos_panel(session, momento: datetime | None = None) -> tuple[Indicadores, 
         if sus and sus.estado == "prueba" and mandato is None and dias is not None and dias < DIAS_POR_VENCER:
             motivos.append(("Prueba termina sin suscripción", "critico"))
         if sus and sus.estado == "pendiente" and momento - empresa.creada_en > timedelta(hours=24):
-            motivos.append(("No activó la prueba (no ha escrito por WhatsApp)" if sus.pendiente_de == "whatsapp"
-                            else "No activó la prueba (falta tarjeta)", "atencion"))
+            motivos.append(("Sin activar: falta escribir por WhatsApp" if sus.pendiente_de == "whatsapp"
+                            else "Sin activar: falta tarjeta", "atencion"))
         if sus and sus.prueba_repetida and sus.estado == "vencida":
             motivos.append(("Prueba repetida: su cuenta de Mercado Pago ya la usó", "info"))
         elif sus and sus.estado == "vencida" and dias is not None and dias > -7:

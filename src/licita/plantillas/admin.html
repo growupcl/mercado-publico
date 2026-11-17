@@ -35,6 +35,8 @@ main{padding-block:28px 56px}
 .aldia{display:flex;gap:10px;align-items:center;background:var(--ok-soft);color:var(--ok);border-radius:12px;padding:14px 16px;font-weight:600}
 /* Etiquetas de estado y motivos: siempre ícono + texto */
 .et-estado,.motivo{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap}
+/* Los motivos pueden ser largos: se parten en líneas dentro de la tarjeta en vez de salirse. */
+.motivo{white-space:normal;max-width:100%;align-items:flex-start;line-height:1.35;padding:4px 10px;border-radius:12px}
 .e-prueba{background:var(--gold-soft);color:var(--gold)} .e-activa{background:var(--ok-soft);color:var(--ok)}
 .e-vencida{background:var(--error-soft);color:var(--error)} .e-otro{background:var(--brand-soft);color:var(--brand)}
 .motivo.critico{background:var(--error-soft);color:var(--error)} .motivo.atencion{background:var(--gold-soft);color:var(--gold)}

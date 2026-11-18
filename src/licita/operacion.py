@@ -19,6 +19,7 @@ IMPACTO = {
     "sync": "No se sincronizaron las órdenes de compra del día (precios de referencia).",
     "suscripciones": "No se revisaron los vencimientos ni los cobros rechazados.",
     "avisos-prueba": "No salieron los avisos de fin de prueba ni de primer cobro.",
+    "radar": "Las empresas Pro no recibieron el aviso semanal de licitaciones que suelen repetirse (Se viene).",
     "agenda": "Algunas empresas no recibieron los avisos de plazos o el resultado de las licitaciones a las que van a postular.",
     "historico-oc": "No se cargó el histórico de órdenes de compra.",
     "indexnow": "No se avisó a los buscadores de las licitaciones nuevas (no afecta a los clientes).",

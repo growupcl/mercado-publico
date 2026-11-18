@@ -57,7 +57,36 @@ COLUMNAS = {
     "fecha": ("FechaEnvio", "FechaCreacion"),
     "nombre": ("Nombre",),
     "rubro": ("RubroN3", "RubroN2", "RubroN1", "Categoria"),
+    "procedencia": ("ProcedenciaOC",),
+    "es_compra_agil": ("EsCompraAgil",),
+    "es_trato_directo": ("EsTratoDirecto",),
+    "codigo_licitacion": ("CodigoLicitacion",),
+    "convenio_marco": ("Codigo_ConvenioMarco",),
 }
+VACIOS = {"", "na", "n/a", "null", "0", "-"}
+
+
+def _valor(texto: str) -> str:
+    return "" if (texto or "").strip().lower() in VACIOS else texto.strip()
+
+
+def origen_compra(fila: dict[str, str]) -> tuple[str, str]:
+    """(origen, código de licitación) de una línea: "licitacion", "compra_agil", "convenio_marco", "trato_directo",
+    "otro" o "" si el archivo no trae esas columnas (los meses antiguos)."""
+    procedencia = (fila.get("procedencia") or "").lower()
+    licitacion = _valor(fila.get("codigo_licitacion", ""))[:40]
+    si = lambda campo: (fila.get(campo) or "").strip().lower() in ("si", "sí", "1", "true")  # noqa: E731
+    if not (procedencia or licitacion or fila.get("es_compra_agil") or fila.get("convenio_marco")):
+        return "", ""
+    if si("es_compra_agil") or "gil" in procedencia or "-COT" in licitacion.upper():
+        return "compra_agil", licitacion
+    if _valor(fila.get("convenio_marco", "")) or "convenio" in procedencia:
+        return "convenio_marco", ""
+    if licitacion or "licitaci" in procedencia:
+        return "licitacion", licitacion
+    if si("es_trato_directo") or "trato directo" in procedencia:
+        return "trato_directo", ""
+    return "otro", ""
 
 
 def numero(valor: str | None) -> float | None:
@@ -102,6 +131,7 @@ class ResumenHistorico:
     ya_estaban: int = 0
     filtrados: int = 0  # sin relación con los clientes
     descartados: int = 0  # canceladas, otra moneda o sin precio
+    completados: int = 0  # ya estaban y se les agregó el origen (licitación, Convenio Marco…)
 
     def sumar(self, otro: "ResumenHistorico") -> None:
         for campo in self.__dataclass_fields__:
@@ -144,10 +174,18 @@ def _guardar_lote(session: Session, lote: list[Precio], resumen: ResumenHistoric
     if not lote:
         return
     codigos = {p.referencia for p in lote}
-    existentes = set(session.execute(
-        select(Precio.referencia, Precio.posicion).where(Precio.fuente == FUENTE, Precio.referencia.in_(codigos))
-    ).all())
+    existentes = {(ref, pos): (id_, origen) for id_, ref, pos, origen in session.execute(
+        select(Precio.id, Precio.referencia, Precio.posicion, Precio.origen)
+        .where(Precio.fuente == FUENTE, Precio.referencia.in_(codigos))
+    ).all()}
     nuevos = [p for p in lote if (p.referencia, p.posicion) not in existentes]
+    # Las que ya estaban, cargadas antes de guardar el origen: se completa sin duplicar.
+    completar = [{"id": existentes[(p.referencia, p.posicion)][0], "origen": p.origen, "codigo_licitacion": p.codigo_licitacion}
+                 for p in lote if (p.referencia, p.posicion) in existentes and p.origen
+                 and not existentes[(p.referencia, p.posicion)][1]]
+    if completar:
+        session.bulk_update_mappings(Precio, completar)
+        resumen.completados += len(completar)
     resumen.ya_estaban += len(lote) - len(nuevos)
     session.add_all(nuevos)
     session.commit()
@@ -184,7 +222,9 @@ def importar_csv(
             _guardar_lote(session, lote, resumen)
             lote, ordenes_en_lote = [], set()
         ordenes_en_lote.add(codigo)
+        origen, licitacion = origen_compra(fila)
         lote.append(Precio(
+            origen=origen, codigo_licitacion=licitacion,
             fuente=FUENTE, referencia=codigo, posicion=posicion, codigo_producto=fila["codigo_producto"].split(".")[0],
             producto=producto[:2000], unidad=fila["unidad"][:60], precio_unitario=precio, cantidad=numero(fila["cantidad"]),
             proveedor_rut=fila["proveedor_rut"][:20], proveedor_nombre=fila["proveedor_nombre"], organismo=fila["organismo"],

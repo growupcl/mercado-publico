@@ -179,6 +179,7 @@ crontab -l
 | Domingo 4:00 | Limpieza de Compras Ágiles antiguas que no le sirvieron a ningún cliente |
 | 3:15 | Vencimiento de suscripciones impagas |
 | 8:40 | Agenda "Voy a postular": plazos de hoy y mañana, y resultados de las licitaciones que ya cerraron |
+| Lunes 9:10 | Radar "Se viene" (plan Pro): organismos que licitan seguido lo de cada empresa y podrían publicar pronto |
 | 2:45 | Respaldo de la base de datos (se guardan 14 días en `/var/backups/calza`) |
 
 El registro de cada tarea queda en `/opt/calza/logs/tareas.log`.

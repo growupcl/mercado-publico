@@ -95,6 +95,7 @@ def registrar_precios_adjudicacion(session: Session, lic: Licitacion) -> int:
             unidad=it.get("unidad") or "", precio_unitario=adj["precio_unitario"], cantidad=_cantidad(adj.get("cantidad")),
             proveedor_rut=adj.get("proveedor_rut") or "", proveedor_nombre=adj.get("proveedor_nombre") or "",
             organismo=lic.organismo, region=lic.region, fecha=lic.fecha_adjudicacion or lic.fecha_cierre,
+            origen="licitacion", codigo_licitacion=lic.codigo,
         ))
         nuevos += 1
     return nuevos
@@ -127,6 +128,7 @@ def registrar_cotizaciones_compra_agil(session: Session, lic: Licitacion, provee
             producto=" ".join(filter(None, [prod.get("nombre_producto"), prod.get("descripcion")])).strip(),
             unidad=unidades.get(codigo, ""), precio_unitario=precio, cantidad=_cantidad(prod.get("cantidad")),
             proveedor_rut=prov.get("rut_proveedor") or "", proveedor_nombre=prov.get("razon_social") or "",
+            origen="compra_agil", codigo_licitacion=lic.codigo,
             organismo=lic.organismo, region=lic.region, fecha=lic.fecha_cierre,
         ))
     return len(filas)

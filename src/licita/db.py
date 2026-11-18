@@ -223,6 +223,10 @@ class Precio(Base):
     organismo: Mapped[str] = mapped_column(Text, default="")
     region: Mapped[str] = mapped_column(String(120), default="")
     fecha: Mapped[datetime | None] = mapped_column(DateTime, index=True)
+    # Cómo se compró: "licitacion", "compra_agil", "convenio_marco", "trato_directo" u "otro" ("" = no se sabe).
+    origen: Mapped[str] = mapped_column(String(20), default="", server_default="")
+    # Licitación de la que salió la compra (para no contar como compras distintas las órdenes de un mismo contrato).
+    codigo_licitacion: Mapped[str] = mapped_column(String(40), default="", server_default="", index=True)
 
 
 class Suscripcion(Base):
@@ -299,6 +303,18 @@ class Postulacion(Base):
     avisos: Mapped[list[str]] = mapped_column(JSON, default=list)  # hitos ya avisados ("preguntas", "cierre_hoy"…)
     creada_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
     revisada_en: Mapped[datetime | None] = mapped_column(DateTime)  # última consulta del resultado a la API
+
+
+class AvisoRadar(Base):
+    """Previsión del radar "Se viene" ya avisada a una empresa (para no repetirla cada semana)."""
+
+    __tablename__ = "avisos_radar"
+    __table_args__ = (UniqueConstraint("empresa_id", "clave"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    empresa_id: Mapped[int] = mapped_column(ForeignKey("empresas.id"), index=True)
+    clave: Mapped[str] = mapped_column(String(200))  # organismo|código de producto|año-mes previsto
+    enviado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
 
 
 class Pago(Base):

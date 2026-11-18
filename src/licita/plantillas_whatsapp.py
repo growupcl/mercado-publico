@@ -103,8 +103,17 @@ RECORDATORIO_POSTULACION = Plantilla(
     uso="Plazos (preguntas, visita, cierre) y resultado de las licitaciones que la empresa marcó \"Voy a postular\".",
 )
 
+SE_VIENE = Plantilla(
+    nombre="se_viene_recompras",
+    cuerpo=("Hola {{1}}, encontramos {{2}} que se licitan seguido y podrían publicarse en las próximas semanas, por "
+            "ejemplo: {{3}}. Toca el botón para verlas y prepararte antes."),
+    ejemplos=("Aseo Sur", "3 compras", "Hospital de San Carlos, guantes de nitrilo, a principios de diciembre"),
+    botones=("Ver cuáles",),
+    uso="Radar semanal del plan Pro: organismos que licitan lo mismo cada año y podrían volver a hacerlo pronto.",
+)
+
 PLANTILLAS = {p.nombre: p for p in (RESUMEN_DIARIO, RESUMEN_DIARIO_SIMPLE, COBRO_RECHAZADO, ALERTA_COMPRA_AGIL,
-                                    FIN_PRUEBA, SUSCRIPCION_TERMINADA, RECORDATORIO_POSTULACION)}
+                                    FIN_PRUEBA, SUSCRIPCION_TERMINADA, RECORDATORIO_POSTULACION, SE_VIENE)}
 
 # Qué responde Calza cuando el usuario toca cada botón (el payload se define al enviar).
 PAYLOADS_RESUMEN = {

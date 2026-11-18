@@ -26,7 +26,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 from sqlalchemy.orm import sessionmaker
 
-from .db import Calce, Empresa, Invitacion, Licitacion, MandatoPago, Postulacion, MensajeWhatsApp, Pago, Suscripcion, ahora, hora_chile
+from .db import AvisoRadar, Calce, Empresa, Invitacion, Licitacion, MandatoPago, Postulacion, Precio, MensajeWhatsApp, Pago, Suscripcion, ahora, hora_chile
 from .planes import DIAS_PRUEBA, PERIODICIDADES, PLANES, formato_pesos
 from .publico import REGION_POR_SLUG, REGIONES_PUBLICAS, Ficha, Region, buscar, cargar_abiertas
 from .whatsapp import normalizar_telefono
@@ -215,6 +215,8 @@ def _tipo_de_mensaje(tipo: str, contenido: str) -> str:
     texto = (contenido or "").strip().lower()
     if tipo == "documento":
         return "Envió bases (PDF o Word)"
+    if tipo == "boton" and contenido == "SE_VIENE" or texto in ("se viene", "radar"):
+        return "SE VIENE (radar)"
     if tipo == "boton" and contenido.startswith("POSTULO:"):
         return "Marcó 📌 Voy a postular"
     if tipo == "boton":
@@ -283,6 +285,8 @@ def datos_piloto(session, momento: datetime | None = None) -> dict:
         "postulaciones": session.scalar(select(func.count()).select_from(Postulacion)) or 0,
         "postulaciones_activas": session.scalar(select(func.count()).select_from(Postulacion).where(Postulacion.activa.is_(True))) or 0,
         "empresas_postulando": session.scalar(select(func.count(func.distinct(Postulacion.empresa_id)))) or 0,
+        "avisos_radar": session.scalar(select(func.count()).select_from(AvisoRadar)) or 0,
+        "compras_con_origen": session.scalar(select(func.count()).select_from(Precio).where(Precio.origen == "licitacion")) or 0,
     }
 
 

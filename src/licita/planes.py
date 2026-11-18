@@ -33,6 +33,7 @@ PLANES = {
         "Todo lo del plan Pyme",
         "Compras Ágiles que calzan contigo, en tu resumen diario",
         "Alertas urgentes por WhatsApp apenas se publica una Compra Ágil para ti",
+        "Radar \"Se viene\": qué organismos licitan lo tuyo cada año, semanas antes de que publiquen",
         "Precios de referencia: cuánto ha pagado el Estado por lo mismo y si el presupuesto deja margen",
         "Análisis de bases en PDF o Word: hasta 50 al mes",
     )),

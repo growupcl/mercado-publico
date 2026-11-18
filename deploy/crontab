@@ -34,6 +34,8 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 5 10 * * *      /opt/calza/deploy/tareas.sh avisos-prueba
 # 8:40: agenda "Voy a postular" (plazos de hoy y mañana, y resultados de las que ya cerraron).
 40 8 * * *      /opt/calza/deploy/tareas.sh agenda
+# Lunes 9:10: radar "Se viene" (plan Pro): organismos que podrían volver a licitar lo de cada empresa pronto.
+10 9 * * 1      /opt/calza/deploy/tareas.sh radar
 
 # 2:45: respaldo de la base de datos.
 45 2 * * *      /opt/calza/deploy/respaldo.sh >> /opt/calza/logs/respaldos.log 2>&1

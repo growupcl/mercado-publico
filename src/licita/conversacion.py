@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 import anthropic
 
 from .agenda import marcar_postulacion, quitar_de_agenda, texto_agenda
+from .radar import previsiones, texto_radar
 from .semaforo import texto_semaforo
 from .analisis import DocumentoInvalido, LimiteAlcanzado, ServicioAnalisis, detectar_codigo, textos_analisis
 from .db import AnalisisBases, Calce, Empresa, Licitacion, MensajeWhatsApp, ahora, hora_chile
@@ -42,6 +43,7 @@ TEXTO_AYUDA = (
     "• Escribe *PRECIOS* después de ver una licitación para saber cuánto ha pagado el Estado por lo mismo.\n"
     "• Envíame el *PDF de las bases* de una licitación y te digo qué piden, plazos, garantías y cómo se evalúa.\n"
     "• Toca *📌 Voy a postular* en una licitación y te aviso de sus plazos hasta saber quién ganó. Escribe *AGENDA* para verlas.\n"
+    "• Escribe *SE VIENE* para ver qué organismos suelen licitar lo tuyo y podrían publicar pronto (plan Pro).\n"
     "• Escribe *PERFIL* para cambiar qué vendes, tus regiones o tu monto máximo.\n"
     "• Escribe *CUENTA* para ver tu plan o pagar.\n"
     "• Escribe *BAJA* si ya no quieres recibir mensajes."
@@ -274,6 +276,12 @@ def responder(
         if calce is not None and calce.valoracion is None:
             calce.valoracion, calce.valorado_en = 1, momento  # si va a postular, le sirve
         return [marcar_postulacion(session, empresa, lic, momento)]
+
+    if texto == "SE_VIENE" or comando in ("se viene", "radar", "sevienen", "se vienen"):
+        if empresa.plan not in PLANES_CON_PRECIOS:
+            return ["🔭 *Se viene* es parte del plan Pro: te aviso qué organismos licitan lo tuyo cada año, semanas "
+                    "antes de que publiquen. Escribe *CUENTA* para cambiarte de plan."]
+        return [texto_radar(previsiones(session, empresa, momento))]
 
     if comando in ("agenda", "mi agenda", "postulaciones", "mis postulaciones"):
         return [texto_agenda(session, empresa, momento)]

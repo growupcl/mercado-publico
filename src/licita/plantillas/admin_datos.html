@@ -45,6 +45,7 @@
       <p class="muted" style="margin:0">{{ d.mensajes }} mensajes de {{ d.empresas_que_escribieron }} {{ "empresa" if d.empresas_que_escribieron == 1 else "empresas" }}</p>
       {{ tabla(d.uso, "Nadie ha escrito en estos días.") }}
       <p class="muted" style="margin:0">📌 Agenda: {{ d.postulaciones }} {{ "licitación marcada" if d.postulaciones == 1 else "licitaciones marcadas" }} "Voy a postular" por {{ d.empresas_postulando }} {{ "empresa" if d.empresas_postulando == 1 else "empresas" }} ({{ d.postulaciones_activas }} en curso).</p>
+      <p class="muted" style="margin:0">🔭 Radar: {{ d.avisos_radar }} {{ "previsión avisada" if d.avisos_radar == 1 else "previsiones avisadas" }} · {{ d.compras_con_origen | miles }} compras con licitación de origen en el histórico{% if not d.compras_con_origen %} (recarga el histórico para activarlo){% endif %}.</p>
     </section>
   </div>
   <section class="tarjeta pila">

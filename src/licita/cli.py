@@ -338,6 +338,16 @@ def cmd_prueba_sin_tarjeta(args, config: Config, Sesion) -> int:
     return 0
 
 
+def cmd_radar(args, config: Config, Sesion) -> int:
+    from .radar import ejecutar_radar
+
+    wa, correo = (_whatsapp(config) if config.whatsapp_token else None), _correo(config)
+    with Sesion() as s:
+        r = ejecutar_radar(s, wa=wa, correo=correo, idioma=config.whatsapp_idioma)
+    print(f"Radar Se viene: {r.previsiones} previsiones nuevas a {r.empresas} empresas · {r.sin_enviar} sin enviar")
+    return 1 if r.sin_enviar else 0
+
+
 def cmd_agenda(args, config: Config, Sesion) -> int:
     from .agenda import ejecutar_agenda
     from .mercadopublico import MercadoPublicoClient
@@ -453,7 +463,8 @@ def cmd_historico_oc(args, config: Config, Sesion) -> int:
 
     def informar(etiqueta, r):
         print(f"{etiqueta}: {r.lineas:,} líneas de {r.ordenes:,} órdenes · {r.guardados:,} precios nuevos · "
-              f"{r.ya_estaban:,} ya estaban · {r.filtrados:,} de otros rubros · {r.descartados:,} descartados".replace(",", "."))
+              f"{r.ya_estaban:,} ya estaban ({r.completados:,} con origen agregado) · {r.filtrados:,} de otros rubros · "
+              f"{r.descartados:,} descartados".replace(",", "."))
 
     with Sesion() as s:
         interes = None if args.todo else interes_de_clientes(s)
@@ -615,6 +626,9 @@ def construir_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("prueba-sin-tarjeta", help="Pasa las cuentas que esperaban tarjeta a la prueba que se activa por WhatsApp")
     s.set_defaults(fn=cmd_prueba_sin_tarjeta)
+
+    s = sub.add_parser("radar", help="Avisa a las empresas Pro qué organismos podrían volver a licitar lo suyo pronto")
+    s.set_defaults(fn=cmd_radar)
 
     s = sub.add_parser("agenda", help="Avisa los plazos y resultados de las licitaciones marcadas \"Voy a postular\"")
     s.set_defaults(fn=cmd_agenda)

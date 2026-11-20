@@ -220,7 +220,7 @@ class Precio(Base):
     cantidad: Mapped[float | None] = mapped_column(Float)
     proveedor_rut: Mapped[str] = mapped_column(String(20), default="")
     proveedor_nombre: Mapped[str] = mapped_column(Text, default="")
-    organismo: Mapped[str] = mapped_column(Text, default="")
+    organismo: Mapped[str] = mapped_column(Text, default="", index=True)
     region: Mapped[str] = mapped_column(String(120), default="")
     fecha: Mapped[datetime | None] = mapped_column(DateTime, index=True)
     # Cómo se compró: "licitacion", "compra_agil", "convenio_marco", "trato_directo" u "otro" ("" = no se sabe).

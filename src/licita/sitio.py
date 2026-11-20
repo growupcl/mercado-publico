@@ -22,10 +22,11 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import sessionmaker
 
 from .db import ahora
+from .radar import calendario_organismo
 from .planes import DIAS_PRUEBA, PLANES, PRECIO_FUNDADOR_PRO, formato_pesos, monto
 from .publico import (
     POR_PAGINA, REGION_POR_SLUG, REGIONES_PUBLICAS, RUBRO_POR_SLUG, RUBROS, Cache, Ficha, adjudicadas_recientes, buscar, cargar_abiertas,
-    a_organismo, cargar_ficha, ejemplo_resumen, estadisticas, nombre_organismo, organismos_recientes, pagina, recientes_de_organismo,
+    a_organismo, cargar_ficha, con_articulo, ejemplo_resumen, estadisticas, nombre_organismo, organismos_recientes, pagina, recientes_de_organismo,
     slug_organismo,
 )
 
@@ -142,8 +143,15 @@ def precios_publicos(session, f: Ficha) -> list[dict]:
     return filas
 
 
-def faq_organismo(nombre: str, con_tarjeta: bool = False) -> list[tuple[str, str]]:
-    return [
+def faq_organismo(nombre: str, con_tarjeta: bool = False, calendario: list | None = None) -> list[tuple[str, str]]:
+    cuando = []
+    if calendario:
+        ejemplos = "; ".join(f"{r.producto.lower()} (licitó en {r.licito_en})" for r in calendario[:3])
+        cuando = [(f"¿Cuándo licita {nombre}?",
+                   f"Según sus compras de los últimos años, {nombre} licita seguido, por ejemplo: {ejemplos}. "
+                   f"La próxima vez podría ser alrededor de {calendario[0].cuando}. Son estimaciones: las fechas "
+                   "dependen del organismo. Con el plan Pro de Calza te avisamos semanas antes.")]
+    return cuando + [
         (f"¿Cómo le vendo {a_organismo(nombre)}?",
          f"{nombre} compra a través de Mercado Público. Para ofertar necesitas una cuenta de proveedor en "
          "mercadopublico.cl; cada licitación tiene sus bases, plazos y requisitos, y la oferta se presenta en la ficha "
@@ -168,6 +176,7 @@ def crear_router_publico(
     indexnow = clave_indexnow(url_publica)
     plantillas.env.filters["miles"] = lambda n: f"{n:,}".replace(",", ".")
     plantillas.env.filters["a_organismo"] = a_organismo
+    plantillas.env.filters["con_articulo"] = con_articulo
     plantillas.env.globals["item_list_ld"] = lambda fichas, desde=0: [
         {"@type": "ListItem", "position": desde + i, "url": f"{url_publica}/licitacion/{f.codigo}", "name": f.nombre}
         for i, f in enumerate(fichas, 1)
@@ -295,6 +304,19 @@ def crear_router_publico(
             return conocidos
         return organismos_cache.obtener("organismos", calcular)
 
+    calendarios = Cache(segundos=6 * 3600)
+
+    def calendario_de(organismo: str) -> list:
+        """Calendario de lo que licita el organismo (6 horas en cache). Si falla, la página sale sin él."""
+        def calcular():
+            try:
+                with Sesion() as s:
+                    return calendario_organismo(s, organismo)
+            except Exception:
+                log.exception("No se pudo calcular el calendario de %s", organismo)
+                return []
+        return calendarios.obtener(f"calendario:{organismo}", calcular)
+
     @router.get("/licitaciones/organismo/{org_slug}", response_class=HTMLResponse)
     def por_organismo(request: Request, org_slug: str):
         organismo = organismos().get(org_slug) if len(org_slug) <= 90 else None
@@ -304,13 +326,14 @@ def crear_router_publico(
         propias = [f for f in abiertas() if f.organismo == organismo]
         with Sesion() as s:
             recientes = recientes_de_organismo(s, organismo, excluir={f.codigo for f in propias})
+        calendario = calendario_de(organismo)
         region = next((r for r in REGIONES_PUBLICAS if any(r.contiene(f) for f in propias + recientes)), None)
-        faq = faq_organismo(nombre, con_tarjeta)
+        faq = faq_organismo(nombre, con_tarjeta, calendario)
         return html(request, "organismo.html", {
-            "nombre": nombre, "abiertas": propias, "recientes": recientes, "region": region,
+            "nombre": nombre, "abiertas": propias, "recientes": recientes, "region": region, "calendario": calendario,
             "canonical": f"{url_publica}/licitaciones/organismo/{org_slug}",
             "migas": [("Licitaciones", "/licitaciones"), (nombre, f"/licitaciones/organismo/{org_slug}")],
-            "indexable": bool(propias) or len(recientes) >= 3, "dias_prueba": DIAS_PRUEBA, "faq": faq,
+            "indexable": bool(propias) or len(recientes) >= 3 or bool(calendario), "dias_prueba": DIAS_PRUEBA, "faq": faq,
             "faq_ld": [{"@type": "Question", "name": p, "acceptedAnswer": {"@type": "Answer", "text": r}} for p, r in faq],
         })
 

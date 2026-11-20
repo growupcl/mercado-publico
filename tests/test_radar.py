@@ -102,3 +102,44 @@ def test_comando_se_viene(Sesion):
         assert "es parte del plan Pro" in responder(s, e, "texto", "se viene", momento=UTC)[0]
         e.plan = "pro"
         assert "Por ahora no veo licitaciones" in responder(s, e, "boton", "SE_VIENE", momento=UTC)[0]
+
+
+def test_calendario_del_organismo(Sesion):
+    from licita.radar import calendario_organismo
+
+    with Sesion() as s:
+        _oc(s, "OC-1", "100-1-LE24", datetime(2024, 12, 10))
+        _oc(s, "OC-2", "100-9-LE25", datetime(2025, 12, 5))
+        _oc(s, "OC-3", "", datetime(2025, 3, 1), origen="convenio_marco")
+        s.add(Precio(fuente="orden_de_compra", referencia="OC-9", posicion=0, codigo_producto="44121700",
+                     producto="Lápices pasta azul marca X caja de 50", precio_unitario=100, cantidad=1,
+                     organismo="HOSPITAL DE SAN CARLOS", fecha=datetime(2023, 6, 1), origen="licitacion",
+                     codigo_licitacion="300-1-LE23"))
+        s.add(Precio(fuente="orden_de_compra", referencia="OC-10", posicion=0, codigo_producto="44121700",
+                     producto="Lápices pasta", precio_unitario=100, cantidad=1, organismo="HOSPITAL DE SAN CARLOS",
+                     fecha=datetime(2025, 1, 10), origen="licitacion", codigo_licitacion="300-2-LE25"))
+        s.commit()
+        [r] = calendario_organismo(s, "HOSPITAL DE SAN CARLOS", UTC)  # lápices: ritmo roto (19 meses)
+        assert (r.producto, r.licito_en, r.cuando) == ("Guantes", "dic 2024 y dic 2025", "noviembre de 2026")
+        assert calendario_organismo(s, "Otro organismo", UTC) == []
+
+
+def test_pagina_del_organismo_muestra_el_calendario(Sesion):
+    from fastapi.testclient import TestClient
+
+    from licita.servidor import crear_app
+    from licita.web import crear_router_web
+
+    with Sesion() as s:
+        s.add(Licitacion(codigo="100-5-LE26", nombre="Guantes de látex", estado_codigo=6, organismo="HOSPITAL DE SAN CARLOS",
+                         fecha_publicacion=datetime.now() - timedelta(days=20), fecha_cierre=datetime.now() - timedelta(days=5),
+                         items=[], raw={}, descripcion="", tipo="", region="", comuna="", moneda="CLP"))
+        hace = datetime.now() - timedelta(days=300)  # relativo a hoy: el test no vence con el tiempo
+        _oc(s, "OC-1", "100-1-LE24", hace - timedelta(days=365))
+        _oc(s, "OC-2", "100-9-LE25", hace)
+        s.commit()
+    cliente = TestClient(crear_app(Sesion, router_web=crear_router_web(Sesion, mp=None, ia=None, url_publica="https://calza.cl")))
+    r = cliente.get("/licitaciones/organismo/hospital-de-san-carlos")
+    assert r.status_code == 200
+    assert "¿Qué suele licitar y cuándo?" in r.text and "Guantes" in r.text
+    assert "¿Cuándo licita Hospital de San Carlos?" in r.text and "de que el Hospital de San Carlos vuelva a licitar" in r.text

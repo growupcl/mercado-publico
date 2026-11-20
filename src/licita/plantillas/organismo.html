@@ -31,6 +31,23 @@
 </section>
 {% endif %}
 
+{% if calendario %}
+<section class="pila" style="margin-bottom:32px" aria-labelledby="t-calendario">
+  <h2 id="t-calendario">¿Qué suele licitar y cuándo?</h2>
+  <p class="muted" style="margin:0">Según sus licitaciones de los últimos años (sin contar compras por Convenio Marco ni Compra Ágil).</p>
+  <div class="tabla"><table>
+    <thead><tr><th scope="col">Producto o servicio</th><th scope="col">Licitó en</th><th scope="col">Próxima probable</th></tr></thead>
+    <tbody>{% for r in calendario %}
+      <tr><td>{{ r.producto }}</td><td>{{ r.licito_en }}</td><td>{{ r.cuando | capitalize }}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  <div class="tarjeta pila" style="padding:16px 18px">
+    <p style="margin:0"><strong>Con Calza Pro te avisamos semanas antes</strong> de que {{ nombre | con_articulo }} vuelva a licitar lo tuyo, para que prepares tu oferta con tiempo. Son estimaciones: las fechas las decide el organismo.</p>
+    <div><a class="boton secundario" href="/registro?plan=pro">Probar Pro {{ dias_prueba }} días gratis</a></div>
+  </div>
+</section>
+{% endif %}
+
 {% if recientes %}
 <section class="pila" style="margin-bottom:32px" aria-labelledby="t-recientes">
   <h2 id="t-recientes">Sus últimas licitaciones</h2>

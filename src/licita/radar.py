@@ -60,6 +60,66 @@ class Prevision:
         return f"a {parte} de {mes}"
 
 
+def estimar_proxima(fechas: list[date]) -> date | None:
+    """Fecha probable de la próxima licitación, si las anteriores muestran un ritmo de 5 a 14 meses."""
+    ordenadas = sorted(fechas)
+    ciclos = [(b - a).days for a, b in zip(ordenadas, ordenadas[1:])]
+    ciclos = [c for c in ciclos if CICLO_MINIMO <= c <= CICLO_MAXIMO]
+    if not ciclos:
+        return None
+    return ordenadas[-1] + timedelta(days=round(statistics.median(ciclos)))
+
+
+@dataclass
+class Recurrente:
+    """Algo que un organismo licita seguido: para su página pública."""
+
+    codigo_producto: str
+    producto: str
+    fechas: list[date]
+    proxima: date
+
+    @property
+    def licito_en(self) -> str:
+        return _fechas([(f, "") for f in self.fechas])
+
+    @property
+    def cuando(self) -> str:
+        return f"{MESES[self.proxima.month - 1]} de {self.proxima.year}"
+
+
+# Si la fecha estimada pasó hace más de esto sin una licitación nueva, el ritmo se rompió: no se muestra.
+TOLERANCIA_ATRASO = 45
+MAXIMO_RECURRENTES = 8
+
+
+def calendario_organismo(session: Session, organismo: str, momento: datetime | None = None) -> list[Recurrente]:
+    """Lo que el organismo licita seguido y cuándo podría volver a hacerlo (solo compras licitadas)."""
+    momento = momento or ahora()
+    hoy = hora_chile(momento).date()
+    desde = momento - timedelta(days=30 * MESES_HISTORIA)
+    por_codigo: dict[str, dict[str, date]] = defaultdict(dict)  # código de producto → licitación → fecha
+    nombres: dict[str, str] = {}
+    for p in session.scalars(select(Precio).where(
+            Precio.organismo == organismo, Precio.origen == "licitacion", Precio.codigo_licitacion != "",
+            Precio.fecha >= desde)):
+        if not p.codigo_producto or not p.fecha:
+            continue
+        actual = por_codigo[p.codigo_producto].get(p.codigo_licitacion)
+        por_codigo[p.codigo_producto][p.codigo_licitacion] = min(actual, p.fecha.date()) if actual else p.fecha.date()
+        nombre = " ".join((p.producto or "").split()[:8])
+        if nombre and (p.codigo_producto not in nombres or len(nombre) < len(nombres[p.codigo_producto])):
+            nombres[p.codigo_producto] = nombre  # el más corto suele ser el nombre genérico
+    resultado = []
+    for codigo, lics in por_codigo.items():
+        fechas = sorted(lics.values())
+        proxima = estimar_proxima(fechas) if len(fechas) >= 2 else None
+        if proxima is None or (hoy - proxima).days > TOLERANCIA_ATRASO:
+            continue
+        resultado.append(Recurrente(codigo, nombres.get(codigo, f"producto {codigo}"), fechas, proxima))
+    return sorted(resultado, key=lambda r: r.proxima)[:MAXIMO_RECURRENTES]
+
+
 def codigos_de_interes(session: Session, empresa: Empresa, momento: datetime | None = None) -> dict[str, str]:
     """Códigos de producto de lo que le calza a la empresa (calces buenos o 👍 de los últimos 6 meses) → nombre."""
     desde = (momento or ahora()) - timedelta(days=180)
@@ -107,12 +167,8 @@ def previsiones(session: Session, empresa: Empresa, momento: datetime | None = N
         if len(lics) < 2 or (organismo, codigo) in abiertas:
             continue  # una sola licitación no muestra ritmo; si ya está abierta, le llega en el resumen
         ordenadas = sorted((d["fecha"], c) for c, d in lics.items())
-        ciclos = [(b[0] - a[0]).days for a, b in zip(ordenadas, ordenadas[1:])]
-        ciclos = [c for c in ciclos if CICLO_MINIMO <= c <= CICLO_MAXIMO]
-        if not ciclos:
-            continue
-        proxima = ordenadas[-1][0] + timedelta(days=round(statistics.median(ciclos)))
-        if not AVISO_DESDE <= (proxima - hoy).days <= AVISO_HASTA:
+        proxima = estimar_proxima([f for f, _ in ordenadas])
+        if proxima is None or not AVISO_DESDE <= (proxima - hoy).days <= AVISO_HASTA:
             continue
         ultima = lics[ordenadas[-1][1]]
         resultado.append(Prevision(

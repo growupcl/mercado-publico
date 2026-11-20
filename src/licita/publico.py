@@ -276,6 +276,16 @@ MASCULINOS_ORGANISMO = ("servicio", "hospital", "ministerio", "gobierno", "insti
                         "liceo", "colegio", "jardín", "jardin", "parque", "museo", "archivo", "tribunal", "banco")
 
 
+def con_articulo(nombre: str) -> str:
+    """"Universidad de Tarapacá" → "la Universidad de Tarapacá"; "Hospital X" → "el Hospital X"; siglas sin artículo."""
+    primera = (nombre.split() or [""])[0].lower()
+    if primera in FEMENINOS_ORGANISMO:
+        return f"la {nombre}"
+    if primera in MASCULINOS_ORGANISMO:
+        return f"el {nombre}"
+    return nombre
+
+
 def a_organismo(nombre: str) -> str:
     """"Universidad de Tarapacá" → "a la Universidad de Tarapacá"; "Hospital de San Carlos" → "al Hospital de San
     Carlos"; las siglas y lo desconocido van sin artículo ("a JUNAEB")."""

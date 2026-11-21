@@ -150,7 +150,7 @@ def faq_organismo(nombre: str, con_tarjeta: bool = False, calendario: list | Non
     cuando = []
     if indicadores is not None and indicadores.como_compra:
         partes = ", ".join(f"{pct}% por {modo.lower()}" for modo, pct in indicadores.como_compra[:3])
-        texto = f"En los últimos dos años, de lo que {nombre} compró en los rubros que analiza Calza, {partes}."
+        texto = f"En los últimos dos años, de lo que {nombre} compró en Mercado Público, {partes}."
         if indicadores.un_oferente:
             uno, total = indicadores.un_oferente
             texto += f" {uno} de sus últimas {total} licitaciones adjudicadas tuvieron un solo oferente."

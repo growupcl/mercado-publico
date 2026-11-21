@@ -22,11 +22,11 @@ a mano desde [datosabiertos.chilecompra.cl](http://datosabiertos.chilecompra.cl/
 ## Comandos
 
 ```bash
-# Carga inicial: 24 meses (unos 60 a 90 minutos; ~2 minutos por mes más la descarga)
-deploy/tareas.sh historico-oc --meses 24 --rubros-publicos
+# Carga inicial: 24 meses completos (2 a 4 horas; ~7 GB, unos 575 bytes por línea con índices)
+deploy/tareas.sh historico-oc --meses 24 --todo
 
 # Semanal (ya está en el crontab, lunes 1:30): mes actual y anterior, que ChileCompra sigue completando
-deploy/tareas.sh historico-oc --meses 2 --rubros-publicos
+deploy/tareas.sh historico-oc --meses 2 --todo
 
 # Cliente de un rubro nuevo: repetir la carga para traer sus productos
 deploy/tareas.sh historico-oc --meses 24
@@ -35,9 +35,10 @@ deploy/tareas.sh historico-oc --meses 24
 docker compose exec app licita historico-oc --archivo /ruta/2026-9.zip /ruta/2026-8.zip
 ```
 
-`--rubros-publicos` suma a los rubros de los clientes los 15 de la portada (aseo, construcción, computación…): es lo
-que alimenta la guía pública de precios (/precios). `--todo` guarda todos los rubros (~20 GB para 24 meses): evítalo
-sin ampliar el disco. La tabla `precios` no entra en el respaldo diario (`deploy/respaldo.sh`): son datos públicos que
+`--todo` guarda todas las órdenes de compra (ChileCompra publica unas 400 a 500 mil líneas al mes: ~7 GB para 24
+meses). Es lo que alimenta la guía pública de precios (/precios) y los indicadores de cada organismo, que así son del
+organismo completo y no solo de algunos rubros. `--rubros-publicos` (clientes más los 15 rubros de la portada) sirve si
+el disco queda justo. La tabla `precios` no entra en el respaldo diario (`deploy/respaldo.sh`): son datos públicos que
 se recargan con estos comandos.
 
 ## Espacio

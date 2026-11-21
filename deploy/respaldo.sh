@@ -18,7 +18,9 @@ umask 077  # los respaldos tienen datos de clientes: solo los lee el usuario cal
 mkdir -p "$destino"
 chmod 700 "$destino"
 archivo="$destino/calza-$(date +%F).sql.gz"
-docker compose exec -T db pg_dump -U calza -d calza | gzip > "$archivo.tmp"
+# Sin los datos de la tabla precios: son públicos (histórico de ChileCompra), pesan el 90% de la base y se recargan
+# con deploy/tareas.sh historico-oc. Guardar 14 copias diarias de ellos llenaría el disco. Su estructura sí se respalda.
+docker compose exec -T db pg_dump -U calza -d calza --exclude-table-data=precios | gzip > "$archivo.tmp"
 mv "$archivo.tmp" "$archivo"
 find "$destino" -name 'calza-*.sql.gz' -mtime +14 -delete
 echo "$(date -Is) respaldo listo: $archivo ($(du -h "$archivo" | cut -f1))"

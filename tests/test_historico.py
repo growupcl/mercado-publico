@@ -114,3 +114,12 @@ def test_comando_importa_un_archivo_descargado(Sesion, tmp_path, monkeypatch, ca
     assert "3 precios nuevos" in capsys.readouterr().out
     assert main(["historico-oc", "--archivo", str(ruta)]) == 0
     assert "no hay clientes con palabras clave" in capsys.readouterr().out
+
+
+def test_interes_rubros_publicos():
+    from licita.publico import interes_rubros_publicos
+
+    interes = interes_rubros_publicos()
+    assert interes("Resma de papel tamaño carta para artículos de oficina")
+    assert interes("Servicio de guardias de seguridad privada")
+    assert not interes("Arriendo de helicóptero")

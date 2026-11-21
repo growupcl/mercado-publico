@@ -222,7 +222,7 @@ deploy/tareas.sh historico-oc --meses 24
 | Usar cualquier comando de Calza | `docker compose exec app licita --help` |
 | Ver y registrar facturas ([facturacion.md](facturacion.md)) | `docker compose exec app licita facturas` |
 | Respaldar ahora | `deploy/respaldo.sh` |
-| Restaurar un respaldo | `gunzip -c /var/backups/calza/calza-AAAA-MM-DD.sql.gz \| docker compose exec -T db psql -U calza -d calza` |
+| Restaurar un respaldo | `gunzip -c /var/backups/calza/calza-AAAA-MM-DD.sql.gz \| docker compose exec -T db psql -U calza -d calza` y después `deploy/tareas.sh historico-oc --meses 24 --rubros-publicos` (el respaldo no trae los precios: son públicos y se recargan) |
 
 **Respaldos fuera del servidor:** además de los automáticos de Vultr, copia de vez en cuando
 `/var/backups/calza` a otro lugar, por ejemplo con `scp calza@IP:/var/backups/calza/*.gz .`.

@@ -17,13 +17,13 @@ from xml.sax.saxutils import escape
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import sessionmaker
 
 from .db import ahora
 from .radar import calendario_organismo
-from .transparencia import indicadores_organismo
+from .transparencia import guia_producto, indicadores_organismo, productos_con_guia
 from .planes import DIAS_PRUEBA, PLANES, PRECIO_FUNDADOR_PRO, formato_pesos, monto
 from .publico import (
     POR_PAGINA, REGION_POR_SLUG, REGIONES_PUBLICAS, RUBRO_POR_SLUG, RUBROS, Cache, Ficha, adjudicadas_recientes, buscar, cargar_abiertas,
@@ -138,7 +138,8 @@ def precios_publicos(session, f: Ficha) -> list[dict]:
         ref = referencia_item(session, item, region=f.region, contexto=f.nombre, presupuesto=presupuesto)
         if ref is None or ref.dispersa or ref.fuera_de_escala or ref.observaciones < MINIMO_COMPRAS_PUBLICO:
             continue
-        filas.append({"producto": item.get("producto") or item.get("categoria") or "", "unidad": item.get("unidad") or "",
+        filas.append({"codigo": str(item.get("codigo_producto")),
+                      "producto": item.get("producto") or item.get("categoria") or "", "unidad": item.get("unidad") or "",
                       "p25": ref.p25, "p75": ref.p75, "observaciones": ref.observaciones,
                       "parecidos": ref.por_similitud or bool(ref.parecidas_a) or ref.por_tamano})
     return filas
@@ -338,6 +339,57 @@ def crear_router_publico(
                 return None
         return calendarios.obtener(f"indicadores:{organismo}", calcular)
 
+    guias = Cache(segundos=12 * 3600)
+
+    def productos_guia() -> dict:
+        """código → producto de la guía de precios (12 horas en cache)."""
+        def calcular():
+            try:
+                with Sesion() as s:
+                    return {p.codigo: p for p in productos_con_guia(s)}
+            except Exception:
+                log.exception("No se pudo armar la lista de la guía de precios")
+                return {}
+        return guias.obtener("productos", calcular)
+
+    @router.get("/precios", response_class=HTMLResponse)
+    def guia_precios(request: Request):
+        productos = sorted(productos_guia().values(), key=lambda p: p.nombre.lower())
+        return html(request, "precios.html", {
+            "productos": productos, "canonical": f"{url_publica}/precios",
+            "migas": [("Guía de precios", "/precios")],
+        })
+
+    @router.get("/precios/{param}", response_class=HTMLResponse)
+    def guia_de_un_producto(request: Request, param: str):
+        producto = productos_guia().get(param.split("-")[0]) if len(param) <= 120 else None
+        if producto is None:
+            raise HTTPException(status_code=404)
+        if param != producto.slug:
+            return RedirectResponse(f"/precios/{producto.slug}", status_code=301)
+
+        def calcular():
+            with Sesion() as s:
+                return guia_producto(s, producto.codigo)
+        g = guias.obtener(f"guia:{producto.codigo}", calcular)
+        if g is None:
+            raise HTTPException(status_code=404)
+        abiertas_producto = [f for f in abiertas() if any(str(it.get("codigo_producto")) == g.codigo for it in f.items)]
+        nombre = g.nombre.lower()
+        faq = [(f"¿Cuánto cuesta {nombre} en Mercado Público?",
+                f"Según {g.compras} compras públicas de los últimos 24 meses, el Estado paga en mediana {formato_pesos(g.mediana)} "
+                f"neto por {g.unidad or 'unidad'}. La mitad de las compras está entre {formato_pesos(g.p25)} y {formato_pesos(g.p75)}."),
+               (f"¿Cómo le vendo {nombre} al Estado?",
+                "Necesitas una cuenta de proveedor en mercadopublico.cl y ofertar en las licitaciones o Compras Ágiles que "
+                "publican los organismos. Calza te avisa por WhatsApp cuando se publica una que calza contigo, con el precio "
+                f"de referencia para competir. Los primeros {DIAS_PRUEBA} días son gratis.")]
+        return html(request, "precio.html", {
+            "g": g, "abiertas": abiertas_producto, "dias_prueba": DIAS_PRUEBA, "faq": faq,
+            "faq_ld": [{"@type": "Question", "name": p, "acceptedAnswer": {"@type": "Answer", "text": r}} for p, r in faq],
+            "canonical": f"{url_publica}/precios/{producto.slug}",
+            "migas": [("Guía de precios", "/precios"), (g.nombre, f"/precios/{producto.slug}")],
+        })
+
     @router.get("/licitaciones/organismo/{org_slug}", response_class=HTMLResponse)
     def por_organismo(request: Request, org_slug: str):
         organismo = organismos().get(org_slug) if len(org_slug) <= 90 else None
@@ -353,7 +405,7 @@ def crear_router_publico(
         faq = faq_organismo(nombre, con_tarjeta, calendario, indicadores)
         return html(request, "organismo.html", {
             "nombre": nombre, "abiertas": propias, "recientes": recientes, "region": region, "calendario": calendario,
-            "ind": indicadores,
+            "ind": indicadores, "guia": productos_guia(),
             "canonical": f"{url_publica}/licitaciones/organismo/{org_slug}",
             "migas": [("Licitaciones", "/licitaciones"), (nombre, f"/licitaciones/organismo/{org_slug}")],
             "indexable": bool(propias) or len(recientes) >= 3 or bool(calendario), "dias_prueba": DIAS_PRUEBA, "faq": faq,
@@ -387,7 +439,7 @@ def crear_router_publico(
         return html(request, "licitacion.html", {
             "f": f, "abierta": abierta, "dias": f.dias_para_cierre(), "rubro": rubro, "region": region,
             "similares": similares[:6], "migas": migas, "canonical": f"{url_publica}/licitacion/{f.codigo}",
-            "precios": precios_de(f) if abierta else [], "indexable": f.indexable,
+            "precios": precios_de(f) if abierta else [], "indexable": f.indexable, "guia": productos_guia(),
             "dias_prueba": DIAS_PRUEBA, "organismo": nombre_organismo(f.organismo),
             "organismo_url": (f"/licitaciones/organismo/{slug_organismo(f.organismo)}"
                               if f.organismo and slug_organismo(f.organismo) in organismos() else ""),
@@ -428,6 +480,8 @@ def crear_router_publico(
                     (f"{url_publica}/registro", None, "0.6")]
             urls += [(f"{url_publica}/licitaciones/region/{r.slug}", hoy, "0.8") for r in REGIONES_PUBLICAS]
             urls += [(f"{url_publica}/licitaciones/rubro/{r.slug}", hoy, "0.8") for r in RUBROS]
+            urls += [(f"{url_publica}/precios", hoy, "0.8")]
+            urls += [(f"{url_publica}/precios/{p.slug}", hoy, "0.6") for p in productos_guia().values()]
             urls += [(f"{url_publica}/licitaciones/organismo/{s}", hoy, "0.6")
                      for s in sorted({slug_organismo(f.organismo) for f in fichas if f.organismo} - {""})]
             urls += [(f"{url_publica}/licitacion/{f.codigo}", _fecha_iso(f.actualizada_en), "0.5") for f in fichas]

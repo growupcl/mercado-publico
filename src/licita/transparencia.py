@@ -151,3 +151,88 @@ def indicadores_organismo(session: Session, organismo: str, momento: datetime | 
         if len(precios) == PRODUCTOS_EN_PAGINA:
             break
     return IndicadoresOrganismo(como_compra, total_origen or total, principal, un_oferente, precios)
+
+
+# --- Guía pública de precios por producto ---
+
+MINIMO_COMPRAS_GUIA = 20
+MINIMO_ORGANISMOS_GUIA = 5
+PRODUCTOS_EN_GUIA = 400
+MINIMO_COMPRAS_REGION = 5
+
+
+@dataclass
+class ProductoGuia:
+    codigo: str
+    nombre: str
+    compras: int
+
+    @property
+    def slug(self) -> str:
+        from .publico import slug
+
+        return f"{self.codigo}-{slug(self.nombre)[:60].strip('-')}"
+
+
+def productos_con_guia(session: Session, momento: datetime | None = None) -> list[ProductoGuia]:
+    """Productos con compras suficientes para una página de precios, del más comprado al menos."""
+    from sqlalchemy import func
+
+    filas = session.execute(
+        select(Precio.codigo_producto, func.count(), func.count(func.distinct(Precio.organismo)), func.min(Precio.producto))
+        .where(Precio.fuente.in_(FUENTES_PAGADAS), Precio.fecha >= _desde(momento), Precio.codigo_producto != "")
+        .group_by(Precio.codigo_producto)
+        .having(func.count() >= MINIMO_COMPRAS_GUIA, func.count(func.distinct(Precio.organismo)) >= MINIMO_ORGANISMOS_GUIA)
+        .order_by(func.count().desc())
+        .limit(PRODUCTOS_EN_GUIA)
+    ).all()
+    return [ProductoGuia(codigo, " ".join((nombre or codigo).split()[:8]), compras) for codigo, compras, _, nombre in filas]
+
+
+@dataclass
+class GuiaPrecio:
+    codigo: str
+    nombre: str
+    unidad: str
+    compras: int
+    organismos: int
+    mediana: float
+    p25: float
+    p75: float
+    por_region: list[tuple[str, float, int]]  # (región, mediana, compras)
+    proveedores: list[tuple[str, int]]  # (proveedor, compras ganadas)
+    tendencia: int | None  # % de cambio de la mediana: últimos 6 meses frente a los 6 anteriores
+
+
+def guia_producto(session: Session, codigo: str, momento: datetime | None = None) -> GuiaPrecio | None:
+    """Cuánto paga el Estado por un producto, en su unidad más usada. None si no hay datos suficientes o confiables."""
+    momento = momento or ahora()
+    filas = list(session.scalars(select(Precio).where(
+        Precio.codigo_producto == codigo, Precio.fuente.in_(FUENTES_PAGADAS), Precio.fecha >= _desde(momento))))
+    if len(filas) < MINIMO_COMPRAS_GUIA:
+        return None
+    unidad = Counter(_unidad(p.unidad) for p in filas).most_common(1)[0][0]
+    filas = [p for p in filas if _unidad(p.unidad) == unidad]
+    validos = set(_sin_atipicos([p.precio_unitario for p in filas]))
+    filas = [p for p in filas if p.precio_unitario in validos]
+    organismos = {normalizar(p.organismo or "").strip() for p in filas}
+    if len(filas) < MINIMO_COMPRAS_GUIA or len(organismos) < MINIMO_ORGANISMOS_GUIA:
+        return None
+    p25, mediana, p75 = _cuartiles(sorted(p.precio_unitario for p in filas))
+    if p25 > 0 and p75 / p25 > DISPERSION_MAXIMA:
+        return None  # el código mezcla cosas de tamaños muy distintos: una "guía" sería engañosa
+    regiones = defaultdict(list)
+    for p in filas:
+        if p.region:
+            regiones[p.region.strip()].append(p.precio_unitario)
+    por_region = sorted(((r, statistics.median(v), len(v)) for r, v in regiones.items() if len(v) >= MINIMO_COMPRAS_REGION),
+                        key=lambda x: -x[2])[:10]
+    proveedores = Counter(p.proveedor_nombre.strip() for p in filas if p.proveedor_nombre).most_common(5)
+    recientes = [p.precio_unitario for p in filas if p.fecha and p.fecha >= momento - timedelta(days=182)]
+    anteriores = [p.precio_unitario for p in filas if p.fecha and momento - timedelta(days=365) <= p.fecha < momento - timedelta(days=182)]
+    tendencia = None
+    if len(recientes) >= 5 and len(anteriores) >= 5:
+        tendencia = round((statistics.median(recientes) / statistics.median(anteriores) - 1) * 100)
+    nombre = min((" ".join((p.producto or "").split()[:8]) for p in filas if p.producto), key=len, default=codigo)
+    return GuiaPrecio(codigo, nombre, unidad, len(filas), len(organismos), mediana, p25, p75, por_region, proveedores,
+                      tendencia)

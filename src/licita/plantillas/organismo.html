@@ -76,7 +76,7 @@
   <div class="tabla"><table>
     <thead><tr><th scope="col">Producto o servicio</th><th scope="col">Pagó (mediana)</th><th scope="col">Resto del Estado (mediana)</th><th scope="col">Diferencia</th></tr></thead>
     <tbody>{% for p in ind.precios %}
-      <tr><td>{{ p.producto }}{% if p.unidad %} <span class="ayuda">({{ p.unidad }})</span>{% endif %}<div class="ayuda">{{ p.compras_organismo }} compras frente a {{ p.compras_estado | miles }}</div></td>
+      <tr><td>{% if guia.get(p.codigo_producto) %}<a href="/precios/{{ guia[p.codigo_producto].slug }}">{{ p.producto }}</a>{% else %}{{ p.producto }}{% endif %}{% if p.unidad %} <span class="ayuda">({{ p.unidad }})</span>{% endif %}<div class="ayuda">{{ p.compras_organismo }} compras frente a {{ p.compras_estado | miles }}</div></td>
           <td>{{ fmt(p.mediana_organismo) }}</td><td>{{ fmt(p.mediana_estado) }}</td>
           <td><strong>{{ p.diferencia }}</strong></td></tr>
     {% endfor %}</tbody>

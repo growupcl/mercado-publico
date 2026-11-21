@@ -111,7 +111,7 @@
     <div class="tabla"><table>
       <thead><tr><th scope="col">Producto o servicio</th><th scope="col">Precio habitual c/u</th><th scope="col">Compras</th></tr></thead>
       <tbody>{% for p in precios %}
-        <tr><td>{{ p.producto }}{% if p.unidad %} <span class="ayuda">({{ p.unidad }})</span>{% endif %}{% if p.parecidos %}<div class="ayuda">Con compras parecidas: revisa que sean comparables</div>{% endif %}</td>
+        <tr><td>{% if guia.get(p.codigo) %}<a href="/precios/{{ guia[p.codigo].slug }}">{{ p.producto }}</a>{% else %}{{ p.producto }}{% endif %}{% if p.unidad %} <span class="ayuda">({{ p.unidad }})</span>{% endif %}{% if p.parecidos %}<div class="ayuda">Con compras parecidas: revisa que sean comparables</div>{% endif %}</td>
             <td>{% if p.p25|round == p.p75|round %}{{ fmt(p.p25) }}{% else %}{{ fmt(p.p25) }} – {{ fmt(p.p75) }}{% endif %}</td>
             <td>{{ p.observaciones | miles }}</td></tr>
       {% endfor %}</tbody>

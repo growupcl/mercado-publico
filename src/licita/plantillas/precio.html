@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% from "_macros.html" import tarjeta_lic, migas as migas_nav %}
+{% block titulo %}¿Cuánto paga el Estado por {{ g.nombre | lower }}? Precio en Mercado Público · Calza{% endblock %}
+{% block descripcion %}El Estado paga en mediana {{ fmt(g.mediana) }} por {{ g.unidad or "unidad" }} de {{ g.nombre | lower }} (habitual {{ fmt(g.p25) }} – {{ fmt(g.p75) }}), según {{ g.compras | miles }} compras públicas de {{ g.organismos }} organismos en los últimos 24 meses.{% endblock %}
+{% block jsonld %}
+<script type="application/ld+json">{{ {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": faq_ld} | tojson }}</script>
+{% endblock %}
+{% block contenido %}
+{{ migas_nav(migas) }}
+<article class="pila" style="max-width:820px">
+  <h1 style="font-size:clamp(26px,4vw,38px)">¿Cuánto paga el Estado por {{ g.nombre | lower }}?</h1>
+  <div class="rejilla" style="gap:12px">
+    <div class="tarjeta"><div class="muted">Precio mediano</div><div style="font-size:28px;font-weight:600">{{ fmt(g.mediana) }}</div><div class="ayuda">por {{ g.unidad or "unidad" }}, neto</div></div>
+    <div class="tarjeta"><div class="muted">Rango habitual</div><div style="font-size:22px;font-weight:600">{{ fmt(g.p25) }} – {{ fmt(g.p75) }}</div><div class="ayuda">la mitad de las compras está en este rango</div></div>
+    <div class="tarjeta"><div class="muted">Base</div><div style="font-size:22px;font-weight:600">{{ g.compras | miles }} compras</div><div class="ayuda">de {{ g.organismos }} organismos, últimos 24 meses{% if g.tendencia is not none %} · {% if g.tendencia > 2 %}subió {{ g.tendencia }}%{% elif g.tendencia < -2 %}bajó {{ -g.tendencia }}%{% else %}estable{% endif %} en el último semestre{% endif %}</div></div>
+  </div>
+
+  {% if abiertas %}
+  <section class="tarjeta pila" style="background:var(--brand-soft);border-color:transparent">
+    <h2 style="margin:0;font-size:22px">Hoy hay {{ abiertas|length }} {{ "licitación abierta" if abiertas|length == 1 else "licitaciones abiertas" }} de este producto</h2>
+    <ul class="lista-lic">{% for f in abiertas[:5] %}{{ tarjeta_lic(f) }}{% endfor %}</ul>
+    <p style="margin:0">¿Lo vendes? Calza te avisa por WhatsApp cada vez que se publica una, con el precio para competir.</p>
+    <div><a class="boton" href="/registro">Avísame gratis por {{ dias_prueba }} días</a></div>
+  </section>
+  {% endif %}
+
+  {% if g.por_region %}
+  <section class="pila"><h2>Precio por región</h2>
+    <div class="tabla"><table>
+      <thead><tr><th scope="col">Región</th><th scope="col">Mediana</th><th scope="col">Compras</th></tr></thead>
+      <tbody>{% for region, mediana, n in g.por_region %}<tr><td>{{ region }}</td><td>{{ fmt(mediana) }}</td><td>{{ n | miles }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+  {% endif %}
+
+  {% if g.proveedores %}
+  <section class="pila"><h2>Quién le vende más al Estado</h2>
+    <div class="tabla"><table>
+      <thead><tr><th scope="col">Proveedor</th><th scope="col">Compras ganadas</th></tr></thead>
+      <tbody>{% for nombre, n in g.proveedores %}<tr><td>{{ nombre }}</td><td>{{ n | miles }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+  {% endif %}
+
+  <p class="ayuda">Precio unitario neto (sin IVA) en la unidad de medida más usada ({{ g.unidad or "unidad" }}), sin valores atípicos, según órdenes de compra y adjudicaciones publicadas en Mercado Público. Cada compra puede tener condiciones distintas (cantidad, marca, despacho, zona): úsalo como referencia.</p>
+
+  <section class="tarjeta pila" style="background:var(--brand-soft);border-color:transparent">
+    <h2 style="margin:0">¿Le vendes {{ g.nombre | lower }} al Estado?</h2>
+    <p style="margin:0">Calza te avisa por WhatsApp las licitaciones que calzan contigo, te dice si el presupuesto deja margen y a qué precio se ha comprado antes, y te recuerda cada plazo hasta saber quién ganó.</p>
+    <div><a class="boton" href="/registro">Probar {{ dias_prueba }} días gratis</a></div>
+  </section>
+
+  <section class="pila" aria-labelledby="t-faq"><h2 id="t-faq">Preguntas frecuentes</h2>
+    {% for pregunta, respuesta in faq %}<details class="faq"{% if loop.first %} open{% endif %}><summary>{{ pregunta }}</summary><p>{{ respuesta }}</p></details>{% endfor %}
+  </section>
+  <p><a href="/precios">← Ver todos los productos de la guía</a></p>
+</article>
+{% endblock %}

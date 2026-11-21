@@ -23,6 +23,7 @@ from sqlalchemy.orm import sessionmaker
 
 from .db import ahora
 from .radar import calendario_organismo
+from .transparencia import indicadores_organismo
 from .planes import DIAS_PRUEBA, PLANES, PRECIO_FUNDADOR_PRO, formato_pesos, monto
 from .publico import (
     POR_PAGINA, REGION_POR_SLUG, REGIONES_PUBLICAS, RUBRO_POR_SLUG, RUBROS, Cache, Ficha, adjudicadas_recientes, buscar, cargar_abiertas,
@@ -143,8 +144,16 @@ def precios_publicos(session, f: Ficha) -> list[dict]:
     return filas
 
 
-def faq_organismo(nombre: str, con_tarjeta: bool = False, calendario: list | None = None) -> list[tuple[str, str]]:
+def faq_organismo(nombre: str, con_tarjeta: bool = False, calendario: list | None = None,
+                  indicadores=None) -> list[tuple[str, str]]:
     cuando = []
+    if indicadores is not None and indicadores.como_compra:
+        partes = ", ".join(f"{pct}% por {modo.lower()}" for modo, pct in indicadores.como_compra[:3])
+        texto = f"En los últimos dos años, de lo que {nombre} compró en los rubros que analiza Calza, {partes}."
+        if indicadores.un_oferente:
+            uno, total = indicadores.un_oferente
+            texto += f" {uno} de sus últimas {total} licitaciones adjudicadas tuvieron un solo oferente."
+        cuando.append((f"¿Cómo compra {nombre}?", texto + " Más empresas compitiendo suele significar mejores precios."))
     if calendario:
         ejemplos = "; ".join(f"{r.producto.lower()} (licitó en {r.licito_en})" for r in calendario[:3])
         cuando = [(f"¿Cuándo licita {nombre}?",
@@ -317,6 +326,18 @@ def crear_router_publico(
                 return []
         return calendarios.obtener(f"calendario:{organismo}", calcular)
 
+    def indicadores_de(organismo: str):
+        """Cómo compra el organismo y sus precios frente al resto del Estado (6 horas en cache)."""
+        def calcular():
+            try:
+                with Sesion() as s:
+                    ind = indicadores_organismo(s, organismo)
+                return None if ind.vacio else ind
+            except Exception:
+                log.exception("No se pudieron calcular los indicadores de %s", organismo)
+                return None
+        return calendarios.obtener(f"indicadores:{organismo}", calcular)
+
     @router.get("/licitaciones/organismo/{org_slug}", response_class=HTMLResponse)
     def por_organismo(request: Request, org_slug: str):
         organismo = organismos().get(org_slug) if len(org_slug) <= 90 else None
@@ -327,10 +348,12 @@ def crear_router_publico(
         with Sesion() as s:
             recientes = recientes_de_organismo(s, organismo, excluir={f.codigo for f in propias})
         calendario = calendario_de(organismo)
+        indicadores = indicadores_de(organismo)
         region = next((r for r in REGIONES_PUBLICAS if any(r.contiene(f) for f in propias + recientes)), None)
-        faq = faq_organismo(nombre, con_tarjeta, calendario)
+        faq = faq_organismo(nombre, con_tarjeta, calendario, indicadores)
         return html(request, "organismo.html", {
             "nombre": nombre, "abiertas": propias, "recientes": recientes, "region": region, "calendario": calendario,
+            "ind": indicadores,
             "canonical": f"{url_publica}/licitaciones/organismo/{org_slug}",
             "migas": [("Licitaciones", "/licitaciones"), (nombre, f"/licitaciones/organismo/{org_slug}")],
             "indexable": bool(propias) or len(recientes) >= 3 or bool(calendario), "dias_prueba": DIAS_PRUEBA, "faq": faq,

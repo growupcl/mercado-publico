@@ -265,7 +265,7 @@ def nombre_organismo(nombre: str) -> str:
     return " ".join(palabras)
 
 
-FEMENINOS_ORGANISMO = ("universidad", "municipalidad", "ilustre", "i.", "dirección", "direccion", "subsecretaría",
+FEMENINOS_ORGANISMO = ("universidad", "municipalidad", "ilustre", "i.", "i", "dirección", "direccion", "subsecretaría",
                        "subsecretaria", "junta", "corporación", "corporacion", "superintendencia", "secretaría",
                        "secretaria", "gobernación", "gobernacion", "delegación", "delegacion", "fiscalía", "fiscalia",
                        "defensoría", "defensoria", "tesorería", "tesoreria", "contraloría", "contraloria", "cámara",

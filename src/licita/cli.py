@@ -468,6 +468,11 @@ def cmd_historico_oc(args, config: Config, Sesion) -> int:
 
     with Sesion() as s:
         interes = None if args.todo else interes_de_clientes(s)
+        if interes is not None and args.rubros_publicos:
+            from .publico import interes_rubros_publicos
+
+            de_clientes, publicos = interes, interes_rubros_publicos()
+            interes = lambda texto: de_clientes(texto) or publicos(texto)  # noqa: E731
         if interes is not None and not _hay_palabras_clave(s):
             print("Aviso: no hay clientes con palabras clave; no se guardará nada. Usa --todo para cargar todos los rubros.")
         if args.archivo:
@@ -612,6 +617,8 @@ def construir_parser() -> argparse.ArgumentParser:
     s.add_argument("--hasta", metavar="AAAA-MM", help="Último mes a cargar (por defecto, el actual)")
     s.add_argument("--archivo", nargs="+", help="Importa .zip o .csv ya descargados en vez de descargarlos")
     s.add_argument("--todo", action="store_true", help="Guarda todos los rubros, no solo los de los clientes (ocupa mucho espacio)")
+    s.add_argument("--rubros-publicos", action="store_true",
+                   help="Además de los rubros de los clientes, los 15 de la portada (para la guía de precios)")
     s.set_defaults(fn=cmd_historico_oc)
 
     s = sub.add_parser("reconstruir-precios", help="Llena la tabla de precios con lo ya sincronizado")

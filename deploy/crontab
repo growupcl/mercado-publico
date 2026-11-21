@@ -22,7 +22,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 30 23 * * *     /opt/calza/deploy/tareas.sh sync --ordenes --max-detalles 1500
 
 # Lunes 1:30: precios del histórico de órdenes de compra (mes actual y anterior, que ChileCompra sigue completando).
-30 1 * * 1      /opt/calza/deploy/tareas.sh historico-oc --meses 2
+30 1 * * 1      /opt/calza/deploy/tareas.sh historico-oc --meses 2 --rubros-publicos
 
 # Domingo 4:00: borra Compras Ágiles cerradas hace más de 60 días que no le sirvieron a ningún cliente.
 0 4 * * 0       /opt/calza/deploy/tareas.sh limpiar

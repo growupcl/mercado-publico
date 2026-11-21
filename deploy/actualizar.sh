@@ -25,4 +25,6 @@ if [ "$antes" != "$(sha256sum deploy/Caddyfile)" ]; then
   docker compose restart caddy
 fi
 docker image prune -f >/dev/null
+# La cache de compilación crece con cada actualización (llegó a 6 GB) y no se usa después de construir la app.
+docker builder prune -f >/dev/null
 docker compose ps

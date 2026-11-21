@@ -203,6 +203,12 @@ RUBROS = [
 RUBRO_POR_SLUG = {r.slug: r for r in RUBROS}
 
 
+def interes_rubros_publicos() -> Callable[[str], bool]:
+    """True si el texto es de alguno de los rubros de la portada (para la guía de precios y las páginas públicas)."""
+    frases = [r for rubro in RUBROS for r in rubro._raices]
+    return lambda texto: any(f <= raices(texto) for f in frases)
+
+
 def cargar_abiertas(session: Session, momento: datetime | None = None) -> list[Ficha]:
     """Licitaciones y Compras Ágiles abiertas, de la más nueva a la más antigua."""
     ahora_cl = hora_chile(momento)

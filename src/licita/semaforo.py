@@ -20,6 +20,8 @@ from sqlalchemy.orm import Session
 from .calce import normalizar
 from .db import Licitacion, Precio, hora_chile
 from .precios import FUENTES_PAGADAS, MESES_HISTORIA, informe_precios
+from .resumen import formato_pesos
+from .transparencia import pago_caro
 
 VERDE, AMARILLO, ROJO = "🟢", "🟡", "🔴"
 # Mismo organismo y producto: con al menos estas compras se puede hablar de "quién suele ganar".
@@ -86,6 +88,18 @@ def _presupuesto(session: Session, lic: Licitacion, momento: datetime) -> Senal 
     return Senal(ROJO, f"El presupuesto está {-holgura:.0%} bajo el precio de mercado: revisa si te da el margen.")
 
 
+def _paga_caro(session: Session, lic: Licitacion, momento: datetime | None) -> Senal | None:
+    """Si el organismo suele pagar mucho más que el resto del Estado por lo mismo: oportunidad para ofertar bien."""
+    comparado = pago_caro(session, lic, momento)
+    if comparado is None:
+        return None
+    veces = f"{comparado.veces:.1f}".replace(".", ",")
+    return Senal(VERDE, f"Este organismo ha pagado {veces} veces lo que paga el resto del Estado por "
+                        f"{comparado.producto.lower()} ({formato_pesos(comparado.mediana_organismo)} frente a "
+                        f"{formato_pesos(comparado.mediana_estado)} por {comparado.unidad or 'unidad'}). "
+                        "Si ofertas a precio de mercado, tienes buenas opciones.")
+
+
 def _exigencias(lic: Licitacion) -> Senal | None:
     requisitos = " ".join((lic.clasificacion or {}).get("requisitos_destacados") or [])
     texto = normalizar(requisitos)
@@ -101,6 +115,7 @@ def senales(session: Session, lic: Licitacion, *, con_precios: bool, momento: da
     lista = [_tiempo(lic, ahora_cl), _competencia(session, lic, ahora_cl), _exigencias(lic)]
     if con_precios:
         lista.insert(2, _presupuesto(session, lic, momento))
+        lista.insert(3, _paga_caro(session, lic, momento))
     return [s for s in lista if s is not None]
 
 

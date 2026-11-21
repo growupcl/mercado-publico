@@ -48,6 +48,48 @@
 </section>
 {% endif %}
 
+{% if ind %}
+<section class="pila" style="margin-bottom:32px" aria-labelledby="t-como-compra">
+  <h2 id="t-como-compra">¿Cómo compra {{ nombre | con_articulo }}?</h2>
+  <p class="muted" style="margin:0">Datos públicos de Mercado Público de los últimos dos años, en los rubros que analiza Calza.</p>
+  <div class="rejilla dos" style="gap:16px">
+    {% if ind.como_compra %}
+    <div class="tarjeta pila" style="padding:18px 20px">
+      <h3 style="font-size:17px;margin:0">De cada $100 que compró</h3>
+      {% for modo, pct in ind.como_compra %}
+      <div><div style="display:flex;justify-content:space-between;font-size:15px"><span>{{ modo }}</span><strong>{{ pct }}%</strong></div>
+        <div style="height:8px;border-radius:4px;background:var(--line)"><div style="height:8px;border-radius:4px;background:var(--brand);width:{{ pct }}%"></div></div></div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% if ind.un_oferente or ind.proveedor_principal %}
+    <div class="tarjeta pila" style="padding:18px 20px">
+      <h3 style="font-size:17px;margin:0">Competencia</h3>
+      {% if ind.un_oferente %}<p style="margin:0"><strong>{{ ind.un_oferente[0] }} de sus últimas {{ ind.un_oferente[1] }}</strong> licitaciones adjudicadas tuvieron un solo oferente.</p>{% endif %}
+      {% if ind.proveedor_principal %}<p style="margin:0">El proveedor con más ventas, {{ ind.proveedor_principal[0] }}, suma el <strong>{{ ind.proveedor_principal[1] }}%</strong> de lo comprado.</p>{% endif %}
+      <p class="ayuda" style="margin:0">Cuando compiten pocas empresas, los precios suelen ser más altos: ahí hay espacio para nuevas ofertas.</p>
+    </div>
+    {% endif %}
+  </div>
+  {% if ind.precios %}
+  <h3 style="font-size:18px;margin:8px 0 0">Lo que paga frente al resto del Estado</h3>
+  <div class="tabla"><table>
+    <thead><tr><th scope="col">Producto o servicio</th><th scope="col">Pagó (mediana)</th><th scope="col">Resto del Estado (mediana)</th><th scope="col">Diferencia</th></tr></thead>
+    <tbody>{% for p in ind.precios %}
+      <tr><td>{{ p.producto }}{% if p.unidad %} <span class="ayuda">({{ p.unidad }})</span>{% endif %}<div class="ayuda">{{ p.compras_organismo }} compras frente a {{ p.compras_estado | miles }}</div></td>
+          <td>{{ fmt(p.mediana_organismo) }}</td><td>{{ fmt(p.mediana_estado) }}</td>
+          <td><strong>{{ p.diferencia }}</strong></td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  <p class="ayuda" style="margin:0">Precio unitario neto por la misma unidad de medida, sin valores atípicos. Una diferencia puede tener razones válidas (ubicación, urgencia, calidad o servicios incluidos): úsalo como referencia, no como conclusión.</p>
+  {% endif %}
+  <div class="tarjeta pila" style="background:var(--brand-soft);border-color:transparent;padding:16px 18px">
+    <p style="margin:0"><strong>¿Vendes esto a mejor precio?</strong> Más empresas compitiendo significa mejores precios para el Estado. Calza te avisa por WhatsApp cuando {{ nombre | con_articulo }} publique una licitación que calce contigo.</p>
+    <div><a class="boton" href="/registro">Avísame gratis por {{ dias_prueba }} días</a></div>
+  </div>
+</section>
+{% endif %}
+
 {% if recientes %}
 <section class="pila" style="margin-bottom:32px" aria-labelledby="t-recientes">
   <h2 id="t-recientes">Sus últimas licitaciones</h2>

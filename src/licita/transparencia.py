@@ -17,12 +17,12 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .calce import normalizar
 from .db import Licitacion, Precio, ahora
-from .precios import DISPERSION_MAXIMA, FUENTES_PAGADAS, MESES_HISTORIA, _cuartiles, _sin_atipicos
+from .precios import DISPERSION_MAXIMA, FUENTES_PAGADAS, MESES_HISTORIA, MAXIMO_FILAS, _cuartiles, _sin_atipicos, filas_precio
 
 MINIMO_MERCADO = 10  # compras del resto del Estado para tener una referencia
 MINIMO_ORGANISMO = 2  # compras del organismo
@@ -67,10 +67,13 @@ def comparar_precio(session: Session, organismo: str, codigo: str, *, momento: d
     """Lo que pagó el organismo por el producto frente al resto del Estado, en su unidad de medida más usada."""
     desde = _desde(momento)
     clave_org = normalizar(organismo).strip()
-    todas = list(session.scalars(select(Precio).where(
-        Precio.codigo_producto == codigo, Precio.fuente.in_(FUENTES_PAGADAS), Precio.fecha >= desde)))
-    propias = filas_organismo if filas_organismo is not None else [
-        p for p in todas if normalizar(p.organismo or "").strip() == clave_org]
+    condiciones = (Precio.codigo_producto == codigo, Precio.fuente.in_(FUENTES_PAGADAS), Precio.fecha >= desde)
+    todas = filas_precio(session, *condiciones)  # las 20.000 más recientes del producto bastan para la mediana
+    propias = filas_organismo
+    if propias is None:
+        propias = filas_precio(session, Precio.organismo == organismo, *condiciones)
+        if len(propias) < MINIMO_ORGANISMO:  # el mismo organismo escrito distinto (mayúsculas, tildes)
+            propias = [p for p in todas if normalizar(p.organismo or "").strip() == clave_org]
     if len(propias) < MINIMO_ORGANISMO:
         return None
     unidad = Counter(_unidad(p.unidad) for p in propias).most_common(1)[0][0]
@@ -114,28 +117,21 @@ class IndicadoresOrganismo:
 
 
 def indicadores_organismo(session: Session, organismo: str, momento: datetime | None = None) -> IndicadoresOrganismo:
-    desde = _desde(momento)
-    filas = list(session.scalars(select(Precio).where(
-        Precio.organismo == organismo, Precio.fuente.in_(FUENTES_PAGADAS), Precio.fecha >= desde)))
-    por_origen, por_proveedor, por_codigo = Counter(), Counter(), defaultdict(list)
-    monto_codigo = Counter()
-    for p in filas:
-        monto = p.precio_unitario * (p.cantidad or 1)
-        if p.origen:
-            por_origen[p.origen] += monto
-        if p.proveedor_nombre:
-            por_proveedor[p.proveedor_nombre.strip()] += monto
-        if p.codigo_producto:
-            por_codigo[p.codigo_producto].append(p)
-            monto_codigo[p.codigo_producto] += monto
-    total_origen = sum(por_origen.values())
+    """Las sumas se hacen en la base: una municipalidad grande tiene cientos de miles de líneas de compra."""
+    condiciones = (Precio.organismo == organismo, Precio.fuente.in_(FUENTES_PAGADAS), Precio.fecha >= _desde(momento))
+    monto = func.sum(Precio.precio_unitario * func.coalesce(Precio.cantidad, 1))
+    por_origen = dict(session.execute(
+        select(Precio.origen, monto).where(*condiciones, Precio.origen != "").group_by(Precio.origen)).all())
+    total_origen = sum(m or 0 for m in por_origen.values())
     como_compra = [(NOMBRES_ORIGEN.get(o, o), round(100 * m / total_origen))
-                   for o, m in por_origen.most_common()] if total_origen else []
-    total = sum(por_proveedor.values())
+                   for o, m in sorted(por_origen.items(), key=lambda x: -(x[1] or 0))] if total_origen else []
+    proveedores = session.execute(
+        select(Precio.proveedor_nombre, monto).where(*condiciones, Precio.proveedor_nombre != "")
+        .group_by(Precio.proveedor_nombre).order_by(monto.desc()).limit(2)).all()
+    total = session.scalar(select(monto).where(*condiciones, Precio.proveedor_nombre != "")) or 0
     principal = None
-    if total and len(por_proveedor) >= 2:
-        nombre, monto = por_proveedor.most_common(1)[0]
-        principal = (nombre, round(100 * monto / total))
+    if total and len(proveedores) >= 2:
+        principal = (proveedores[0][0].strip(), round(100 * (proveedores[0][1] or 0) / total))
     oferentes = []
     for (raw,) in session.execute(select(Licitacion.raw).where(
             Licitacion.organismo == organismo, Licitacion.estado_codigo == ESTADO_ADJUDICADA)):
@@ -144,8 +140,11 @@ def indicadores_organismo(session: Session, organismo: str, momento: datetime | 
             oferentes.append(numero)
     un_oferente = (sum(1 for n in oferentes if n == 1), len(oferentes)) if len(oferentes) >= 3 else None
     precios = []
-    for codigo, _ in monto_codigo.most_common(PRODUCTOS_EN_PAGINA * 3):
-        comparado = comparar_precio(session, organismo, codigo, momento=momento, filas_organismo=por_codigo[codigo])
+    codigos = session.execute(
+        select(Precio.codigo_producto).where(*condiciones, Precio.codigo_producto != "")
+        .group_by(Precio.codigo_producto).order_by(monto.desc()).limit(PRODUCTOS_EN_PAGINA * 3)).scalars().all()
+    for codigo in codigos:
+        comparado = comparar_precio(session, organismo, codigo, momento=momento)
         if comparado:
             precios.append(comparado)
         if len(precios) == PRODUCTOS_EN_PAGINA:
@@ -176,8 +175,6 @@ class ProductoGuia:
 
 def productos_con_guia(session: Session, momento: datetime | None = None) -> list[ProductoGuia]:
     """Productos con compras suficientes para una página de precios, del más comprado al menos."""
-    from sqlalchemy import func
-
     filas = session.execute(
         select(Precio.codigo_producto, func.count(), func.count(func.distinct(Precio.organismo)), func.min(Precio.producto))
         .where(Precio.fuente.in_(FUENTES_PAGADAS), Precio.fecha >= _desde(momento), Precio.codigo_producto != "")
@@ -207,12 +204,13 @@ class GuiaPrecio:
 def guia_producto(session: Session, codigo: str, momento: datetime | None = None) -> GuiaPrecio | None:
     """Cuánto paga el Estado por un producto, en su unidad más usada. None si no hay datos suficientes o confiables."""
     momento = momento or ahora()
-    filas = list(session.scalars(select(Precio).where(
-        Precio.codigo_producto == codigo, Precio.fuente.in_(FUENTES_PAGADAS), Precio.fecha >= _desde(momento))))
-    if len(filas) < MINIMO_COMPRAS_GUIA:
+    condiciones = (Precio.codigo_producto == codigo, Precio.fuente.in_(FUENTES_PAGADAS), Precio.fecha >= _desde(momento))
+    unidades = session.execute(select(func.lower(Precio.unidad), func.count()).where(*condiciones)
+                               .group_by(func.lower(Precio.unidad)).order_by(func.count().desc()).limit(1)).first()
+    if unidades is None or unidades[1] < MINIMO_COMPRAS_GUIA:
         return None
-    unidad = Counter(_unidad(p.unidad) for p in filas).most_common(1)[0][0]
-    filas = [p for p in filas if _unidad(p.unidad) == unidad]
+    filas = filas_precio(session, *condiciones, func.lower(Precio.unidad) == unidades[0])
+    unidad = _unidad(unidades[0])
     validos = set(_sin_atipicos([p.precio_unitario for p in filas]))
     filas = [p for p in filas if p.precio_unitario in validos]
     organismos = {normalizar(p.organismo or "").strip() for p in filas}
@@ -234,5 +232,7 @@ def guia_producto(session: Session, codigo: str, momento: datetime | None = None
     if len(recientes) >= 5 and len(anteriores) >= 5:
         tendencia = round((statistics.median(recientes) / statistics.median(anteriores) - 1) * 100)
     nombre = min((" ".join((p.producto or "").split()[:8]) for p in filas if p.producto), key=len, default=codigo)
-    return GuiaPrecio(codigo, nombre, unidad, len(filas), len(organismos), mediana, p25, p75, por_region, proveedores,
+    # La muestra se limita a las compras más recientes: el total sale del conteo en la base.
+    compras = unidades[1] if len(filas) >= MAXIMO_FILAS * 0.9 else len(filas)
+    return GuiaPrecio(codigo, nombre, unidad, compras, len(organismos), mediana, p25, p75, por_region, proveedores,
                       tendencia)

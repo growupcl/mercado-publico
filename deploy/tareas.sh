@@ -22,7 +22,12 @@ fi
 salida=$(mktemp)
 trap 'rm -f "$salida"' EXIT
 estado=0
-docker compose exec -T app licita "$@" > "$salida" 2>&1 || estado=$?
+if [ "$1" = "historico-oc" ]; then
+  # La carga del histórico corre en un contenedor aparte: si la app del sitio se reinicia, no la corta.
+  docker compose run --rm -T --no-deps app licita "$@" > "$salida" 2>&1 || estado=$?
+else
+  docker compose exec -T app licita "$@" > "$salida" 2>&1 || estado=$?
+fi
 {
   echo "== $(date -Is) licita $*"
   cat "$salida"

@@ -46,6 +46,22 @@ RANGO_TAMANO = 4.0
 MAS_GRANDES = 3
 
 
+# Con el histórico completo, un producto común tiene cientos de miles de compras: traerlas todas como objetos llenó la
+# memoria del servidor (1,9 GB) y reiniciaba la app. Para medianas y rangos bastan las más recientes, y solo con las
+# columnas que se usan.
+MAXIMO_FILAS = 20_000
+COLUMNAS_LIVIANAS = (Precio.referencia, Precio.codigo_producto, Precio.producto, Precio.unidad, Precio.precio_unitario,
+                     Precio.cantidad, Precio.proveedor_nombre, Precio.organismo, Precio.region, Precio.fecha,
+                     Precio.origen, Precio.codigo_licitacion)
+
+
+def filas_precio(session: Session, *condiciones, limite: int = MAXIMO_FILAS, columnas=COLUMNAS_LIVIANAS) -> list:
+    """Compras que cumplen las condiciones, de la más reciente a la más antigua, con un tope y solo esas columnas
+    (filas con los mismos nombres de atributo que Precio)."""
+    return session.execute(select(*columnas).where(*condiciones)
+                           .order_by(Precio.fecha.desc().nulls_last()).limit(limite)).all()
+
+
 # --- Carga de precios desde lo sincronizado ---
 
 def _cantidad(valor) -> float | None:
@@ -245,9 +261,9 @@ def _observaciones(
     session: Session, item: dict, desde: datetime, fuentes: tuple[str, ...] = FUENTES_PAGADAS
 ) -> tuple[list[Precio], bool]:
     codigo = str(item.get("codigo_producto") or "")
-    base = select(Precio).where((Precio.fecha.is_(None)) | (Precio.fecha >= desde), Precio.fuente.in_(fuentes))
+    base = ((Precio.fecha.is_(None)) | (Precio.fecha >= desde), Precio.fuente.in_(fuentes))
     if codigo:
-        exactas = list(session.scalars(base.where(Precio.codigo_producto == codigo)))
+        exactas = filas_precio(session, *base, Precio.codigo_producto == codigo)
         if len(exactas) >= MINIMO_OBSERVACIONES:
             return exactas, False
     # Productos parecidos de la misma familia del clasificador.
@@ -255,10 +271,10 @@ def _observaciones(
     if not texto:
         return [], True
     if len(codigo) >= 6:
-        candidatas = session.scalars(base.where(Precio.codigo_producto.startswith(codigo[:6])))
+        candidatas = filas_precio(session, *base, Precio.codigo_producto.startswith(codigo[:6]))
     else:
         # Sin código de producto: con el histórico cargado la tabla tiene millones de filas, se miran las más recientes.
-        candidatas = session.scalars(base.order_by(Precio.fecha.desc()).limit(MAXIMO_SIN_CODIGO))
+        candidatas = filas_precio(session, *base, limite=MAXIMO_SIN_CODIGO)
     parecidas = [p for p in candidatas if texto and len(texto & tokens(p.producto)) / len(texto) >= SIMILITUD_MINIMA]
     return parecidas, True
 

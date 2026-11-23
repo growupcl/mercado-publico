@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from .calce import normalizar
 from .db import Licitacion, Precio, hora_chile
-from .precios import FUENTES_PAGADAS, MESES_HISTORIA, informe_precios
+from .precios import FUENTES_PAGADAS, MESES_HISTORIA, filas_precio, informe_precios
 from .resumen import formato_pesos
 from .transparencia import pago_caro
 
@@ -57,12 +57,19 @@ def _competencia(session: Session, lic: Licitacion, ahora_cl: datetime) -> Senal
     if not codigos or not lic.organismo:
         return None
     desde = ahora_cl - timedelta(days=30 * MESES_HISTORIA)
-    organismo = normalizar(lic.organismo).strip()
+    condiciones = (Precio.codigo_producto.in_(codigos), Precio.fuente.in_(FUENTES_PAGADAS),
+                   (Precio.fecha.is_(None)) | (Precio.fecha >= desde))
+    columnas = (Precio.referencia, Precio.proveedor_nombre, Precio.organismo)
+    # Primero por el nombre exacto (usa el índice); si no alcanza, el mismo organismo escrito distinto (mayúsculas,
+    # tildes) entre las compras recientes de esos productos.
+    filas = filas_precio(session, Precio.organismo == lic.organismo, *condiciones, columnas=columnas)
+    if len({p.referencia for p in filas}) < MINIMO_COMPRAS_COMPETENCIA:
+        organismo = normalizar(lic.organismo).strip()
+        filas = [p for p in filas_precio(session, *condiciones, columnas=columnas)
+                 if normalizar(p.organismo or "").strip() == organismo]
     ganadores: dict[str, str] = {}  # compra → proveedor
-    for p in session.scalars(select(Precio).where(
-            Precio.codigo_producto.in_(codigos), Precio.fuente.in_(FUENTES_PAGADAS),
-            (Precio.fecha.is_(None)) | (Precio.fecha >= desde))):
-        if p.referencia != lic.codigo and p.proveedor_nombre and normalizar(p.organismo or "").strip() == organismo:
+    for p in filas:
+        if p.referencia != lic.codigo and p.proveedor_nombre:
             ganadores.setdefault(p.referencia, p.proveedor_nombre.strip())
     if len(ganadores) < MINIMO_COMPRAS_COMPETENCIA:
         return None

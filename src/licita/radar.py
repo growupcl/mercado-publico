@@ -26,6 +26,7 @@ from .db import AvisoRadar, Calce, Empresa, Licitacion, Precio, ahora, hora_chil
 from .notificaciones import registrar, ventana_abierta
 from .planes import PLANES_CON_PRECIOS
 from .plantillas_whatsapp import SE_VIENE
+from .precios import filas_precio
 from .resumen import MESES, URL_FICHA, formato_pesos
 from .whatsapp import ClienteWhatsApp, ErrorWhatsApp
 
@@ -100,9 +101,9 @@ def calendario_organismo(session: Session, organismo: str, momento: datetime | N
     desde = momento - timedelta(days=30 * MESES_HISTORIA)
     por_codigo: dict[str, dict[str, date]] = defaultdict(dict)  # código de producto → licitación → fecha
     nombres: dict[str, str] = {}
-    for p in session.scalars(select(Precio).where(
-            Precio.organismo == organismo, Precio.origen == "licitacion", Precio.codigo_licitacion != "",
-            Precio.fecha >= desde)):
+    for p in filas_precio(session, Precio.organismo == organismo, Precio.origen == "licitacion",
+                          Precio.codigo_licitacion != "", Precio.fecha >= desde, limite=50_000,
+                          columnas=(Precio.codigo_producto, Precio.codigo_licitacion, Precio.fecha, Precio.producto)):
         if not p.codigo_producto or not p.fecha:
             continue
         actual = por_codigo[p.codigo_producto].get(p.codigo_licitacion)
@@ -152,9 +153,10 @@ def previsiones(session: Session, empresa: Empresa, momento: datetime | None = N
         return []
     desde = momento - timedelta(days=30 * MESES_HISTORIA)
     grupos: dict[tuple[str, str], dict[str, dict]] = defaultdict(dict)  # (organismo, código) → licitación → datos
-    for p in session.scalars(select(Precio).where(
-            Precio.codigo_producto.in_(codigos), Precio.origen == "licitacion", Precio.codigo_licitacion != "",
-            Precio.fecha >= desde)):
+    for p in filas_precio(session, Precio.codigo_producto.in_(codigos), Precio.origen == "licitacion",
+                          Precio.codigo_licitacion != "", Precio.fecha >= desde, limite=100_000,
+                          columnas=(Precio.organismo, Precio.codigo_producto, Precio.codigo_licitacion, Precio.fecha,
+                                    Precio.region, Precio.precio_unitario, Precio.cantidad)):
         if not p.organismo or not p.fecha or not _en_sus_regiones(empresa, p.region):
             continue
         clave = (normalizar(p.organismo).strip(), p.codigo_producto)

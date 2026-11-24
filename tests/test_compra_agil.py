@@ -306,3 +306,16 @@ def test_caida_de_la_api_de_chilecompra_es_aviso_y_no_error(Sesion):
         _empresa(s)
         r = ciclo_compra_agil(s, cliente, ia, None, momento=MOMENTO)
     assert r.errores == [] and len(r.avisos) == 1 and "se reintenta" in r.avisos[0]
+
+
+def test_cuota_agotada_del_ticket_es_aviso_y_no_error(Sesion):
+    from licita.compra_agil import ClienteCompraAgil
+
+    cliente = ClienteCompraAgil("TICKET-PRUEBA", pausa=0, dormir=lambda s: None,
+                                http=httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(429))))
+    ia, _ = _ia({})
+    with Sesion() as s:
+        _empresa(s)
+        r = ciclo_compra_agil(s, cliente, ia, None, momento=MOMENTO)
+    assert r.errores == [] and len(r.avisos) == 1
+    assert "límite de consultas" in r.avisos[0] and "se reintenta" in r.avisos[0]

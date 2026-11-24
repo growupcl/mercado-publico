@@ -33,6 +33,14 @@ MAXIMO_VECES = 10
 # Códigos de servicios y obras (segmentos 70 a 95 del catálogo): su "unidad" suele ser el contrato o la obra entera,
 # que no se puede comparar entre organismos. Solo se comparan bienes.
 PRIMER_SEGMENTO_SERVICIOS = "70"
+# Unidades que delatan un servicio o un contrato aunque el código sea de un bien (software por mes, aljibes "global").
+UNIDADES_DE_SERVICIO = frozenset({
+    "mes", "meses", "mensual", "global", "servicio", "servicios", "unidad no definida", "hora", "horas", "dia", "dias",
+    "jornada", "ano", "anos", "anual", "contrato", "proyecto", "obra", "sesion", "sesiones",
+})
+# Una línea por $10 millones o más con cantidad 1 es un contrato o un lote completo (una obra, la distribución de agua
+# de una temporada, un lote de computadores), no el precio de una unidad.
+PRECIO_CONTRATO = 10_000_000
 PRODUCTOS_EN_PAGINA = 6
 NOMBRES_ORIGEN = {"licitacion": "Licitación", "compra_agil": "Compra Ágil", "convenio_marco": "Convenio Marco",
                   "trato_directo": "Trato directo", "otro": "Otras modalidades"}
@@ -73,23 +81,32 @@ def es_bien(codigo: str) -> bool:
     return len(codigo) >= 2 and codigo[:2].isdigit() and codigo[:2] < PRIMER_SEGMENTO_SERVICIOS
 
 
+def _comparable(p) -> bool:
+    """Si la línea de compra es un precio por unidad que se puede comparar con el de otro organismo."""
+    if _unidad(p.unidad) in UNIDADES_DE_SERVICIO:
+        return False
+    return not ((p.cantidad or 1) <= 1 and p.precio_unitario >= PRECIO_CONTRATO)
+
+
 def comparar_precio(session: Session, organismo: str, codigo: str, *, momento: datetime | None = None,
                     filas_organismo: list[Precio] | None = None) -> PrecioComparado | None:
     """Lo que pagó el organismo por el producto frente al resto del Estado, en su unidad de medida más usada.
 
-    None si no hay una comparación honesta: servicios y obras, pocos datos, un código que mezcla cosas muy distintas
-    o una diferencia tan grande (sobre 10 veces) que casi seguro no es el mismo producto."""
+    None si no hay una comparación honesta: servicios, obras y contratos completos, pocos datos, un código que mezcla
+    cosas muy distintas o una diferencia tan grande (sobre 10 veces) que casi seguro no es el mismo producto."""
     if not es_bien(codigo):
         return None
     desde = _desde(momento)
     clave_org = normalizar(organismo).strip()
     condiciones = (Precio.codigo_producto == codigo, Precio.fuente.in_(FUENTES_PAGADAS), Precio.fecha >= desde)
-    todas = filas_precio(session, *condiciones)  # las 20.000 más recientes del producto bastan para la mediana
+    # Las 20.000 más recientes del producto bastan para la mediana.
+    todas = [p for p in filas_precio(session, *condiciones) if _comparable(p)]
     propias = filas_organismo
     if propias is None:
         propias = filas_precio(session, Precio.organismo == organismo, *condiciones)
         if len(propias) < MINIMO_ORGANISMO:  # el mismo organismo escrito distinto (mayúsculas, tildes)
             propias = [p for p in todas if normalizar(p.organismo or "").strip() == clave_org]
+    propias = [p for p in propias if _comparable(p)]
     if len(propias) < MINIMO_ORGANISMO:
         return None
     unidad = Counter(_unidad(p.unidad) for p in propias).most_common(1)[0][0]

@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from .alertas import ResultadoAlertas, enviar_alertas_compra_agil
 from .calce import buscar_calces, interes_de_clientes
-from .compra_agil import ApiNoDisponible, ClienteCompraAgil, ResumenCompraAgil, sincronizar_compras_agiles
+from .compra_agil import ApiNoDisponible, ClienteCompraAgil, CuotaAgotada, ResumenCompraAgil, sincronizar_compras_agiles
 from .db import Empresa, hoy_en_chile
 from .planes import PLANES_CON_COMPRA_AGIL
 from .whatsapp import ClienteWhatsApp
@@ -123,6 +123,12 @@ def ciclo_compra_agil(
             # Caída de ChileCompra: no es un error de Calza. Lo que no se trajo ahora llega en la próxima ejecución.
             session.rollback()
             resultado.avisos.append(f"compra ágil: {e}; se reintenta en la próxima ejecución")
+        except CuotaAgotada:
+            # El ticket tiene un tope diario de consultas: al agotarlo no hay nada que arreglar, la cuota se repone sola.
+            # Lo que ya se guardó queda; el resto llega cuando vuelva la cuota.
+            session.rollback()
+            resultado.avisos.append("compra ágil: se alcanzó el límite de consultas del ticket (HTTP 429); "
+                                    "se reintenta en la próxima ejecución")
         except MercadoPublicoError as e:
             session.rollback()
             resultado.errores.append(f"compra ágil: {e}")

@@ -158,3 +158,26 @@ def test_no_compara_servicios_ni_diferencias_imposibles(Sesion):
         assert comparar_precio(s, ORG, nefrologia, momento=UTC) is None  # servicio: no se compara
         assert comparar_precio(s, ORG, GUANTES, momento=UTC) is None  # más de 10 veces: no es el mismo producto
         assert indicadores_organismo(s, ORG, momento=UTC).precios == []
+
+
+def test_no_compara_contratos_completos_ni_unidades_de_servicio(Sesion):
+    """Casos reales: la PDI registró un lote de computadores de $211 millones como "1 unidad"; una municipalidad
+    arrienda software por mes. No son precios por unidad."""
+    computadores, software = "43211507", "43231500"
+    with Sesion() as s:
+        for i in range(12):
+            _precio(s, f"PC-{i}", 550_000 + i * 1000, organismo=f"HOSPITAL {i}", codigo=computadores, unidad="Unidad")
+            _precio(s, f"SW-{i}", 680_000 + i * 1000, organismo=f"HOSPITAL {i}", codigo=software, unidad="Mes")
+        _precio(s, "PDI-1", 211_276_124, organismo=ORG, codigo=computadores, unidad="Unidad", cantidad=1)
+        _precio(s, "PDI-2", 33_391_505, organismo=ORG, codigo=computadores, unidad="Unidad", cantidad=1)
+        _precio(s, "M-1", 3_459_387, organismo=ORG, codigo=software, unidad="Mes")
+        _precio(s, "M-2", 3_500_000, organismo=ORG, codigo=software, unidad="Mes")
+        s.commit()
+        assert comparar_precio(s, ORG, computadores, momento=UTC) is None
+        assert comparar_precio(s, ORG, software, momento=UTC) is None
+        # Si además compró computadores por unidad, esos sí se comparan.
+        _precio(s, "PDI-3", 1_200_000, organismo=ORG, codigo=computadores, unidad="Unidad", cantidad=20)
+        _precio(s, "PDI-4", 1_300_000, organismo=ORG, codigo=computadores, unidad="Unidad", cantidad=10)
+        s.commit()
+        c = comparar_precio(s, ORG, computadores, momento=UTC)
+        assert c.compras_organismo == 2 and c.mediana_organismo == 1_250_000

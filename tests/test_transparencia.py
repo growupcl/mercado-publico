@@ -140,3 +140,21 @@ def test_paginas_de_la_guia(Sesion):
     sitemap = cliente.get("/sitemap.xml").text
     assert "https://calza.cl/precios<" in sitemap and f"https://calza.cl{enlace}<" in sitemap
     assert 'href="/precios"' in cliente.get("/").text  # enlazada desde el pie de página
+
+
+def test_no_compara_servicios_ni_diferencias_imposibles(Sesion):
+    """Casos reales: FONASA contrata diálisis por contrato anual y el resto por sesión; CENABAST compra un remedio de
+    $25 millones con el mismo código que unas cápsulas de $1.000. Ninguno es un sobreprecio."""
+    nefrologia = "85121608"
+    with Sesion() as s:
+        _mercado(s)
+        for i in range(12):
+            _precio(s, f"N-{i}", 370_000 + i * 1000, organismo=f"HOSPITAL {i}", codigo=nefrologia)
+        _precio(s, "F-1", 2_568_384_000, organismo=ORG, codigo=nefrologia)
+        _precio(s, "F-2", 2_600_000_000, organismo=ORG, codigo=nefrologia)
+        _precio(s, "C-1", 24_900_000, organismo=ORG)
+        _precio(s, "C-2", 23_896_000, organismo=ORG)
+        s.commit()
+        assert comparar_precio(s, ORG, nefrologia, momento=UTC) is None  # servicio: no se compara
+        assert comparar_precio(s, ORG, GUANTES, momento=UTC) is None  # más de 10 veces: no es el mismo producto
+        assert indicadores_organismo(s, ORG, momento=UTC).precios == []

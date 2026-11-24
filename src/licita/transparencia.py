@@ -27,6 +27,12 @@ from .precios import DISPERSION_MAXIMA, FUENTES_PAGADAS, MESES_HISTORIA, MAXIMO_
 MINIMO_MERCADO = 10  # compras del resto del Estado para tener una referencia
 MINIMO_ORGANISMO = 2  # compras del organismo
 UMBRAL_OPORTUNIDAD = 1.8  # paga 1,8 veces o más que el resto: se le avisa al cliente
+# Sobre 10 veces casi nunca es el mismo producto: el código mezcla cosas distintas (un remedio de $25 millones la caja
+# con cápsulas de $1.000) o la "unidad" de uno es un contrato completo y la del resto una sesión.
+MAXIMO_VECES = 10
+# Códigos de servicios y obras (segmentos 70 a 95 del catálogo): su "unidad" suele ser el contrato o la obra entera,
+# que no se puede comparar entre organismos. Solo se comparan bienes.
+PRIMER_SEGMENTO_SERVICIOS = "70"
 PRODUCTOS_EN_PAGINA = 6
 NOMBRES_ORIGEN = {"licitacion": "Licitación", "compra_agil": "Compra Ágil", "convenio_marco": "Convenio Marco",
                   "trato_directo": "Trato directo", "otro": "Otras modalidades"}
@@ -62,9 +68,19 @@ class PrecioComparado:
         return "igual" if abs(pct) < 5 else f"{pct:+d}%"
 
 
+def es_bien(codigo: str) -> bool:
+    """Bienes del catálogo de Mercado Público: los servicios y las obras no tienen un precio unitario comparable."""
+    return len(codigo) >= 2 and codigo[:2].isdigit() and codigo[:2] < PRIMER_SEGMENTO_SERVICIOS
+
+
 def comparar_precio(session: Session, organismo: str, codigo: str, *, momento: datetime | None = None,
                     filas_organismo: list[Precio] | None = None) -> PrecioComparado | None:
-    """Lo que pagó el organismo por el producto frente al resto del Estado, en su unidad de medida más usada."""
+    """Lo que pagó el organismo por el producto frente al resto del Estado, en su unidad de medida más usada.
+
+    None si no hay una comparación honesta: servicios y obras, pocos datos, un código que mezcla cosas muy distintas
+    o una diferencia tan grande (sobre 10 veces) que casi seguro no es el mismo producto."""
+    if not es_bien(codigo):
+        return None
     desde = _desde(momento)
     clave_org = normalizar(organismo).strip()
     condiciones = (Precio.codigo_producto == codigo, Precio.fuente.in_(FUENTES_PAGADAS), Precio.fecha >= desde)
@@ -86,9 +102,11 @@ def comparar_precio(session: Session, organismo: str, codigo: str, *, momento: d
     p25, mediana_estado, p75 = _cuartiles(resto)
     if mediana_estado <= 0 or (p25 > 0 and p75 / p25 > DISPERSION_MAXIMA):
         return None  # el código mezcla cosas de tamaños muy distintos: no hay referencia honesta
+    mediana_organismo = statistics.median(p.precio_unitario for p in propias)
+    if not 1 / MAXIMO_VECES <= mediana_organismo / mediana_estado <= MAXIMO_VECES:
+        return None
     nombre = min((" ".join((p.producto or "").split()[:8]) for p in propias if p.producto), key=len, default=codigo)
-    return PrecioComparado(codigo, nombre, unidad, statistics.median(p.precio_unitario for p in propias),
-                           mediana_estado, len(propias), len(resto))
+    return PrecioComparado(codigo, nombre, unidad, mediana_organismo, mediana_estado, len(propias), len(resto))
 
 
 def pago_caro(session: Session, lic: Licitacion, momento: datetime | None = None) -> PrecioComparado | None:
@@ -141,7 +159,8 @@ def indicadores_organismo(session: Session, organismo: str, momento: datetime | 
     un_oferente = (sum(1 for n in oferentes if n == 1), len(oferentes)) if len(oferentes) >= 3 else None
     precios = []
     codigos = session.execute(
-        select(Precio.codigo_producto).where(*condiciones, Precio.codigo_producto != "")
+        select(Precio.codigo_producto).where(*condiciones, Precio.codigo_producto != "",
+                                             Precio.codigo_producto < PRIMER_SEGMENTO_SERVICIOS)
         .group_by(Precio.codigo_producto).order_by(monto.desc()).limit(PRODUCTOS_EN_PAGINA * 3)).scalars().all()
     for codigo in codigos:
         comparado = comparar_precio(session, organismo, codigo, momento=momento)
